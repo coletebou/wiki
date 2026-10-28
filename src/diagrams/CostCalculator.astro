@@ -3,6 +3,7 @@
 // shown. Pick a preset or set each line; the totals follow. Taxes, overages beyond the lines here, and usage-billed
 // extras are not included.
 import prices from '../data/prices.json';
+import { HATCH_TURN } from './ink';
 
 type P = { label: string; amount: number; period: string; unit?: string; display: string; asOf: string; source: string; note?: string; unverified?: boolean };
 const all = prices as Record<string, P>;
@@ -68,6 +69,45 @@ const data = JSON.stringify({ lines, presets, prices: priceData, limits: LIMITS 
 const groups = [...new Set(lines.map((l) => l.group))];
 const host = (u: string) => new URL(u).hostname.replace(/^www\./, '');
 const fmtDate = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+// A balance, drawn above the totals: coins in one pan, a toothed wheel in the other, and the machines outweigh their price.
+const beamTilt = -4.2;
+const rad = (beamTilt * Math.PI) / 180;
+const pivot = { x: 130, y: 22 };
+const beamEnd = (s: number) => ({ x: pivot.x + s * 78 * Math.cos(rad), y: pivot.y - s * 78 * Math.sin(rad) });
+const panL = beamEnd(-1);
+const panR = beamEnd(1);
+const panDrop = 40;
+const pan = (e: { x: number; y: number }) => {
+  const y = e.y + panDrop;
+  return {
+    chains: `M${e.x} ${e.y + 2}L${e.x - 21} ${y}M${e.x} ${e.y + 2}L${e.x + 21} ${y}M${e.x} ${e.y + 2}L${e.x} ${y - 1}`,
+    bowl: `M${e.x - 23} ${y}Q${e.x} ${y + 13} ${e.x + 23} ${y}Z`,
+    shade: `M${e.x - 4} ${y + 6.4}Q${e.x + 10} ${y + 6} ${e.x + 21} ${y + 1.2}L${e.x + 23} ${y}Q${e.x + 12} ${y + 9.6} ${e.x - 4} ${y + 6.4}Z`,
+    y,
+  };
+};
+const pans = [pan(panL), pan(panR)];
+// The beam: thickest over the pivot, thinning to a ring at each end.
+const beam = (() => {
+  const along = { x: Math.cos(rad), y: -Math.sin(rad) };
+  const across = { x: -along.y, y: along.x };
+  const at = (u: number, h: number) => `${(pivot.x + along.x * u + across.x * h).toFixed(1)} ${(pivot.y + along.y * u + across.y * h).toFixed(1)}`;
+  const us = [-76, -40, 0, 40, 76];
+  const half = (u: number) => 2.4 - (1.5 * Math.abs(u)) / 76;
+  return `M${us.map((u) => at(u, -half(u))).join('L')}L${us.slice().reverse().map((u) => at(u, half(u))).join('L')}Z`;
+})();
+const coins = Array.from({ length: 5 }, (_, i) => ({ cx: panL.x + (i === 4 ? 6 : -2 + (i % 2) * 2), cy: pans[0].y - 2.2 - i * 3.3 }));
+const gear = (() => {
+  const c = { x: panR.x, y: pans[1].y - 9 };
+  const pts: string[] = [];
+  const teeth = 10;
+  for (let i = 0; i < teeth; i++) {
+    const a = (i / teeth) * Math.PI * 2;
+    const w = (Math.PI * 2) / teeth;
+    for (const [f, r] of [[0, 7], [0.14, 9.6], [0.44, 9.6], [0.58, 7]] as const) pts.push(`${(c.x + Math.cos(a + f * w) * r).toFixed(1)} ${(c.y + Math.sin(a + f * w) * r).toFixed(1)}`);
+  }
+  return { rim: `M${pts.join('L')}Z`, c };
+})();
 const short = (id: string, none = 'None') => (id === 'none' ? none : all[id].label.replace(/^(Cloudflare|Vercel|Tailscale|GitHub|Claude|ChatGPT|Sentry|Langfuse|Datadog) /, ''));
 ---
 <figure class="study calc" data-pagefind-ignore aria-labelledby="calc-title">
@@ -81,6 +121,45 @@ const short = (id: string, none = 'None') => (id === 'none' ? none : all[id].lab
     ))}
   </div>
   <p class="calc-note" aria-live="polite">{presets.cole.note}</p>
+
+  <svg class="study-svg calc-libra" viewBox="0 0 260 104" aria-hidden="true" focusable="false">
+    <defs>
+      <pattern id="calc-hatch" width="3.2" height="3.2" patternUnits="userSpaceOnUse" patternTransform={`rotate(${HATCH_TURN})`}>
+        <line x1="0" y1="0" x2="0" y2="3.2" stroke="currentColor" stroke-width="0.7" opacity="0.55" />
+      </pattern>
+    </defs>
+    <path class="ink-fine" d="M100 98H160M92 101.5H168" />
+    <path class="ink paper" d="M110 98L114 91H146L150 98Z" />
+    <path class="ink paper" d="M124 91V30H136V91" />
+    <path d="M130.5 31.5H135.4V90.4H130.5Z" fill="url(#calc-hatch)" />
+    <path class="ink-fine" d="M127 34V88M130 34V88M133 34V88" />
+    <path class="ink paper" d="M120 30H140L136 26H124Z" />
+    <path class="ink paper" d={beam} />
+    {[panL, panR].map((e) => <circle class="ink paper" cx={e.x} cy={e.y} r="1.9" />)}
+    <path class="ink paper" d={`M${pivot.x - 3.6} ${pivot.y + 5}L${pivot.x} ${pivot.y - 4}L${pivot.x + 3.6} ${pivot.y + 5}Z`} />
+    <circle class="ink paper" cx={pivot.x} cy={pivot.y} r="2.2" />
+    <path class="chalk" d={`M${pivot.x} ${pivot.y - 6}V${pivot.y - 14}`} />
+    <path class="ink-fine" d={`M${pivot.x - 7} ${pivot.y - 11}A8 8 0 0 1 ${pivot.x + 7} ${pivot.y - 11}`} />
+    {pans.map((p) => (
+      <>
+        <path class="ink-fine" d={p.chains} />
+        <path class="ink paper" d={p.bowl} />
+        <path d={p.shade} fill="url(#calc-hatch)" stroke="none" />
+      </>
+    ))}
+    {coins.map((c) => (
+      <>
+        <path class="ink paper" d={`M${c.cx - 8} ${c.cy}V${c.cy + 2}A8 2.6 0 0 0 ${c.cx + 8} ${c.cy + 2}V${c.cy}`} />
+        <ellipse class="ink paper" cx={c.cx} cy={c.cy} rx="8" ry="2.6" />
+      </>
+    ))}
+    <path class="ink paper" d={gear.rim} />
+    <circle class="ink" cx={gear.c.x} cy={gear.c.y} r="2.4" />
+    <path class="ink-fine" d={`M${gear.c.x} ${gear.c.y - 6.6}V${gear.c.y + 6.6}M${gear.c.x - 6.6} ${gear.c.y}H${gear.c.x + 6.6}`} />
+    <text class="label-hand" x="88" y="99" text-anchor="end">libra</text>
+    <text class="libra-label" x={panL.x} y={pans[0].y + 22} text-anchor="middle">pretium</text>
+    <text class="libra-label" x={panR.x} y={pans[1].y + 22} text-anchor="middle">machinae</text>
+  </svg>
 
   <div class="calc-totals" aria-live="polite">
     <div><span class="t-label">Each month</span><span class="t-value" data-total="month">$0</span></div>
@@ -141,11 +220,29 @@ const short = (id: string, none = 'None') => (id === 'none' ? none : all[id].lab
     gap: 0.5rem;
     margin: 0 0 1rem;
   }
+  .calc-libra {
+    width: min(100%, 17rem);
+    margin: 0 auto 0.4rem;
+  }
+  .calc-libra .paper {
+    fill: var(--paper);
+  }
+  .calc-libra .libra-label {
+    font-size: 9.5px;
+    font-style: italic;
+    fill: var(--ink-3);
+  }
+  .calc-libra .label-hand {
+    font-size: 19px;
+    opacity: 0.75;
+  }
+  /* Each total a ruled cartouche, its sum underlined twice, as a ledger closes a column. */
   .calc-totals > div {
-    padding: 0.6rem 0.8rem;
+    padding: 0.6rem 0.8rem 0.7rem;
     border: 1px solid var(--rule);
-    border-radius: 3px;
+    border-radius: 2px;
     background: var(--paper);
+    box-shadow: inset 0 0 0 3px var(--paper), inset 0 0 0 3.6px color-mix(in srgb, var(--rule) 70%, transparent);
     text-align: center;
   }
   .t-label {
@@ -157,17 +254,28 @@ const short = (id: string, none = 'None') => (id === 'none' ? none : all[id].lab
     color: var(--ink-3);
   }
   .t-value {
-    display: block;
+    display: inline-block;
+    padding: 0 0.15em 0.05em;
     font-size: 1.6rem;
     line-height: 1.2;
     font-variant-numeric: lining-nums tabular-nums;
     color: var(--sanguine);
+    border-bottom: 3px double color-mix(in srgb, var(--sanguine) 70%, transparent);
   }
   .calc-form fieldset {
     margin: 0 0 0.9rem;
     padding: 0.2rem 0 0.4rem;
     border: 0;
     border-top: 1px solid var(--rule);
+  }
+  .calc-form legend::before {
+    /* The rubricator's mark, as before every section of the text. */
+    content: '¶';
+    content: '¶' / '';
+    margin-right: 0.45em;
+    font-family: var(--font-text);
+    letter-spacing: 0;
+    color: var(--sanguine-2);
   }
   .calc-form legend {
     padding-right: 0.6rem;

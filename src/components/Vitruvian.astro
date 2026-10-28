@@ -1,0 +1,840 @@
+---
+// The frontispiece: Leonardo's Vitruvian man, redrawn as the beast. One man in two poses inscribed in the circle
+// and the square, on Vitruvius' own measures (the head an eighth of the height, the navel the circle's centre, the
+// arms' span the height). The machine is drawn into him: a prompt at the navel, the square's four quarters numbered as
+// tmux numbers its panes, and instruments in the margins. Everything is computed here, at build time, into plain
+// strokes: the limbs from a skeleton and a width at each point along it, the hatching from the side of each form that
+// faces away from the light, which falls from the upper left. The hatching runs from upper left to lower right, the
+// way Leonardo's left hand drew it. Ornament only: hidden from assistive technology.
+type P = [number, number];
+
+const S = 240; // the square's side: the man's height
+const CX = 200; // the axis
+const TOP = 120; // the crown, on the square's top
+const FOOT = TOP + S; // the soles, on the square's foot
+const R = 146; // the circle: from the navel to the soles, 0.608 of the height
+const NAVEL: P = [CX, FOOT - R];
+const LIGHT: P = unit([1, 1.25]);
+
+function add(a: P, b: P): P {
+  return [a[0] + b[0], a[1] + b[1]];
+}
+function sub(a: P, b: P): P {
+  return [a[0] - b[0], a[1] - b[1]];
+}
+function mul(a: P, k: number): P {
+  return [a[0] * k, a[1] * k];
+}
+function len(a: P) {
+  return Math.hypot(a[0], a[1]);
+}
+function unit(a: P): P {
+  return mul(a, 1 / (len(a) || 1));
+}
+const dot = (a: P, b: P) => a[0] * b[0] + a[1] * b[1];
+const mx = (p: P): P => [2 * CX - p[0], p[1]];
+const r1 = (n: number) => Math.round(n * 10) / 10;
+const xy = (p: P) => `${r1(p[0])} ${r1(p[1])}`;
+const onCircle = (deg: number, r = R): P => [NAVEL[0] + r * Math.sin((deg * Math.PI) / 180), NAVEL[1] + r * Math.cos((deg * Math.PI) / 180)];
+
+/** A smooth curve through the points (Catmull-Rom as cubic Béziers). */
+function smooth(pts: P[], closed = false, k = 1 / 6): string {
+  const n = pts.length;
+  if (n < 2) return '';
+  const at = (i: number) => (closed ? pts[(i + n) % n] : pts[Math.max(0, Math.min(n - 1, i))]);
+  let d = `M${xy(pts[0])}`;
+  for (let i = 0; i < (closed ? n : n - 1); i++) {
+    const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+    d += `C${xy([p1[0] + (p2[0] - p0[0]) * k, p1[1] + (p2[1] - p0[1]) * k])} ${xy([p2[0] - (p3[0] - p1[0]) * k, p2[1] - (p3[1] - p1[1]) * k])} ${xy(p2)}`;
+  }
+  return closed ? `${d}Z` : d;
+}
+const poly = (pts: P[]) => `M${pts.map(xy).join('L')}Z`;
+/** A clip region needs no tenths: its outer edge already runs past the contour it hugs. */
+const zone = (pts: P[]) => `M${pts.map((p) => `${Math.round(p[0])} ${Math.round(p[1])}`).join('L')}Z`;
+
+/** A point and its direction at fraction t of the way along a polyline. */
+function walker(spine: P[]) {
+  const segs = spine.slice(1).map((p, i) => len(sub(p, spine[i])));
+  const total = segs.reduce((a, b) => a + b, 0);
+  const at = (t: number): P => {
+    let d = Math.max(0, Math.min(1, t)) * total;
+    for (let i = 0; i < segs.length; i++) {
+      if (d <= segs[i] || i === segs.length - 1) return add(spine[i], mul(sub(spine[i + 1], spine[i]), Math.min(1, d / segs[i])));
+      d -= segs[i];
+    }
+    return spine[spine.length - 1];
+  };
+  const dir = (t: number): P => unit(sub(at(Math.min(1, t + 0.035)), at(Math.max(0, t - 0.035))));
+  return { at, dir, total };
+}
+
+/** A width that eases through keyframes [t, a, b] (Hermite through Catmull-Rom tangents). */
+function easing(keys: number[][], col: number) {
+  return (t: number) => {
+    let i = 0;
+    while (i < keys.length - 2 && t > keys[i + 1][0]) i++;
+    const [k0, k1, k2, k3] = [keys[Math.max(0, i - 1)], keys[i], keys[i + 1], keys[Math.min(keys.length - 1, i + 2)]];
+    const h = k2[0] - k1[0] || 1;
+    const s = Math.max(0, Math.min(1, (t - k1[0]) / h));
+    const m1 = ((k2[col] - k0[col]) / (k2[0] - k0[0] || 1)) * h;
+    const m2 = ((k3[col] - k1[col]) / (k3[0] - k1[0] || 1)) * h;
+    const s2 = s * s;
+    const s3 = s2 * s;
+    return (2 * s3 - 3 * s2 + 1) * k1[col] + (s3 - 2 * s2 + s) * m1 + (-2 * s3 + 3 * s2) * k2[col] + (s3 - s2) * m2;
+  };
+}
+
+interface Limb {
+  /** Contour on side a (to the left of travel on screen: up for a limb drawn rightward, right for one drawn down). */
+  a: string;
+  b: string;
+  /** Both sides joined round the far end, for an arm and its hand. */
+  whole: string;
+  /** The heavier line on the side away from the light. */
+  weight: string;
+  shade: P[][];
+  deep: P[][];
+}
+/** A limb from its bones and its widths: two contours, and the bands of shadow inside them. */
+function limb(spine: P[], keys: number[][], o: { from?: number; to?: number; fromB?: number } = {}): Limb {
+  const { at, dir, total } = walker(spine);
+  const wa = easing(keys, 1);
+  const wb = easing(keys, 2);
+  const from = o.from ?? 0;
+  const fromB = o.fromB ?? from;
+  const to = o.to ?? 1;
+  const side = (t: number, s: 1 | -1): P => {
+    const d = dir(t);
+    return add(at(t), mul([d[1], -d[0]], s * (s === 1 ? wa(t) : wb(t))));
+  };
+  const n = Math.max(10, Math.round(total / 4.5));
+  const ts = (f: number) => Array.from({ length: n + 1 }, (_, i) => f + ((to - f) * i) / n);
+  const A = ts(from).map((t) => side(t, 1));
+  const B = ts(fromB).map((t) => side(t, -1));
+  // The heavier line: the stretches of each contour that turn away from the light.
+  const weights: string[] = [];
+  for (const [pts, list, s] of [[A, ts(from), 1], [B, ts(fromB), -1]] as const) {
+    let run: P[] = [];
+    list.forEach((t, i) => {
+      const d = dir(t);
+      if (dot(mul([d[1], -d[0]], s), LIGHT) > 0.2 && i > 0 && i < list.length - 1) run.push(pts[i]);
+      else {
+        if (run.length > 2) weights.push(smooth(run));
+        run = [];
+      }
+    });
+    if (run.length > 2) weights.push(smooth(run));
+  }
+  const whole = smooth([...A, ...B.slice().reverse()]);
+  // Shadow: on each side, a band whose depth follows how far that side turns from the light, ending in staggered
+  // strokes like a hand's.
+  const shade: P[][] = [];
+  const deep: P[][] = [];
+  for (const s of [1, -1] as const) {
+    const m = Math.max(20, Math.round(total / 2));
+    let run: { out: P; inn: P; dp: P }[] = [];
+    const flush = () => {
+      if (run.length > 3) {
+        shade.push([...run.map((r) => r.out), ...run.map((r) => r.inn).reverse()]);
+        const deepRun = run.filter((r) => len(sub(r.dp, r.out)) > 0.3);
+        if (deepRun.length > 3) deep.push([...deepRun.map((r) => r.out), ...deepRun.map((r) => r.dp).reverse()]);
+      }
+      run = [];
+    };
+    for (let i = 0; i <= m; i++) {
+      const t = (s === 1 ? from : fromB) + ((to - (s === 1 ? from : fromB)) * i) / m;
+      const d = dir(t);
+      const nrm = mul([d[1], -d[0]], s);
+      const w = s === 1 ? wa(t) : wb(t);
+      const facing = dot(nrm, LIGHT);
+      const env = Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, (t - from) / (to - from || 1)))), 0.45);
+      if (facing > 0.12) {
+        const depth = w * (0.34 + 0.56 * facing) * env * (i % 2 ? 0.86 : 1.06);
+        const out = add(at(t), mul(nrm, w + 0.4));
+        const inn = add(at(t), mul(nrm, w - depth));
+        const dp = add(at(t), mul(nrm, w - (facing > 0.68 ? depth * 0.48 * (i % 3 ? 0.85 : 1.1) : 0)));
+        run.push({ out, inn, dp });
+      } else flush();
+    }
+    flush();
+  }
+  return { a: smooth(A), b: smooth(B), whole, weight: weights.join(''), shade, deep };
+}
+
+/** Mirror a path's coordinates across the axis (only for paths of absolute M, L, C and Z commands). */
+function mirrorD(d: string): string {
+  return d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (_, x, y) => `${r1(2 * CX - Number(x))} ${y}`);
+}
+
+// ── The bones ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Right side of the page; the left is the mirror image. Heights after Vitruvius: chin at an eighth, the nipples at a
+// quarter, the groin at the half, the knee a quarter up from the soles; an arm from shoulder to fingertip is a little
+// under half the span.
+const SHOULDER: P = [221, 167];
+const flatArm: P[] = [SHOULDER, [272, 167.4], [297, 167], [CX + S / 2, 166.6]];
+// The raised arm: the middle finger on the circle, level with the crown.
+const raisedShoulder: P = [221, 163.5];
+// "Raise your arms till your middle fingers touch the level of the top of your head": the fingertip is where the
+// circle crosses the crown's height.
+const raisedTip = onCircle(180 - (Math.acos((TOP - NAVEL[1]) / -R) * 180) / Math.PI);
+const along = (p: P, q: P, t: number): P => add(p, mul(sub(q, p), t));
+const raisedArm: P[] = [raisedShoulder, along(raisedShoulder, raisedTip, 0.5), along(raisedShoulder, raisedTip, 0.76), raisedTip];
+
+const ARM_KEYS = [
+  [0, 8, 9.8],
+  [0.08, 9.7, 8.4],
+  [0.16, 8.7, 7.6],
+  [0.25, 6.6, 6.9],
+  [0.35, 6.5, 7.1],
+  [0.45, 5.1, 5.4],
+  [0.51, 4.6, 4.6],
+  [0.58, 6.1, 5.3],
+  [0.7, 4.3, 3.9],
+  [0.77, 3.1, 3.0],
+  [0.84, 3.8, 3.5],
+  [0.93, 3.4, 3.0],
+  [0.985, 2.1, 1.8],
+  [1, 0.7, 0.7],
+];
+const HIP: P = [211, 238];
+const flatLeg: P[] = [HIP, [207.8, 298], [206.6, 350]];
+// Outside, then inside: the hip, the long swell of the outer thigh, the inner thigh's teardrop just above the knee, the
+// knee, the calf (its inner head higher and fuller), the narrowing to the ankle and its bones.
+const LEG_KEYS = [
+  [0, 13.6, 9],
+  [0.08, 13.2, 9.8],
+  [0.2, 12.6, 9.4],
+  [0.33, 11.2, 8.4],
+  [0.42, 9.4, 8.6],
+  [0.48, 8.0, 8.4],
+  [0.54, 6.9, 6.6],
+  [0.6, 7.6, 7.6],
+  [0.66, 8.1, 7.4],
+  [0.74, 6.9, 6.0],
+  [0.84, 4.9, 4.3],
+  [0.94, 3.7, 3.5],
+  [1, 4.4, 4.2],
+];
+// The spread leg: "the space between the legs will be an equilateral triangle", so each leg leans 30 degrees, and
+// reaches until its ankle stands just inside the circle, the sole on it.
+function spreadAnkle() {
+  const dir = unit([Math.sin(Math.PI / 6), Math.cos(Math.PI / 6)]);
+  let a = 80;
+  let b = 140;
+  for (let i = 0; i < 40; i++) {
+    const m = (a + b) / 2;
+    if (len(sub(add(HIP, mul(dir, m)), NAVEL)) < R - 9.5) a = m;
+    else b = m;
+  }
+  const ankle = add(HIP, mul(dir, (a + b) / 2));
+  return { ankle, deg: (Math.atan2(ankle[0] - NAVEL[0], ankle[1] - NAVEL[1]) * 180) / Math.PI };
+}
+const spread = spreadAnkle();
+const spreadLeg: P[] = [HIP, add(along(HIP, spread.ankle, 0.53), [1.2, -0.6]), spread.ankle];
+
+const arms = [limb(flatArm, ARM_KEYS), limb(raisedArm, ARM_KEYS)];
+const legs = [limb(flatLeg, LEG_KEYS, { fromB: 0.03 }), limb(spreadLeg, LEG_KEYS, { fromB: 0.03 })];
+// The left side, drawn from the mirrored bones so that its shadow falls on its own right.
+const mirrorBones = (b: P[]) => b.map(mx);
+const armsL = [limb(mirrorBones(flatArm), ARM_KEYS.map(([t, a, b]) => [t, b, a])), limb(mirrorBones(raisedArm), ARM_KEYS.map(([t, a, b]) => [t, b, a]))];
+const legsL = [limb(mirrorBones(flatLeg), LEG_KEYS.map(([t, a, b]) => [t, b, a]), { from: 0.03 }), limb(mirrorBones(spreadLeg), LEG_KEYS.map(([t, a, b]) => [t, b, a]), { from: 0.03 })];
+
+/** A foot in profile: ankle, toe direction, the sole's normal (pointing to the ground), its length. */
+function foot(ank: P, toe: P, down: P, L: number) {
+  const f = unit(toe);
+  const v = unit(down);
+  const q = (u: number, w: number): P => add(ank, add(mul(f, u * L), mul(v, w * L)));
+  // The shin's front down over the instep to the toes; the toes round under to the ball, the arch lifts, the heel
+  // rounds and climbs into the tendon.
+  const top = smooth([q(0.11, -0.24), q(0.15, -0.1), q(0.3, -0.01), q(0.5, 0.075), q(0.68, 0.135), q(0.83, 0.175), q(0.93, 0.215)]);
+  const sole = smooth([q(0.93, 0.215), q(0.935, 0.26), q(0.86, 0.29), q(0.66, 0.3), q(0.42, 0.268), q(0.16, 0.296), q(0.02, 0.305), q(-0.09, 0.28), q(-0.15, 0.19), q(-0.13, 0.03), q(-0.1, -0.22)]);
+  const toes = `M${xy(q(0.76, 0.16))}Q${xy(q(0.8, 0.23))} ${xy(q(0.79, 0.29))}M${xy(q(0.85, 0.18))}Q${xy(q(0.88, 0.235))} ${xy(q(0.87, 0.282))}`;
+  const ankleBone = `M${xy(q(-0.03, -0.02))}Q${xy(q(0.03, -0.06))} ${xy(q(0.06, 0.02))}`;
+  const shade = [q(0.16, 0.3), q(0.42, 0.272), q(0.66, 0.304), q(0.86, 0.294), q(0.84, 0.25), q(0.64, 0.25), q(0.42, 0.226), q(0.18, 0.25)];
+  return { d: top + sole, fine: toes + ankleBone, shade };
+}
+// Turned out and toward us, so a little foreshortened.
+const flatFoot = foot(flatLeg[2], [1, 0.3], [0.12, 1], 24);
+const spreadFootR = foot(spread.ankle, [Math.cos((spread.deg * Math.PI) / 180), -Math.sin((spread.deg * Math.PI) / 180)], [Math.sin((spread.deg * Math.PI) / 180), Math.cos((spread.deg * Math.PI) / 180)], 29);
+const feetR = [flatFoot, spreadFootR];
+
+// ── The trunk, the neck and the head (right half, mirrored) ──────────────────────────────────────────────────
+const trunkSide: P[] = [[223, 175.5], [224.6, 184], [224, 194], [221.8, 204], [219.6, 212.5], [219.2, 220], [221.2, 228], [223, 235], [224, 242]];
+const trapezius: P[] = [[205.6, 153.5], [210.5, 157.2], [216.5, 159.4], [221.5, 160]];
+const neck: P[] = [[205.2, 146.5], [205.5, 150.5], [205.8, 154.5]];
+const face: P[] = [[200, 120.6], [206.4, 122.2], [210.2, 127.4], [210.9, 134.2], [209.8, 140.4], [207, 145.9], [203, 149.3], [200, 150.1]];
+const hairOut: P[] = [[200, 119.2], [208.4, 120.6], [213.8, 126], [215.6, 133.6], [215, 141.2], [213, 147.4], [210.2, 151.6]];
+const right = {
+  trunk: smooth(trunkSide),
+  trap: smooth(trapezius),
+  neck: smooth(neck),
+  face: smooth(face),
+  hair: smooth(hairOut),
+};
+// Locks of hair, falling from the crown and curling at the jaw.
+const locks = [
+  'M201 119.6C205 120.4 209 123 210.6 127.4',
+  'M203.5 121C209 123 213.4 128 213.6 134.6C213.8 140 211.4 144 211.8 147.6C212 150.2 214.2 150.8 215 149',
+  'M210.4 128.6C212.2 133.2 211.4 138.2 210.6 142C210 145.6 211 149.2 213 151.4',
+  'M205 120.4C207.6 121.6 210 124.4 211.6 128.6',
+  'M212.8 140.2C214.6 143.6 215.6 147 213.6 150.4C212.6 152 210.6 152.4 209.6 150.8',
+];
+const brow = 'M201.4 133.2C202.8 131.8 205.6 131 208.6 132.1M202.2 133.6C204.2 132.6 206.4 132.4 208 132.8';
+const eye = 'M202.3 135.6C203.6 134.3 205.6 134.1 207.2 135.3M203.4 136.4C204.4 136.8 205.6 136.7 206.4 136.2M206.8 137.8C207.8 138.6 208.6 139.8 208.8 141.2';
+const nose = 'M201.2 133.8C201.2 136.6 201.7 139.4 202.4 141.3C202.9 142.6 201.8 143.3 200.6 142.8M199 142.4C199.4 143 200 143.2 200.6 142.8';
+const mouth = 'M200 145.4C201.4 145.1 202.6 145.3 203.6 145.9';
+const midline = 'M197.3 145.7C198.4 145.2 199.2 145.3 200 145.4M198.6 147.4C199.5 147.8 200.5 147.8 201.4 147.4M199 149.2C199.8 149.6 200.4 149.6 201 149.2';
+const pupil: P = [204.6, 135.3];
+// Anatomy, in finer line: collarbones, the chest, the line of the belly, the ribs, the crests of the hips.
+const anatomyR = [
+  'M201.6 160.8C206 159.6 213 160.4 220 162',
+  'M200.8 183.6C205 185.4 211.4 185.4 216.4 182.4C218.6 181 220 178.6 221 176.4',
+  'M201.2 196.6C206.4 198.4 212 201.4 216.6 206.4',
+  'M202.6 204.2C205.2 204.6 207.2 205.4 208.4 206.6M202.8 223C205 222.6 207 222.8 208.2 223.6',
+  'M218 228.4C214.4 233.6 209.6 239 204.2 243.6',
+  'M205.6 149.8C204.6 153.4 203.2 157.6 201.4 160.6',
+  'M224.4 168.2C228 167.4 231.4 167.6 234.6 169.2',
+];
+const anatomyMid = 'M200 166V206';
+const nipples: P[] = [[212.2, 180.6], [187.8, 180.6]];
+// Knees and shins on every leg, at the knee's height along each.
+const kneeMarks = [flatLeg, spreadLeg].flatMap((bones) => {
+  const w = walker(bones);
+  const k = w.at(0.54);
+  const d = w.dir(0.54);
+  const n: P = [d[1], -d[0]];
+  const cap = (s: number) => `M${xy(add(k, add(mul(n, -3.6 * s), mul(d, -2.4))))}Q${xy(add(k, add(mul(n, 0), mul(d, 3.6))))} ${xy(add(k, add(mul(n, 3.4), mul(d, -2.2))))}`;
+  const shin = `M${xy(add(w.at(0.6), mul(n, 1.6)))}Q${xy(add(w.at(0.75), mul(n, 2.6)))} ${xy(add(w.at(0.92), mul(n, 0.8)))}`;
+  return [cap(1), shin];
+});
+const kneeD = kneeMarks.join('');
+// Elbows and the fold of the wrist on every arm.
+const elbowD = [flatArm, raisedArm]
+  .map((bones) => {
+    const w = walker(bones);
+    const e = w.at(0.51);
+    const d = w.dir(0.51);
+    const n: P = [d[1], -d[0]];
+    const wr = w.at(0.775);
+    return `M${xy(add(e, add(mul(n, 2.6), mul(d, -1.4))))}Q${xy(add(e, mul(d, 1.2)))} ${xy(add(e, add(mul(n, -2), mul(d, -1))))}M${xy(add(wr, mul(n, 2.6)))}L${xy(add(wr, mul(n, -2.4)))}`;
+  })
+  .join('');
+// Fingers: three partings from the knuckles to the tips, and a thumb.
+const handD = (bones: P[], thumbSide: 1 | -1) => {
+  const w = walker(bones);
+  let d = '';
+  for (const off of [-1.3, 0.1, 1.4]) {
+    const a = w.at(0.86);
+    const b = w.at(0.975);
+    const dir = w.dir(0.93);
+    const n: P = [dir[1], -dir[0]];
+    d += `M${xy(add(a, mul(n, off)))}L${xy(add(b, mul(n, off * 0.7)))}`;
+  }
+  const dir = w.dir(0.8);
+  const n: P = mul([dir[1], -dir[0]], thumbSide);
+  const base = add(w.at(0.79), mul(n, 3.3));
+  const tip = add(w.at(0.9), mul(n, 5.4));
+  d += `M${xy(base)}Q${xy(add(base, add(mul(n, 3), mul(dir, 3))))} ${xy(tip)}Q${xy(add(tip, add(mul(n, -1.6), mul(dir, -0.4))))} ${xy(add(w.at(0.87), mul(n, 2.9)))}`;
+  return d;
+};
+const handsR = handD(flatArm, 1) + handD(raisedArm, 1);
+
+// The trunk's shadow: down its right side and under the chest, the chin and the hair, staggered like strokes.
+function band(pts: P[], inward: P, depth: (i: number) => number): P[] {
+  const out = pts.map((p) => add(p, mul(inward, -0.4)));
+  const inn = pts.map((p, i) => add(p, mul(inward, depth(i) * (i % 2 ? 0.7 : 1.1))));
+  return [...out, ...inn.reverse()];
+}
+const sampleCurve = (pts: P[], per: number): P[] => {
+  const out: P[] = [];
+  for (let i = 0; i < pts.length - 1; i++) for (let j = 0; j < per; j++) out.push(along(pts[i], pts[i + 1], j / per));
+  out.push(pts[pts.length - 1]);
+  return out;
+};
+const trunkShade = band(sampleCurve(trunkSide, 4), [-1, 0], (i) => 3 + 4.2 * Math.sin((Math.PI * i) / 32));
+const chestShade = band(sampleCurve([[202, 184.6], [208, 186.2], [214, 184.6], [219, 180.6]], 3), [0, 1], (i) => 2.6 + 1.6 * Math.sin((Math.PI * i) / 9));
+const chinShade: P[] = [[196, 150.4], [200, 151.2], [204.6, 149.6], [205.6, 152.4], [205.6, 156.6], [203, 154.8], [200, 153.4], [196.6, 152.6]];
+const hairShadeR: P[] = [[210.6, 127.4], [213.8, 127], [215.4, 134], [214.8, 141.4], [212.8, 147.6], [210, 151.4], [208.6, 146.6], [210.4, 140.8], [211, 134]];
+const hairShadeL: P[] = [[191, 121.4], [196, 120.2], [193.4, 123.4], [190.4, 128.6], [188.8, 134], [186.8, 128.4]];
+const faceShade: P[] = [[206.2, 136.4], [210.6, 135.4], [209.8, 140.4], [207, 145.9], [204.2, 148.6], [205, 144.2], [206.6, 140.6]];
+const absShade = band(sampleCurve([[216.8, 206], [216.2, 214], [216.6, 222], [218.4, 228.6]], 3), [-1, 0], (i) => 2.6 + 2.4 * Math.sin((Math.PI * i) / 9));
+const groinShade: P[] = [[204, 243.8], [208.4, 240], [212.6, 235.4], [210.4, 240.6], [205.6, 246.6]];
+
+const shadeZones: P[][] = [
+  ...[...arms, ...armsL, ...legs, ...legsL].flatMap((l) => l.shade),
+  ...feetR.map((f) => f.shade),
+  ...feetR.map((f) => f.shade.map(mx)),
+  trunkShade,
+  chestShade,
+  band(sampleCurve([[198, 184.6], [192, 186.2], [186, 184.6], [181, 180.6]], 3), [0, 1], (i) => 1.6 + 1.2 * Math.sin((Math.PI * i) / 9)),
+  chinShade,
+  hairShadeR,
+  hairShadeL,
+  faceShade,
+  absShade,
+  groinShade,
+];
+const deepZones: P[][] = [...[...arms, ...armsL, ...legs, ...legsL].flatMap((l) => l.deep), chinShade, hairShadeR, groinShade];
+
+/** Parallel strokes at an angle across a box, for a clip to cut into hatching. */
+function strokes(box: [number, number, number, number], gap: number, deg: number, jitter = 0.3) {
+  const a = (deg * Math.PI) / 180;
+  const v: P = [Math.cos(a), Math.sin(a)];
+  const u: P = [-v[1], v[0]];
+  const [x0, y0, x1, y1] = box;
+  const corners: P[] = [[x0, y0], [x1, y0], [x0, y1], [x1, y1]];
+  const cs = corners.map((c) => dot(c, u));
+  const ls = corners.map((c) => dot(c, v));
+  const [cmin, cmax, lmin, lmax] = [Math.min(...cs), Math.max(...cs), Math.min(...ls), Math.max(...ls)];
+  let d = '';
+  let i = 0;
+  for (let c = cmin; c <= cmax; c += gap, i++) {
+    const cc = c + Math.sin(i * 1.7) * jitter;
+    const p = add(mul(u, cc), mul(v, lmin));
+    const q = add(mul(u, cc), mul(v, lmax));
+    d += `M${xy(p)}L${xy(q)}`;
+  }
+  return d;
+}
+const FIG_BOX: [number, number, number, number] = [74, 112, 326, 368];
+const hatch = strokes(FIG_BOX, 1.9, 58);
+const crossHatch = strokes(FIG_BOX, 2.1, 128, 0.2);
+
+const contours = {
+  arms: arms.map((l) => l.whole),
+  armsL: armsL.map((l) => l.whole),
+  legs: legs.map((l) => l.a + l.b),
+  legsL: legsL.map((l) => l.a + l.b),
+  weight: [...arms, ...armsL, ...legs, ...legsL].map((l) => l.weight).join(''),
+};
+// The crotch, where the inner contours of the legs meet.
+const crotch = 'M203.6 240.4Q201.2 243.2 200 246.2Q198.8 243.2 196.4 240.4';
+
+// ── The construction, the measures, the machine ─────────────────────────────────────────────────────────────
+const SQ = { x: CX - S / 2, y: TOP, s: S };
+const palm = S / 24; // four fingers make a palm, twenty-four palms a man
+const scaleY = FOOT + 13;
+const scaleBlocks = Array.from({ length: 24 }, (_, i) => i)
+  .filter((i) => i % 2 === 1)
+  .map((i) => `M${r1(SQ.x + i * palm)} ${scaleY}h${r1(palm)}v3.6h${-r1(palm)}Z`)
+  .join('');
+const scaleTicks = Array.from({ length: 25 }, (_, i) => `M${r1(SQ.x + i * palm)} ${scaleY - (i % 6 === 0 ? 3.4 : 1.4)}v${i % 6 === 0 ? 7 : 5}`).join('') + Array.from({ length: 3 }, (_, i) => `M${r1(SQ.x + (i + 1) * (palm / 4))} ${scaleY + 3.6}v2.4`).join('');
+const headTicks = Array.from({ length: 9 }, (_, i) => `M${SQ.x - (i % 4 === 0 ? 7 : 4.5)} ${TOP + i * (S / 8)}h${i % 4 === 0 ? 7 : 4.5}`).join('');
+const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+const circleTicks = Array.from({ length: 72 }, (_, i) => {
+  const deg = i * 5;
+  const long = deg % 45 === 0;
+  const a = onCircle(deg, R);
+  const b = onCircle(deg, R + (long ? 4.6 : 2.2));
+  return `M${xy(a)}L${xy(b)}`;
+}).join('');
+// The arms' swing between the poses, struck from each shoulder just beyond the fingertips.
+const arc = (c: P, from: P, to: P) => {
+  const r = len(sub(from, c));
+  const sweep = (from[0] - c[0]) * (to[1] - c[1]) - (from[1] - c[1]) * (to[0] - c[0]) > 0 ? 1 : 0;
+  return `M${xy(from)}A${r1(r)} ${r1(r)} 0 0 ${sweep} ${xy(to)}`;
+};
+const flatTip = flatArm[flatArm.length - 1];
+const reach = (c: P, tip: P, extra: number) => add(c, mul(unit(sub(tip, c)), len(sub(tip, c)) + extra));
+const swingD = [1, -1]
+  .map((side) => {
+    const c = side === 1 ? SHOULDER : mx(SHOULDER);
+    const f = side === 1 ? flatTip : mx(flatTip);
+    const r = side === 1 ? raisedTip : mx(raisedTip);
+    return arc(c, reach(c, f, 9), reach(c, r, 9));
+  })
+  .join('');
+
+/** A toothed wheel, as Leonardo drew them: a rim of square teeth, a hub, spokes. */
+function wheel(c: P, r: number, teeth: number, phase = 0, th = 3.4) {
+  const pts: P[] = [];
+  for (let i = 0; i < teeth; i++) {
+    const a0 = phase + (i / teeth) * Math.PI * 2;
+    const w = (Math.PI * 2) / teeth;
+    for (const [f, rr] of [[0, r], [0.12, r + th], [0.45, r + th], [0.57, r]] as const) pts.push(add(c, [Math.cos(a0 + f * w) * rr, Math.sin(a0 + f * w) * rr]));
+  }
+  const spokes = Array.from({ length: 4 }, (_, i) => {
+    const a = phase + (i * Math.PI) / 2 + 0.3;
+    return `M${xy(add(c, [Math.cos(a) * 3.2, Math.sin(a) * 3.2]))}L${xy(add(c, [Math.cos(a) * (r - 3.4), Math.sin(a) * (r - 3.4)]))}`;
+  }).join('');
+  // The inner ring as two half circles: an arc that ends where it starts is not drawn at all.
+  return { rim: poly(pts), inner: `M${xy(add(c, [r - 3, 0]))}A${r - 3} ${r - 3} 0 0 1 ${xy(add(c, [3 - r, 0]))}A${r - 3} ${r - 3} 0 0 1 ${xy(add(c, [r - 3, 0]))}`, spokes, hub: c };
+}
+// In mesh: the centres a pitch radius apart (each wheel's root plus half its teeth).
+const bigWheel = wheel([33, 338], 17, 16, 0.1);
+const smallWheel = wheel([33 + 30 * Math.cos((-76 * Math.PI) / 180), 338 + 30 * Math.sin((-76 * Math.PI) / 180)], 9.6, 9, 0.45);
+// A coiled cord from the square's corner, as a spring is drawn, ending in a plug.
+const coil = (() => {
+  const start: P = [SQ.x + S + 0.5, 336];
+  const end: P = [372, 382];
+  const d0 = sub(end, start);
+  const L = len(d0);
+  const v = unit(d0);
+  const n: P = [-v[1], v[0]];
+  const turns = 9;
+  const pts: P[] = [];
+  for (let i = 0; i <= turns * 12; i++) {
+    const t = i / (turns * 12);
+    const ph = t * turns * Math.PI * 2;
+    const env = Math.min(1, t * 8, (1 - t) * 8);
+    const base = add(start, mul(v, t * L));
+    pts.push(add(base, add(mul(n, Math.sin(ph) * 4.2 * env), mul(v, -Math.cos(ph) * 2.6 * env))));
+  }
+  return { d: `M${pts.map(xy).join('L')}`, end, v, n };
+})();
+const plug = (() => {
+  const { end, v, n } = coil;
+  const q = (a: number, b: number): P => add(end, add(mul(v, a), mul(n, b)));
+  return {
+    body: poly([q(0, -3.4), q(10, -4), q(10, 4), q(0, 3.4)]),
+    pins: `M${xy(q(10, -2))}L${xy(q(15.5, -2))}M${xy(q(10, 2))}L${xy(q(15.5, 2))}M${xy(q(3, -3.6))}L${xy(q(3, 3.6))}`,
+    shade: poly([q(0.6, 1), q(9.6, 1.2), q(9.6, 3.6), q(0.6, 3)]),
+  };
+})();
+// Dividers, opened to the circle's radius scaled down, as if just lifted from the sheet.
+const dividers = (() => {
+  const hinge: P = [44, 60];
+  const tipA: P = [22, 126];
+  const tipB: P = [68, 120];
+  const leg = (tip: P, s: 1 | -1) => {
+    const d = unit(sub(tip, hinge));
+    const n: P = mul([-d[1], d[0]], s);
+    const a = add(hinge, mul(n, 2.6));
+    const b = add(hinge, mul(n, -2.6));
+    const m = along(hinge, tip, 0.82);
+    return { outline: poly([a, add(m, mul(n, 1.4)), tip, add(m, mul(n, -1.4)), b]), center: `M${xy(along(hinge, tip, 0.12))}L${xy(along(hinge, tip, 0.8))}`, shade: poly([hinge, add(m, mul(n, s === 1 ? -1.3 : 1.3)), tip, m]) };
+  };
+  return { hinge, tipA, tipB, legs: [leg(tipA, 1), leg(tipB, -1)], scribe: `M${xy(add(tipA, [-1, 2]))}A70 70 0 0 0 ${xy(add(tipB, [2, 2.5]))}` };
+})();
+// A little terminal, drawn in perspective in the upper margin, its screen lit with the same prompt.
+const crt = {
+  front: 'M338 74.5C338 72.5 339.5 71 341.5 71H378.5C380.5 71 382 72.5 382 74.5V104.5C382 106.5 380.5 108 378.5 108H341.5C339.5 108 338 106.5 338 104.5Z',
+  screen: 'M343.2 77.4C350 76.2 370 76.2 376.8 77.4C377.8 84 377.8 95 376.8 101.6C370 102.8 350 102.8 343.2 101.6C342.2 95 342.2 84 343.2 77.4Z',
+  side: 'M382 74.5L392.5 68.2V98.6L382 104.5',
+  top: 'M341.5 71L352.4 65.2H389.8C391.6 65.2 392.6 66.4 392.5 68.2L382 74.5',
+  stand: 'M355 108L353.4 113.4H366.6L365 108M347 116.6C347 114.6 351 113.4 360 113.4S373 114.6 373 116.6C373 118.2 368 119 360 119S347 118.2 347 116.6Z',
+  sideShade: 'M382.4 75L392.1 69V98.4L382.4 104Z',
+  prompt: 'M347.6 85.4L352 88.8L347.6 92.2',
+  cursor: 'M354.2 92.6H359.4',
+  rows: 'M347.6 96.6H366.2M347.6 81.2H360',
+};
+// The square's quarters, numbered as tmux's display-panes numbers its panes.
+const panes: { n: string; at: P }[] = [
+  { n: '0', at: [116, 196] },
+  { n: '1', at: [284, 196] },
+  { n: '2', at: [112, 286] },
+  { n: '3', at: [288, 286] },
+];
+// The heart: a small wheel, set in the chest.
+const heart = wheel([209.4, 191], 3.4, 12, 0.2, 1.3);
+---
+<script is:inline>
+  // The drawing draws itself on the first visit of a session; after that it is simply there.
+  try {
+    if (sessionStorage.getItem('codex-drawn')) document.documentElement.dataset.drawn = '';
+    else addEventListener('pagehide', () => sessionStorage.setItem('codex-drawn', '1'), { once: true });
+  } catch {}
+</script>
+<svg class="vitruvian" viewBox="0 0 400 418" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+  <defs>
+    <clipPath id="vt-shade">{shadeZones.map((z) => <path d={zone(z)} />)}</clipPath>
+    <clipPath id="vt-deep">{deepZones.map((z) => <path d={zone(z)} />)}</clipPath>
+    <clipPath id="vt-instruments">
+      {dividers.legs.map((l) => <path d={l.shade} />)}
+      <path d={crt.sideShade} />
+      <path d={plug.shade} />
+    </clipPath>
+    <radialGradient id="vt-glow">
+      <stop offset="0" stop-color="var(--sanguine-2)" stop-opacity="0.55" />
+      <stop offset="0.45" stop-color="var(--sanguine-2)" stop-opacity="0.18" />
+      <stop offset="1" stop-color="var(--sanguine-2)" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <g class="vt-script" style="--d: 2.9s">
+    <text x="-200" y="24" text-anchor="middle" transform="scale(-1 1)">Vetruvio architecto mecte nella sua opera d’architectura chelle misure dell’omo sono dalla natura</text>
+    <text x="-200" y="40" text-anchor="middle" transform="scale(-1 1)">disstribuite in questo modo, cioè che 4 diti fa 1 palmo, et 4 palmi fa 1 piè</text>
+    <text x="-200" y="410" text-anchor="middle" transform="scale(-1 1)">tanto apre l’omo nele braccia quanto è la sua altezza</text>
+  </g>
+
+  <g class="vt-geom">
+    <path class="draw" pathLength="1" style="--d: 0s" d={`M${xy(onCircle(0))}A${R} ${R} 0 0 1 ${xy(onCircle(180))}A${R} ${R} 0 0 1 ${xy(onCircle(0))}`} />
+    <path class="draw" pathLength="1" style="--d: 0.35s" d={`M${SQ.x} ${SQ.y}H${SQ.x + S}V${SQ.y + S}H${SQ.x}Z`} />
+    <path class="hair-line" style="--d: 0.8s" d={`M${CX} ${NAVEL[1] - R - 8}V${TOP - 3}M${CX} ${FOOT - 4}V${FOOT + 4}M${SQ.x - 12} ${TOP + S / 2}h19M${SQ.x + S + 12} ${TOP + S / 2}h-19M${NAVEL[0] - R - 9} ${NAVEL[1]}h17M${NAVEL[0] + R + 9} ${NAVEL[1]}h-17`} />
+    <path class="ghost draw" pathLength="1" style="--d: 1s" d={`M${SQ.x} ${SQ.y}L${SQ.x + S} ${SQ.y + S}M${SQ.x + S} ${SQ.y}L${SQ.x} ${SQ.y + S}`} />
+  </g>
+
+  <g class="vt-measure">
+    <path class="tick" d={circleTicks} />
+    <path class="tick" d={headTicks} />
+    {roman.map((n, i) => <text class="numeral" x={SQ.x - 10} y={TOP + i * (S / 8) + S / 16 + 2} text-anchor="end">{n}</text>)}
+    <path class="tick" d={`M${SQ.x} ${scaleY}h${S}v3.6h${-S}Z`} />
+    <path class="block" d={scaleBlocks} />
+    <path class="tick" d={scaleTicks} />
+    <text class="label" x={SQ.x - 4} y={scaleY + 4.6} text-anchor="end">palmi</text>
+    <text class="label" x={SQ.x + S + 4} y={scaleY + 4.6}>XXIV</text>
+    <path class="chalk" d={swingD} />
+    <path class="pin" d={`M${CX} ${TOP - 3}v-3M${CX} ${FOOT + 4}v3`} />
+  </g>
+
+  <g class="vt-hatch" style="--d: 2.3s">
+    <path clip-path="url(#vt-shade)" d={hatch} />
+    <path class="cross" clip-path="url(#vt-deep)" d={crossHatch} />
+  </g>
+
+  <g class="vt-body">
+    <g class="pose-square">
+      {contours.arms.slice(0, 1).map((d) => <path class="draw" pathLength="1" style="--d: 1.1s" d={d} />)}
+      {contours.armsL.slice(0, 1).map((d) => <path class="draw" pathLength="1" style="--d: 1.1s" d={d} />)}
+      {contours.legs.slice(0, 1).map((d) => <path class="draw" pathLength="1" style="--d: 1.25s" d={d} />)}
+      {contours.legsL.slice(0, 1).map((d) => <path class="draw" pathLength="1" style="--d: 1.25s" d={d} />)}
+      <path class="draw" pathLength="1" style="--d: 1.4s" d={feetR[0].d + mirrorD(feetR[0].d)} />
+    </g>
+    <g class="pose-circle">
+      {contours.arms.slice(1).map((d) => <path class="draw" pathLength="1" style="--d: 1.6s" d={d} />)}
+      {contours.armsL.slice(1).map((d) => <path class="draw" pathLength="1" style="--d: 1.6s" d={d} />)}
+      {contours.legs.slice(1).map((d) => <path class="draw" pathLength="1" style="--d: 1.75s" d={d} />)}
+      {contours.legsL.slice(1).map((d) => <path class="draw" pathLength="1" style="--d: 1.75s" d={d} />)}
+      <path class="draw" pathLength="1" style="--d: 1.9s" d={feetR[1].d + mirrorD(feetR[1].d)} />
+    </g>
+    <g class="trunk">
+      <path class="draw" pathLength="1" style="--d: 0.95s" d={right.trunk + mirrorD(right.trunk)} />
+      <path class="draw" pathLength="1" style="--d: 0.9s" d={right.trap + mirrorD(right.trap) + right.neck + mirrorD(right.neck)} />
+      <path class="draw" pathLength="1" style="--d: 0.85s" d={right.face + mirrorD(right.face)} />
+      <path class="draw" pathLength="1" style="--d: 0.9s" d={crotch} />
+    </g>
+    <g class="weight" style="--d: 2.1s"><path d={contours.weight} /></g>
+    <g class="fine-ink" style="--d: 2s">
+      <path d={right.hair + mirrorD(right.hair)} />
+      <path d={locks.join('') + mirrorD(locks.join(''))} />
+      <path d={brow + mirrorD(brow) + eye + mirrorD(eye) + nose + mouth + mirrorD(mouth) + midline} />
+      <path d={anatomyR.join('') + mirrorD(anatomyR.join('')) + anatomyMid} />
+      <path d={kneeD + mirrorD(kneeD) + elbowD + mirrorD(elbowD)} />
+      <path d={handsR + mirrorD(handsR)} />
+      <path d={feetR.map((f) => f.fine).join('') + mirrorD(feetR.map((f) => f.fine).join(''))} />
+      {[pupil, mx(pupil), ...nipples].map((p) => <circle class="dot" cx={p[0]} cy={p[1]} r="0.55" />)}
+    </g>
+  </g>
+
+  <g class="vt-machine" style="--d: 2.6s">
+    <circle cx={NAVEL[0]} cy={NAVEL[1]} r="15" fill="url(#vt-glow)" stroke="none" class="glow" />
+    <path class="prompt" d={`M${NAVEL[0] - 5} ${NAVEL[1] - 3.6}l4.2 3.4-4.2 3.4`} />
+    <path class="prompt cursor" d={`M${NAVEL[0] + 0.8} ${NAVEL[1] + 3.6}h4.6`} />
+    <path class="gear" d={heart.rim} />
+    <circle class="gear" cx={heart.hub[0]} cy={heart.hub[1]} r="1" />
+    <g class="panes">
+      {panes.map((p) => <text x={p.at[0]} y={p.at[1]} text-anchor="middle">{p.n}</text>)}
+    </g>
+  </g>
+
+  <g class="vt-margin" style="--d: 2.2s">
+    <g class="instrument">
+      <path class="shade-fill" clip-path="url(#vt-instruments)" d={strokes([14, 54, 74, 130], 1.6, 58, 0) + strokes([380, 64, 395, 108], 1.6, 58, 0) + strokes([360, 360, 396, 396], 1.6, 58, 0)} />
+      {dividers.legs.map((l) => <path d={l.outline} />)}
+      {dividers.legs.map((l) => <path class="fine" d={l.center} />)}
+      <circle cx={dividers.hinge[0]} cy={dividers.hinge[1]} r="4.4" class="paper" />
+      <circle cx={dividers.hinge[0]} cy={dividers.hinge[1]} r="1.3" />
+      <path d={`M${dividers.hinge[0]} ${dividers.hinge[1] - 4.4}V${dividers.hinge[1] - 11}M${dividers.hinge[0] - 2.4} ${dividers.hinge[1] - 11}h4.8`} />
+      <path class="chalk" d={dividers.scribe} />
+      <text class="label" x="45" y="140" text-anchor="middle">circinus</text>
+    </g>
+    <g class="instrument">
+      <path class="paper" d={crt.front} />
+      <path d={crt.top} />
+      <path d={crt.side} />
+      <path d={crt.screen} />
+      <path d={crt.stand} />
+      <path class="prompt" d={crt.prompt} />
+      <path class="prompt cursor" d={crt.cursor} />
+      <path class="fine" d={crt.rows} />
+      <text class="label" x="362" y="131" text-anchor="middle">speculum</text>
+    </g>
+    <g class="instrument">
+      <path class="paper" d={bigWheel.rim} />
+      <path class="fine" d={bigWheel.inner + bigWheel.spokes} />
+      <circle cx={bigWheel.hub[0]} cy={bigWheel.hub[1]} r="3" />
+      <path class="paper" d={smallWheel.rim} />
+      <path class="fine" d={smallWheel.inner + smallWheel.spokes} />
+      <circle cx={smallWheel.hub[0]} cy={smallWheel.hub[1]} r="2.4" />
+      <text class="label" x="33" y="371" text-anchor="middle">rotae</text>
+    </g>
+    <g class="instrument">
+      <path class="fine" d={coil.d} />
+      <path class="paper" d={plug.body} />
+      <path d={plug.pins} />
+      <text class="label" x="352" y="398" text-anchor="middle">nervus</text>
+    </g>
+  </g>
+</svg>
+
+<style>
+  .vitruvian {
+    display: block;
+    width: min(30rem, 100%);
+    height: auto;
+    margin: 1.2rem auto 0.4rem;
+    overflow: visible;
+    color: var(--ink-2);
+  }
+  .vitruvian text {
+    fill: currentColor;
+    stroke: none;
+  }
+  .vt-script text {
+    font-family: var(--font-hand);
+    font-size: 13.5px;
+    opacity: 0.5;
+  }
+  .vt-geom path {
+    stroke-width: 1.05;
+  }
+  .vt-geom .fine {
+    stroke-width: 0.45;
+    opacity: 0.6;
+  }
+  .vt-geom .hair-line {
+    stroke: var(--sanguine-2);
+    stroke-width: 0.5;
+    opacity: 0.55;
+    stroke-dasharray: 3 2.4;
+  }
+  .vt-geom .ghost {
+    stroke-width: 0.4;
+    opacity: 0.3;
+  }
+  .vt-measure .tick {
+    stroke-width: 0.5;
+    opacity: 0.75;
+  }
+  .vt-measure .block {
+    fill: currentColor;
+    stroke: none;
+    opacity: 0.5;
+  }
+  .vt-measure .chalk,
+  .vt-margin .chalk {
+    stroke: var(--sanguine-2);
+    stroke-width: 0.6;
+    stroke-dasharray: 1.6 2.2;
+    opacity: 0.85;
+  }
+  .vt-measure .pin {
+    stroke: var(--sanguine-2);
+    stroke-width: 0.55;
+  }
+  .vitruvian .numeral,
+  .vitruvian .label {
+    font-family: var(--font-text);
+    font-style: italic;
+    font-size: 7.5px;
+    opacity: 0.8;
+  }
+  .vt-hatch path {
+    stroke-width: 0.45;
+  }
+  .vt-hatch .cross {
+    stroke-width: 0.34;
+    opacity: 0.6;
+  }
+  .vt-body path {
+    stroke-width: 0.95;
+  }
+  .vt-body .weight path {
+    stroke-width: 1.5;
+  }
+  .vt-body .fine-ink path {
+    stroke-width: 0.5;
+  }
+  .vt-body .dot {
+    fill: currentColor;
+    stroke: none;
+  }
+  .vt-machine .prompt,
+  .vt-margin .prompt {
+    stroke: var(--sanguine);
+    stroke-width: 1.35;
+  }
+  .vt-margin .prompt {
+    stroke-width: 1;
+  }
+  .vt-machine .gear {
+    stroke: var(--sanguine);
+    stroke-width: 0.5;
+  }
+  .vt-machine .panes text {
+    font-family: var(--font-text);
+    font-style: italic;
+    font-size: 11px;
+    fill: var(--sanguine);
+    opacity: 0.7;
+  }
+  .vt-machine .panes path {
+    stroke: var(--sanguine);
+    stroke-width: 0.5;
+    opacity: 0.8;
+  }
+  .vt-margin path,
+  .vt-margin circle {
+    stroke-width: 0.75;
+  }
+  .vt-margin .fine {
+    stroke-width: 0.45;
+  }
+  .vt-margin .shade-fill {
+    stroke-width: 0.38;
+  }
+  .vt-margin .paper {
+    fill: var(--paper);
+  }
+  .vt-margin .instrument {
+    opacity: 0.85;
+  }
+
+  /* Drawn on: the compass first, then the man, then his shadows, the machine and the margins. Once per visit. */
+  @media (prefers-reduced-motion: no-preference) {
+    :global(html:not([data-drawn])) .vitruvian .draw {
+      stroke-dasharray: 1 1;
+      stroke-dashoffset: 1;
+      animation: vt-draw 1.5s cubic-bezier(0.45, 0.05, 0.3, 1) var(--d, 0s) forwards;
+    }
+    :global(html:not([data-drawn])) .vt-geom .hair-line {
+      opacity: 0;
+      animation: vt-fade-to 1s ease var(--d, 0s) forwards;
+    }
+    :global(html:not([data-drawn])) .vt-hatch,
+    :global(html:not([data-drawn])) .vt-machine,
+    :global(html:not([data-drawn])) .vt-margin,
+    :global(html:not([data-drawn])) .vt-script,
+    :global(html:not([data-drawn])) .vt-measure,
+    :global(html:not([data-drawn])) .vt-body .weight,
+    :global(html:not([data-drawn])) .vt-body .fine-ink {
+      opacity: 0;
+      animation: vt-fade 1.1s ease var(--d, 1.2s) forwards;
+    }
+    .vt-machine .cursor {
+      /* A few blinks, then still: nothing on the page keeps blinking. */
+      animation: vt-blink 1.1s steps(1) 3.6s 4;
+    }
+    @keyframes vt-draw {
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+    @keyframes vt-fade {
+      to {
+        opacity: 1;
+      }
+    }
+    @keyframes vt-fade-to {
+      to {
+        opacity: 0.55;
+      }
+    }
+    @keyframes vt-blink {
+      50% {
+        opacity: 0;
+      }
+    }
+  }
+</style>

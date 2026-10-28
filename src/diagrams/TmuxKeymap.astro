@@ -2,6 +2,7 @@
 // Study I: the tmux keymap. A drawn ANSI keyboard; pick a layer (Alt, Ctrl+b prefix, Ctrl, mouse), then point at, tap,
 // tab to, or actually press a key to read what it does and the line of tmux.conf that makes it so.
 import { BINDINGS, LAYERS, MOUSE, type Binding } from '../data/tmux-keymap';
+import { HATCH_TURN } from './ink';
 
 const U = 44;
 const GAP = 5;
@@ -37,6 +38,16 @@ const short = (b: Binding) => SHORT[b.action] ?? (b.action.startsWith('Window ')
 const on = (layer: string, id: string) => BINDINGS.filter((b) => b.layer === layer && b.key === id);
 const layerIds = ['alt', 'prefix', 'root'] as const;
 const data = JSON.stringify({ bindings: BINDINGS, mouse: MOUSE, layers: LAYERS }).replace(/</g, '\\u003c');
+// The case, drawn as an instrument maker would: a ruled bezel, a screw at each corner, and a measure under it, the
+// board's width in key units.
+const screws = [
+  [-6, -5],
+  [width + 6, -5],
+  [-6, height + 5],
+  [width + 6, height + 5],
+].map(([x, y], i) => ({ x, y, a: 0.5 + i * 0.9 }));
+const dimY = height + 22;
+const units = Math.round((width + GAP) / (U + GAP));
 const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
 ---
 <figure class="study tmux-keymap" data-pagefind-ignore data-layer="alt" aria-labelledby="tk-title">
@@ -50,13 +61,14 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
     ))}
   </div>
   <div class="study-scroll">
-    <svg class="study-svg tk-board" viewBox={`-14 -40 ${width + 28} ${height + 60}`} role="group" aria-label="Keyboard. Focus it and press a chord to look it up." tabindex="0" style="min-width: 600px">
+    <svg class="study-svg tk-board" viewBox={`-14 -40 ${width + 28} ${height + 76}`} role="group" aria-label="Keyboard. Focus it and press a chord to look it up." tabindex="0" style="min-width: 600px">
       <defs>
-        <pattern id="tk-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="6" stroke="var(--sanguine-2)" stroke-width="1.3" opacity="0.55" />
+        {/* Red chalk for the keys that do something, iron-gall ink for shadow; both hatched the way Leonardo's left hand ran. */}
+        <pattern id="tk-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform={`rotate(${HATCH_TURN})`}>
+          <line x1="0" y1="0" x2="0" y2="5" stroke="var(--sanguine-2)" stroke-width="1.15" opacity="0.72" />
         </pattern>
-        <pattern id="tk-hatch-ink" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
-          <line x1="0" y1="0" x2="0" y2="5" stroke="currentColor" stroke-width="0.8" opacity="0.35" />
+        <pattern id="tk-hatch-ink" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform={`rotate(${HATCH_TURN})`}>
+          <line x1="0" y1="0" x2="0" y2="3.4" stroke="currentColor" stroke-width="0.7" opacity="0.5" />
         </pattern>
         <filter id="tk-ink" x="-5%" y="-5%" width="110%" height="110%">
           <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="3" result="n" />
@@ -67,7 +79,21 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
       <text class="caps tk-note" x="0" y="-18" data-for="prefix">First Ctrl+b, release, then a key</text>
       <text class="caps tk-note" x="0" y="-18" data-for="root">Ctrl chords tmux keeps for itself</text>
       <text class="caps tk-note" x="0" y="-18" data-for="mouse">The mouse layer is described below</text>
-      <rect x="-10" y="-8" width={width + 20} height={height + 16} rx="12" class="ink-fine" filter="url(#tk-ink)" />
+      <g class="tk-case" aria-hidden="true">
+        <rect class="tk-bezel" x="-11" y="-10" width={width + 22} height={height + 20} rx="9" filter="url(#tk-ink)" />
+        <rect class="tk-bezel-in" x="-4.5" y="-4" width={width + 9} height={height + 8} rx="6" />
+        <path class="tk-bezel-shade" d={`M${width + 4.5} -2V${height + 4}H-2.5V${height + 10}H${width + 11}V-4Z`} fill="url(#tk-hatch-ink)" />
+        {screws.map((sc) => (
+          <g transform={`translate(${sc.x} ${sc.y}) rotate(${(sc.a * 180) / Math.PI})`}>
+            <circle r="2.6" class="tk-screw" />
+            <path d="M-1.8 0H1.8" class="tk-slot" />
+          </g>
+        ))}
+        <path class="tk-dim" d={`M0 ${dimY - 5}V${dimY + 5}M${width} ${dimY - 5}V${dimY + 5}M0 ${dimY}H${width / 2 - 34}M${width / 2 + 34} ${dimY}H${width}M6 ${dimY - 2.6}L0 ${dimY}L6 ${dimY + 2.6}M${width - 6} ${dimY - 2.6}L${width} ${dimY}L${width - 6} ${dimY + 2.6}`} />
+        {Array.from({ length: units + 1 }, (_, i) => <path class="tk-dim" d={`M${Math.min(width, i * (U + GAP))} ${dimY - 2}v4`} />)}
+        <text class="tk-dim-label" x={width / 2} y={dimY + 4} text-anchor="middle">{units} units</text>
+        <text class="label-hand tk-motto" x={width} y={-18} text-anchor="end">de clavibus</text>
+      </g>
       {keys.map((k) => {
         const classes = ['key', 'node'];
         for (const l of layerIds) if (on(l, k.id).length) classes.push(`b-${l}`);
@@ -78,8 +104,10 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
         const bound = classes.some((c) => c.startsWith('b-'));
         return (
           <g class={classes.join(' ')} data-key={k.id} transform={`translate(${k.x} ${k.y})`} tabindex={bound ? '-1' : undefined} role={bound ? 'button' : undefined} aria-label={bound ? `Key ${k.legend || 'space'}` : undefined}>
-            <rect class="box" width={k.w} height={U} rx="6" filter="url(#tk-ink)" />
-            <rect class="fill" width={k.w} height={U} rx="6" />
+            <rect class="box" width={k.w} height={U} rx="5" filter="url(#tk-ink)" />
+            <rect class="skirt" x="1.5" y={U - 7.4} width={k.w - 3} height="6" rx="2.5" fill="url(#tk-hatch-ink)" />
+            <rect class="fill" x="3.2" y="1.8" width={k.w - 6.4} height={U - 7} rx="3.6" />
+            <rect class="cap" x="3.2" y="1.8" width={k.w - 6.4} height={U - 7} rx="3.6" />
             <text class="legend" x="7" y="16">{k.legend}</text>
             {layerIds.map((l) => {
               const bs = on(l, k.id);
@@ -88,8 +116,8 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
               const extra = bs.find((b) => b.shift || (l === 'prefix' && b.ctrl));
               return (
                 <g class="lbl" data-for={l}>
-                  {plain && <text class="tk-short" x={k.w / 2} y="31" text-anchor="middle">{short(plain)}</text>}
-                  {extra && <text class="tk-short tk-short-2" x={k.w / 2} y={plain ? 41 : 31} text-anchor="middle">{extra.shift ? '⇧' : '^'}{short(extra)}</text>}
+                  {plain && <text class="tk-short" x={k.w / 2} y="26.6" text-anchor="middle">{short(plain)}</text>}
+                  {extra && <text class="tk-short tk-short-2" x={k.w / 2} y={plain ? 35.2 : 26.6} text-anchor="middle">{extra.shift ? '⇧' : '^'}{short(extra)}</text>}
                 </g>
               );
             })}
@@ -135,6 +163,54 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
   .tk-board .key .fill {
     fill: transparent;
     pointer-events: none;
+  }
+  .tk-board .key .cap {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.55;
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .tk-board .key .skirt {
+    pointer-events: none;
+  }
+  .tk-board .tk-case {
+    pointer-events: none;
+  }
+  .tk-board .tk-bezel {
+    fill: color-mix(in srgb, var(--paper-2) 60%, transparent);
+    stroke: currentColor;
+    stroke-width: 1.2;
+  }
+  .tk-board .tk-bezel-in {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.5;
+    opacity: 0.5;
+  }
+  .tk-board .tk-bezel-shade {
+    stroke: none;
+  }
+  .tk-board .tk-screw {
+    fill: var(--paper);
+    stroke: currentColor;
+    stroke-width: 0.6;
+  }
+  .tk-board .tk-slot,
+  .tk-board .tk-dim {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.6;
+    stroke-linecap: round;
+    opacity: 0.7;
+  }
+  .tk-board .tk-dim-label {
+    font-size: 11px;
+    font-style: italic;
+    fill: var(--ink-3);
+  }
+  .tk-board .tk-motto {
+    opacity: 0.6;
   }
   .tk-board .legend {
     font-size: 13px;

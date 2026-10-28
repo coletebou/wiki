@@ -315,3 +315,56 @@
 .study a[href^='http']::after {
   display: none !important;
 }
+
+/* Emblems: the small ink sketches in the corners of a study's sheet and in the margins (src/diagrams/emblems.ts). */
+.emblem :is(path, circle) {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.emblem .paper {
+  fill: var(--paper-2);
+}
+.emblem :is(.fine, .hatch) {
+  stroke-width: 0.55;
+}
+.emblem .dot {
+  fill: currentColor;
+}
+.emblem .sand {
+  fill: currentColor;
+  fill-opacity: 0.35;
+  stroke-width: 0.5;
+}
+.emblem .shine {
+  stroke-width: 0.5;
+  opacity: 0.5;
+}
+.emblem :is(.seal, .seal-mark, .flame) {
+  stroke: var(--sanguine-2);
+}
+.emblem .seal {
+  fill: var(--sanguine-wash);
+}
+.emblem .ashen {
+  stroke-width: 0.6;
+  stroke-dasharray: 1.5 2.5;
+}
+.emblem .cord {
+  stroke-width: 4.2;
+}
+.emblem .cord-in {
+  stroke: var(--paper-2);
+  stroke-width: 2.4;
+}
+.emblem .grille {
+  stroke-width: 0.75;
+}
+.emblem .chalk {
+  stroke: var(--sanguine-2);
+  stroke-width: 0.7;
+  stroke-dasharray: 2 3;
+}
