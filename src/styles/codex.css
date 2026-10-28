@@ -1303,12 +1303,6 @@ kbd {
   color: var(--ink-2);
   text-wrap: balance;
 }
-.frontispiece .vitruvian {
-  display: block;
-  width: min(15rem, 60vw);
-  margin: 1.4rem auto 0.4rem;
-  color: var(--ink-2);
-}
 .seek-large {
   display: flex;
   align-items: center;

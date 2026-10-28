@@ -1,5 +1,6 @@
 ---
 import { folioLabel } from '../../lib/schema.mjs';
+import Vitruvian from '../components/Vitruvian.astro';
 import Base from '../layouts/Base.astro';
 import { href, incipit, tableOf, wiki } from '../lib/wiki';
 
@@ -28,25 +29,7 @@ const cited = [...pages]
           <p class="greek" lang="grc" title="“The house of healing for the soul”, the inscription said to stand over the library">ΨΥΧΗΣ · ΙΑΤΡΕΙΟΝ</p>
           <h1>CODEX TEBOU</h1>
           <p class="beast">How to Be a Beast</p>
-          <svg class="vitruvian" viewBox="0 0 240 240" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true">
-            <g class="draw" stroke-width="1.1">
-              <circle cx="120" cy="128" r="96" />
-              <rect x="44" y="52" width="152" height="152" />
-              <path d="M120 32v192M24 128h192" stroke-width="0.6" opacity="0.5" />
-              <path d="M44 204 196 52M44 52l152 152" stroke-width="0.5" opacity="0.35" />
-            </g>
-            <g stroke-width="1.3" class="draw">
-              <rect x="86" y="96" width="68" height="44" rx="4" />
-              <path d="M94 108l10 6-10 6M110 124h14" />
-              <path d="M120 140v20M104 178h32M98 160h44l-6 18h-32Z" />
-              <path d="M154 104c18-8 32-24 40-44M86 104c-18-8-32-24-40-44" opacity="0.8" />
-              <path d="M154 132c22 4 40 18 50 36M86 132c-22 4-40 18-50 36" opacity="0.8" />
-              <circle cx="120" cy="72" r="13" />
-            </g>
-            <g stroke-width="0.5" opacity="0.5">
-              {Array.from({ length: 22 }, (_, i) => <path d={`M${56 + i * 6.4} 210l6-8`} />)}
-            </g>
-          </svg>
+          <Vitruvian />
           <p class="being">
             being a commonplace book of the machines, the agents and the works by which Cole Tebou builds things, set down
             leaf by leaf and catalogued after the manner of Callimachus
