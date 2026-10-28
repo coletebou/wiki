@@ -46,7 +46,7 @@ message, tool call or event. Each record carries a `uuid` (its id), the `parentU
 
 Not every user record was typed by a user. Tool results are user records too, a message from another session arrives
 with an origin of `peer`, task notifications and scheduled wakeups have origins of their own, and text a harness
-injects is marked `isMeta`. The origin fields are what tell a person's words apart from everything else. (Codex
+injects is marked `isMeta`. The origin fields are what tell a person's words apart from everything else. ([[Codex]]
 rollout files have their own turn records, and its subagent threads are marked as such.)
 
 You can list your own typed prompts, with their ids, from any transcript:

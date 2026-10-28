@@ -57,7 +57,7 @@ The same machinery, with small differences, ships the other things in this part 
 
 Xcode runs only on macOS, so every iPhone app is built, signed and uploaded on a Mac, even when the code was written
 somewhere else. Xcode 27, the current major version, needs macOS Tahoe 26.6 or later. In Cole's setup, agents write
-code on the AWS servers and the laptop, and the builds that need Apple's toolchain run on the [[mac-mini|Mac mini]]
+code on the [[servers|AWS servers]] and the laptop, and the builds that need Apple's toolchain run on the [[mac-mini|Mac mini]]
 on the desk. A new base Mac mini is <Price id="mac-mini" />.
 
 There are two ways around owning the Mac that does the build. GitHub's hosted macOS runners can build and sign in
@@ -177,7 +177,7 @@ A few habits make the slower clock easier to live with:
 
 Cole's iPhone code is mostly written by agents, so the project is shaped for them:
 
-- **The project file is generated.** Both Drover and Tide keep a `project.yml` for XcodeGen as the source of truth and
+- **The project file is generated.** Both [[Drover]] and Tide keep a `project.yml` for XcodeGen as the source of truth and
   generate the Xcode project from it. Agents edit a short YAML file instead of a machine-written `.pbxproj`, and two
   branches that add files no longer conflict in it. The catch: a new Swift file only joins the build after
   `xcodegen generate` runs, so "the tests pass but Xcode can't find the type" means the project was not regenerated.

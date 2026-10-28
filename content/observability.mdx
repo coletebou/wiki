@@ -109,7 +109,7 @@ dashboard:
 | Job missed or failed | Sentry cron monitors | A scheduled job does not check in, fails or runs too long |
 | Service died | systemd `OnFailure=` | A unit gives up restarting |
 | Backup silent | A daily check | The last good backup is more than about a day old |
-| Spending | AWS Budgets, cost anomaly detection, the GitHub Actions budget | 85% and 100% of the month's budget, a forecast over it, or an unusual jump |
+| Spending | AWS Budgets, cost anomaly detection, the [[GitHub Actions]] budget | 85% and 100% of the month's budget, a forecast over it, or an unusual jump |
 | An agent needs Cole | [[drover\|Drover]] | A session is waiting on a question or a permission |
 
 The backup check is the one people forget: `OnFailure=` only fires when a job runs and fails, never when the timer that

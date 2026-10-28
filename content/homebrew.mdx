@@ -79,7 +79,7 @@ Because a Brewfile is Ruby, it can hold logic. Homebrew's docs show lines like `
 | Fun | figlet, fortune, ttyd |
 | Apps | Brave, Chrome, Ghostty, mitmproxy, VS Code, Bitwarden, Claude, Linear, Maccy, Mos, Wispr Flow, Tailscale, Google Antigravity |
 | Fonts | MesloLGS Nerd Font |
-| VS Code extensions | Claude Code, Remote SSH and Dev Containers, Python, YAML, Tailwind, GitHub Actions and more |
+| VS Code extensions | [[Claude Code]], Remote SSH and Dev Containers, Python, YAML, Tailwind, [[GitHub Actions]] and more |
 
 A few entries are worth calling out:
 
@@ -113,7 +113,7 @@ upgrade over it, so the line skips the cask on a Mac that has the App Store vers
 cask "bitwarden" unless File.exist?("/Applications/Bitwarden.app/Contents/_MASReceipt")
 ```
 
-**What is deliberately not here.** The Codex CLI is installed as an npm global by the installer instead, so every
+**What is deliberately not here.** The [[codex|Codex CLI]] is installed as an npm global by the installer instead, so every
 machine, Mac or Linux, Intel or ARM, gets the same binary and version; a Homebrew `codex` would fight it for the
 command name. macOS preferences, like tap to click, cannot live in a Brewfile at all; a separate script that the
 installer runs sets them with `defaults write`.
