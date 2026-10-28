@@ -20,7 +20,7 @@ People and agents edit it the same way: by pull request. An agent edit that pass
 | `scripts/` | Checks: pages, links in the built site, public safety, the deny-list tool |
 | `safety/denylist.json` | Salted hashes of phrases that must never be published |
 | `docs/` | The editing guide, design records and plans |
-| `.github/workflows/` | CI, agent auto-merge, the weekly external link check |
+| `.github/workflows/` | CI, agent auto-merge, the weekly external link check, the daily agent-branch cleanup |
 
 ## Develop
 
@@ -71,7 +71,9 @@ Every pull request to `master` runs four required checks: **build** (unit tests,
 end to end), **links**, **gitleaks** and **public-safety** (sources, the built site, the pull request's title, body and
 commit messages). A pull request labelled `agent-edit`, opened by `coletebou` from a branch of this repository, not a
 draft, that changes only `content/*.mdx`, is squash-merged automatically when the checks pass. Everything else waits for
-review. Vercel deploys `master` to production and every pull request to a preview.
+review. GitHub's own branch deletion skips merges made by GitHub Actions, so a daily job deletes `agent-edit` branches
+once nothing is open on them. Vercel deploys `master` to production and every pull request to a preview, which only
+the Vercel team can open.
 
 The public-safety rules are in [docs/EDITING.md](docs/EDITING.md#the-public-safety-rules). To add a phrase to the
 deny-list without committing it: `node scripts/denylist.mjs add <kind> "<phrase>"`; to rebuild it from a private list of
