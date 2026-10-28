@@ -1,0 +1,34 @@
+# GitHub deletes a merged pull request's branch on its own, except when GitHub Actions made the merge, which is how
+# every agent edit lands (agent-automerge.yml). This removes agent-edit branches once every pull request from them is
+# closed or merged. A branch with an open pull request, or none yet (propose_edit makes the branch just before the
+# pull request), is kept.
+name: agent-branch-cleanup
+
+on:
+  schedule:
+    - cron: '41 5 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  agent-branch-cleanup:
+    name: agent-branch-cleanup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Delete agent-edit branches with nothing open on them
+        run: |
+          gh api "repos/$REPO/git/matching-refs/heads/agent-edit/" --paginate --jq '.[].ref | sub("^refs/heads/"; "")' |
+            while IFS= read -r branch; do
+              states=$(gh api -X GET "repos/$REPO/pulls" -f state=all -f head="${REPO%%/*}:$branch" --jq '[.[].state] | join(" ")')
+              if [ -z "$states" ]; then echo "kept $branch: no pull request yet"; continue; fi
+              case " $states " in *" open "*) echo "kept $branch: a pull request is open"; continue ;; esac
+              gh api -X DELETE "repos/$REPO/git/refs/heads/${branch//+/%2B}" && echo "deleted $branch"
+            done
