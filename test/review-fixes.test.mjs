@@ -1,10 +1,16 @@
-// Regression tests for the issues the first independent review found.
+// Regression tests for the issues the independent reviews found, round by round.
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { createProcessor } from '@mdx-js/mdx';
+import { mdxToJs } from 'satteri';
 import { parseFrontmatter } from '../lib/frontmatter.mjs';
 import { mdxProblems } from '../lib/mdx-safety.mjs';
 import { SALT, hashPhrase, scanText } from '../lib/safety.mjs';
+import { wikiLinks } from '../lib/satteri-wikilinks.mjs';
 import { headingText, slugify } from '../lib/wikilinks.mjs';
 
 const j = (...parts) => parts.join('');
@@ -73,4 +79,24 @@ test('round 2: public IPv6 and legacy Bitcoin addresses are caught', () => {
   assert.deepEqual(rules('docs 2001:db8::1, loopback ::1, link fe80::1, ULA fd12:3456::1, time 12:30:45, a 2001:db8::/32'), []);
   assert.deepEqual(rules(j('pay 1A1zP1eP5QGefi2', 'DMPTfTL5SLmv7DivfNa')), ['wallet:btc-legacy']);
   assert.deepEqual(rules('id 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNb is not a valid address'), []);
+});
+
+test('round 3: an IPv6 host stays a host with a prefix length after it, and a trailing :: is an address', () => {
+  assert.deepEqual(rules(j('dns 2606:4700:', '4700::1111/48')), ['ip:public6']);
+  assert.deepEqual(rules(j('host 2606:4700:', '4700:1:2:3:4::')), ['ip:public6']);
+  assert.deepEqual(rules('ranges 2606:4700::/32 and 2001:db8::/32, the time 12:30:45, std::vector::iterator'), []);
+});
+
+test('round 3: the build fails on a [[ that would print as raw brackets', (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'wiki-build-test-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const content = path.join(dir, 'content');
+  mkdirSync(content);
+  for (const slug of ['other', 'here']) writeFileSync(path.join(content, `${slug}.mdx`), `---\ntitle: ${slug}\n---\nText.\n`);
+  // As Astro compiles a page of the content collection: Sätteri's MDX pipeline with the wiki-link plugin.
+  const compile = (body) => mdxToJs(body, { mdastPlugins: [wikiLinks({ contentDir: content })], fileURL: pathToFileURL(path.join(content, 'here.mdx')) });
+  assert.match(compile('See [[other|plain words]], [[other]] and [[#a-heading|this page]].').code, /wikilink/);
+  for (const body of ['See [[other|_split_]] here.', 'See [[other|~~gone~~]] here.', 'See [[other|at https://example.com]] here.', 'See [[other|a\nwrapped label]].', '[see [[other]]](https://example.com)', 'Left [[open here.', '| a | b |\n|---|---|\n| [[other|label]] | x |']) {
+    assert.throws(() => compile(body), /would print as raw brackets/, body);
+  }
 });
