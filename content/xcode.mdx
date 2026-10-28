@@ -29,7 +29,7 @@ sources:
 ---
 
 Xcode is Apple's integrated development environment and, more importantly, its toolchain: the Swift compiler, the
-SDKs, the simulators, the code signing machinery and the upload tools that every iPhone, Apple Watch and Mac app
+SDKs, the simulators, the code signing machinery and the upload tools that every iPhone, [[apple-watch-apps|Apple Watch]] and Mac app
 passes through. It is free and runs only on a Mac. In Cole's setup Xcode is less an editor than an engine: agents
 write the Swift, and they build, test and run it through Xcode's command line tools, with the Xcode window open
 mostly for the simulator, signing and the few things only it does. It is one stop on the [[ios-development]] map.
@@ -38,10 +38,10 @@ mostly for the simulator, signing and the few things only it does. It is one sto
 
 | Part | What it does |
 |---|---|
-| The Xcode app | Editor, SwiftUI previews, the debugger, the coding assistant |
+| The Xcode app | Editor, [[capacitor-expo-swift\|SwiftUI]] previews, the debugger, the coding assistant |
 | Device Hub | Simulators and paired devices, in one window (Xcode 27) |
 | Instruments | Profiling: time, memory, energy, leaks |
-| Organizer | Archives, distribution to TestFlight and Developer ID, crash reports |
+| Organizer | Archives, distribution to [[TestFlight]] and Developer ID, crash reports |
 | `xcodebuild` | Builds, tests, archives and exports from the terminal |
 | `xcrun simctl` | Creates, boots and drives simulators |
 | `xcrun devicectl` | Installs and launches apps on real devices ([[push-to-your-phone]]) |
@@ -129,7 +129,7 @@ xcrun simctl list devices available                               # simulators y
 ```
 
 Tide's [[github-actions|GitHub Actions]] workflow runs exactly these three layers on every push: the core package
-tests, a simulator build, and its UI tests on an iPad simulator, with the screenshots kept as an artifact. Drover's
+tests, a simulator build, and its UI tests on an iPad simulator, with the screenshots kept as an artifact. [[Drover]]'s
 apps take a `--mock` launch argument (`xcrun simctl launch <device> dev.drover.app --mock`) that runs them on
 synthetic data, which is how its screenshots are made without a real daemon.
 
