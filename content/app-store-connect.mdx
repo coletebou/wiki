@@ -95,7 +95,7 @@ and Access, under Integrations, App Store Connect API:
 - **The private key downloads exactly once.** Apple keeps only the public half. Store the `.p8` file the way you
   store any credential (see [[env-files]] and [[pgp]]), never in a repository, and revoke it if it leaks.
 
-Drover's manual signing workflow shows the safe shape in CI: the key lives in GitHub secrets, a step writes it to the
+[[Drover]]'s manual signing workflow shows the safe shape in CI: the key lives in GitHub secrets, a step writes it to the
 runner's temporary directory with mode `600`, only the steps that need it receive it, and a final step deletes it
 even when the run fails. Here is a generic version of the upload its script performs:
 

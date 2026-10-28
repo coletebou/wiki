@@ -48,7 +48,7 @@ Every machine should feel like the same machine.
 Two settings decide what a machine runs, and the installer records both in `~/.df-profile`:
 
 - **Identity** is who you are on this machine: your git name and email, the short labels for your machines, your
-  Claude Code rules and settings, your shell additions. Personal and work are separate identities, so credentials and
+  [[Claude Code]] rules and settings, your shell additions. Personal and work are separate identities, so credentials and
   config from one never leak into the other. dx ships one synthetic identity, `example`, to copy and edit.
 - **Role** is what the machine is for. `local` is a workstation (macOS, Linux or [[wsl|WSL]]); `server` is a box that
   runs agents and services, with a leaner shell.
@@ -169,7 +169,7 @@ dx is also a [[skills-and-plugins|Claude Code plugin marketplace]], so you can t
 | Plugin | What it gives you |
 |---|---|
 | `session` | [[cc-park]], to park idle Claude Code sessions and resume them with one key, and fresh-session handoffs ([[handoff-chains]]) |
-| `worktrees` | [[parallel-worktrees]]: N Claude Code or Codex sessions in their own worktrees and tmux windows, plus branch stacking |
+| `worktrees` | [[parallel-worktrees]]: N Claude Code or [[Codex]] sessions in their own worktrees and tmux windows, plus branch stacking |
 | `tmux` | `tmux-archive` and `tmux-organize`, to snapshot every pane and to rename and regroup windows by what is in them |
 | `memory` | End-of-session reflections, a nightly memory consolidation, and a scan of transcripts for unfinished work ([[reflection-store]]) |
 | `codex` | Codex subagents driven through tmux, and reading what a Codex agent really did from its transcript |

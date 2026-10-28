@@ -20,7 +20,7 @@ sources:
 
 A bootstrap script turns a blank machine into your machine with one command. Cole's is `install.sh`, at the top of
 the [[dotfiles]]: it detects the operating system and processor, installs packages, pins the developer toolchain,
-links every config file into place, generates the Claude Code settings, sets up scheduled jobs, and writes down every
+links every config file into place, generates the [[Claude Code]] settings, sets up scheduled jobs, and writes down every
 change it makes. Run it twice and the second run changes nothing.
 
 <ColesTake>
@@ -52,7 +52,7 @@ strangers who want one piece. It installs components you name and nothing else:
 ./install.sh --all                   # or --with shell,git,tmux,claude,...
 ```
 
-The components are `shell`, `git`, `tmux`, `claude`, `codex`, and the plugin CLIs (`session`, `worktrees`, `memory`,
+The components are `shell`, `git`, `tmux`, `claude`, `codex`, and the plugin [[CLIs]] (`session`, `worktrees`, `memory`,
 `review`), plus three that `--all` leaves out on purpose: `schedules` (background jobs), `github-kit` (issue forms,
 labels and workflows copied into a repository) and `manager` (a [[drover|Drover]] setting). It never installs
 packages; it links files and generates a few.
