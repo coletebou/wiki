@@ -67,5 +67,41 @@ test('a [[ that opens no wiki link is reported: a wrapped label, one never close
   assert.match(wrapped[0], stray);
   assert.match((await msgs('Left [[other open.')).join(), stray);
   assert.match((await msgs('Three [[[other]] brackets.')).join(), stray);
-  assert.deepEqual(await msgs('Fine: [[other]], [[other|label]], `[[ -f x ]]`, \\[\\[escaped]] and\n\n```sh\n[[ -n "$x" ]]\n```'), []);
+  // An escape is undone before the site looks for links, so \[\[x]] would still be read as one.
+  assert.match((await msgs('Escaped \\[\\[other]] brackets.')).join(), /escaped brackets still render as \[\[/);
+  assert.deepEqual(await msgs('Fine: [[other]], [[other|label]], `[[ -f x ]]` and\n\n```sh\n[[ -n "$x" ]]\n```'), []);
+});
+
+test('a wiki-link label must be plain words: whatever Markdown parses in it splits the link', async () => {
+  const page = (slug, body, folio) => ({
+    slug,
+    source: `---\n---\n${body}`,
+    body,
+    offset: 2,
+    data: { title: slug, summary: 'A summary that is long enough to pass.', table: 'shell', folio, updated: '2026-10-28' },
+  });
+  const msgs = async (label) => {
+    const problems = await validatePages({ pages: [page('here', `See [[other|${label}]] here.`, 1), page('other', 'Text.', 2)], targets: ['here'] });
+    return (problems.get('here') ?? []).map((p) => p.msg).join('\n');
+  };
+  const plain = /label must be plain words/;
+  for (const label of ['`code`', '*it*', '_it_', '__bold__', '~~struck~~', '<kbd>x</kbd>', 'a {/* c */} b', 'at https://example.com', 'at www.example.com', 'mail a@example.com']) {
+    assert.match(await msgs(label), plain, label);
+  }
+  for (const label of ['snake_case words', 'Tom &amp; Jerry', 'the @coletebou account', 'plain words']) {
+    assert.equal(await msgs(label), '', label);
+  }
+});
+
+test('in a table row a wiki link escapes its pipe, or the cell ends inside it', async () => {
+  const page = (slug, body, folio) => ({
+    slug,
+    source: `---\n---\n${body}`,
+    body,
+    offset: 2,
+    data: { title: slug, summary: 'A summary that is long enough to pass.', table: 'shell', folio, updated: '2026-10-28' },
+  });
+  const body = '| a | b |\n|---|---|\n| [[other|label]] | x |\n| [[other\\|label]] | y |\n\nProse may use [[other|label]].';
+  const problems = await validatePages({ pages: [page('here', body, 1), page('other', 'Text.', 2)], targets: ['here'] });
+  assert.deepEqual((problems.get('here') ?? []).map((p) => `${p.line} ${p.msg}`), ['5 [[other|label]]: in a table cell write the pipe escaped, [[target\\|label]]']);
 });

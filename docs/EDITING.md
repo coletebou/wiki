@@ -29,10 +29,12 @@ The body is MDX: Markdown that can hold a few components.
 - No `#` heading: the title comes from the frontmatter. Open with a short paragraph that says what the thing is and why
   it matters; its first words become the page's incipit in the catalogue. Then `##` sections and `###` below them.
 - **Wiki links:** `[[slug]]`, `[[slug|label]]`, `[[slug#section-id|label]]`. A target may be a slug, a title or an
-  alias. Inside a table cell escape the pipe: `[[slug\|label]]`. Keep each link on one line: a label that wraps onto
-  the next line is not a link, and the checks refuse it. The label is plain words, no code or formatting. A link to a
-  page that does not exist fails the build, so add the page in the same change or leave the link out. Section ids are
-  the heading text lowercased, spaces to hyphens, punctuation dropped (`## The \`tm\` picker` is `#the-tm-picker`).
+  alias. Inside a table cell escape the pipe, `[[slug\|label]]`, or the cell ends inside the link. Keep each link on
+  one line: a label that wraps onto the next line is not a link. The label is plain words: no code, emphasis, HTML,
+  comments or bare web addresses, which would split it. Literal double brackets belong in code (escaping them does not
+  work: `\[\[` still renders as a link). The checks and the build refuse each of these. A link to a page that does not
+  exist fails the build, so add the page in the same change or leave the link out. Section ids are the heading text
+  lowercased, spaces to hyphens, punctuation dropped (`## The \`tm\` picker` is `#the-tm-picker`).
 - Link the first mention of anything that has a page. Ordinary Markdown links for the rest of the web, official
   documentation first.
 - No `import` or `export` lines and no HTML comments (`<!-- -->` is invalid MDX; write `{/* ... */}`). A bare `{` or

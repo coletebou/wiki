@@ -29,6 +29,11 @@ const ID = /\s(?:id|name)\s*=\s*"([^"]+)"/g;
 
 const files = walk(dist);
 const html = files.filter((f) => f.endsWith('.html'));
+// An empty directory (a build that failed after clearing it) must not pass as a site with no broken links.
+if (!html.length) {
+  console.error(`check-links: no pages in ${dist}; build the site first`);
+  process.exit(2);
+}
 const ids = new Map();
 const idsOf = (file) => {
   if (!ids.has(file)) {
