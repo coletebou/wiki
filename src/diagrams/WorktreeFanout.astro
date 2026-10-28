@@ -308,6 +308,8 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
 </style>
 
 <script>
+  import { reveal } from '../scripts/study-scroll';
+
   type Lane = { tag: string; branch: string; engine: string; done: string };
   const NS = 'http://www.w3.org/2000/svg';
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -371,6 +373,7 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
         const el = laneEls[i];
         later(t, () => {
           el.classList.add('grown');
+          reveal(el.querySelectorAll('.tree'));
           say(`Lane ${i + 1}: a worktree`, `<code>wt-helper</code> branches <code>${esc(lanes[i].branch)}</code> from <code>origin/HEAD</code> into <code>.claude/worktrees/${esc(lanes[i].tag)}</code>, git-ignored inside the repository.`);
         });
         boot.forEach((b, j) => later(t + 500 + j * 160, () => el.querySelector(`[data-chip="${j}"]`)?.classList.add('on')));
@@ -391,6 +394,7 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
           log(`<<SESSION tag=${lanes[i].tag} branch=${lanes[i].branch}>>`, 'sentinel');
           log(lanes[i].done, 'summary');
           log(`<<END SESSION ${lanes[i].tag}>>`, 'sentinel');
+          reveal(fig.querySelectorAll('.log-box'));
           say(`${lanes[i].tag} finished`, `Its footer piped the summary into <code>pw-append</code>, which takes a <code>mkdir</code> lock first, so two lanes that finish together never interleave. A merge agent can pull one lane out with a single <code>grep</code>.`);
         });
         d += reduced ? 0 : 1100;

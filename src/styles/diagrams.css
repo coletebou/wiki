@@ -258,6 +258,30 @@
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
 }
+/* A drawing wider than its frame fades out at each edge with more of it beyond (src/scripts/study-scroll.ts). */
+.study-scroll.more-right {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+}
+.study-scroll.more-left {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent);
+}
+.study-scroll.more-left.more-right {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+}
+.study-swipe {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  text-align: center;
+  color: var(--ink-3);
+}
+.study-swipe::before {
+  content: '⟷ ';
+  font-style: normal;
+}
 .study-table {
   width: 100%;
   margin-top: 1rem;

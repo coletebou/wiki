@@ -223,6 +223,8 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
 </style>
 
 <script>
+  import { reveal } from '../scripts/study-scroll';
+
   type Binding = { layer: string; key: string; shift?: boolean; ctrl?: boolean; chord: string[]; action: string; why: string; conf: string; stock?: boolean };
   type Data = { bindings: Binding[]; mouse: { action: string; how: string; why: string }[]; layers: { id: string; label: string; note: string }[] };
 
@@ -275,6 +277,7 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
         if (exact.length) list = exact;
       }
       for (const k of board.querySelectorAll('.key')) k.classList.toggle('on', (k as SVGGElement).dataset.key === key);
+      reveal(board.querySelectorAll('.key.on'));
       for (const k of board.querySelectorAll('.m-shift')) k.classList.toggle('lit', list.some((b) => b.shift));
       panel.innerHTML = list
         .map(

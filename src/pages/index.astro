@@ -117,7 +117,7 @@ const cited = [...pages]
             <h3>The library in numbers</h3>
             <ul>
               <li>{pages.length} folios in {tables.filter((t) => t.pages.length).length} tables<small>every one in the <a href="/pinakes/">Pinakes</a></small></li>
-              <li>{[...graph.outlinks.values()].reduce((n: number, l: unknown[]) => n + l.length, 0)} cross-references<small>each answered on the back of its leaf</small></li>
+              <li>{[...graph.outlinks.values()].reduce((n: number, l: unknown[]) => n + l.length, 0).toLocaleString('en-US')} cross-references<small>each answered on the back of its leaf</small></li>
               <li>Kept by people and agents<small>through <a href="/wiki-mcp/">the wiki’s MCP</a>, by pull request</small></li>
             </ul>
             {pages[0] && <p style="margin-top: 1rem; font-style: italic; color: var(--ink-2)">inc. “{incipit(pages[0].body ?? '', 9)}”</p>}
