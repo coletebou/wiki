@@ -54,11 +54,7 @@ jobs:
           echo "reason=$reason" >> "$GITHUB_OUTPUT"
       - name: Enable squash auto-merge on this exact head commit
         if: steps.decide.outputs.reason == ''
-        env:
-          # The squash commit is authored by the pull request's author under their GitHub noreply address, never the
-          # account's primary email: the history of a public repository is public.
-          AUTHOR_EMAIL: ${{ github.event.pull_request.user.id }}+${{ github.event.pull_request.user.login }}@users.noreply.github.com
-        run: gh pr merge "$PR" --repo "$REPO" --auto --squash --match-head-commit "$HEAD_SHA" --author-email "$AUTHOR_EMAIL"
+        run: gh pr merge "$PR" --repo "$REPO" --auto --squash --match-head-commit "$HEAD_SHA"
       - name: Hold for review
         if: steps.decide.outputs.reason != ''
         env:
