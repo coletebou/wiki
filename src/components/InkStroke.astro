@@ -1,11 +1,37 @@
 ---
-// A hand-drawn stroke of red chalk under a title.
+// A stroke of red chalk under a title, as a pen lays one down: it starts fine, swells under the hand and thins out
+// into a curl, with a hairline beneath. Each folio's stroke wavers its own way (the seed is the folio number).
 const { seed = 1 } = Astro.props as { seed?: number };
 const w = (n: number) => (Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453) % 1;
-const y = (n: number) => (7 + w(n) * 2.2).toFixed(2);
-const d = `M2 ${y(1)} C 60 ${y(2)}, 120 ${y(3)}, 180 ${y(4)} S 300 ${y(5)}, 348 ${y(6)}`;
+const y = (n: number) => 7 + w(n) * 2.2;
+const r = (n: number) => n.toFixed(2);
+// The spine, through five wavering heights; then the pressure along it.
+const ys = [y(1), y(2), y(3), y(4), y(5), y(6)];
+const at = (t: number) => {
+  const f = t * (ys.length - 1);
+  const i = Math.min(ys.length - 2, Math.floor(f));
+  const s = f - i;
+  const e = s * s * (3 - 2 * s);
+  return ys[i] + (ys[i + 1] - ys[i]) * e;
+};
+const END = 318;
+const N = 36;
+const pts = Array.from({ length: N + 1 }, (_, i) => {
+  const t = i / N;
+  const half = 0.35 + 2.05 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.7)), 1.1) * (1 - 0.3 * t);
+  return { x: 3 + t * (END - 3), y: at(t), half };
+});
+const swash = `M${pts.map((p) => `${r(p.x)} ${r(p.y - p.half)}`).join('L')}L${pts
+  .slice()
+  .reverse()
+  .map((p) => `${r(p.x)} ${r(p.y + p.half)}`)
+  .join('L')}Z`;
+const last = pts[pts.length - 1];
+const curl = `M${r(last.x - 3)} ${r(last.y)}C${r(last.x + 10)} ${r(last.y - 0.6)} ${r(last.x + 22)} ${r(last.y - 3.6)} ${r(last.x + 17)} ${r(last.y - 4.6)}C${r(last.x + 12)} ${r(last.y - 5.4)} ${r(last.x + 10)} ${r(last.y - 0.8)} ${r(last.x + 24)} ${r(last.y + 2.2)}`;
+const hair = `M30 ${r(y(7) + 1.4)} C 110 ${r(y(8) + 1.4)}, 200 ${r(y(9) + 1.4)}, 290 ${r(y(10) + 1.2)}`;
 ---
 <svg class="underline-stroke" viewBox="0 0 350 14" preserveAspectRatio="none" aria-hidden="true">
-  <path d={d} fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.85" />
-  <path d={`M30 ${y(7)} C 110 ${y(8)}, 200 ${y(9)}, 300 ${y(10)}`} fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.45" />
+  <path d={swash} fill="currentColor" opacity="0.85" />
+  <path d={curl} fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity="0.85" />
+  <path d={hair} fill="none" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" opacity="0.5" />
 </svg>
