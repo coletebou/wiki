@@ -3,6 +3,8 @@
 // boxes, ledgers and marks joined by curved flows, with views to switch between, a walk-through that lights up each
 // step, and any part you click or tab to explained below. Everything is drawn at build time; the script only toggles.
 import type { FNode, Flow, Scene } from '../data/agent-fleet';
+import { emblem } from './emblems';
+import { HATCH_TURN, overshoot, plate } from './ink';
 
 interface Props {
   scenes: Scene[];
@@ -62,6 +64,39 @@ function geometry(scene: Scene, fl: Flow) {
   return { d: `M${f(s.x)} ${f(s.y)} Q${f(ctrl.x)} ${f(ctrl.y)} ${f(e.x)} ${f(e.y)}`, lx: mid.x, ly: mid.y - 6, len: Math.round(Math.hypot(e.x - s.x, e.y - s.y) * 1.25) };
 }
 
+// The hand: every part drawn as an engraver would. Boxes are ruled cartouches whose lines run past their corners, as
+// a draughtsman's do; stores are scrolls, rolled at both ends; tabs are the tags that hung from them; frames are
+// plates with cornerpieces. Shadows fall to the lower right in Leonardo's left-handed hatching.
+const ROLL = 11;
+function scroll(x: number, y: number, w: number, h: number) {
+  const ext = 3;
+  const ry = 2.3;
+  const roll = (x0: number) => {
+    const cx = x0 + ROLL / 2;
+    return {
+      body: `M${x0} ${y - ext}V${y + h + ext}A${ROLL / 2} ${ry} 0 0 0 ${x0 + ROLL} ${y + h + ext}V${y - ext}Z`,
+      shade: `M${f(x0 + ROLL * 0.56)} ${y - ext}V${f(y + h + ext + ry * 0.9)}A${ROLL / 2} ${ry} 0 0 0 ${x0 + ROLL} ${y + h + ext}V${y - ext}Z`,
+      end: `M${x0} ${y - ext}A${ROLL / 2} ${ry} 0 1 0 ${x0 + ROLL} ${y - ext}A${ROLL / 2} ${ry} 0 1 0 ${x0} ${y - ext}Z`,
+      curl: `M${f(cx - 2.6)} ${y - ext}A2.6 1.1 0 1 0 ${f(cx + 2.6)} ${y - ext}A1.4 0.6 0 1 0 ${f(cx - 0.2)} ${y - ext}`,
+      knobs: `M${cx} ${f(y - ext - ry)}v-3.2M${cx} ${f(y + h + ext + ry)}v3.2`,
+    };
+  };
+  return [roll(x), roll(x + w - ROLL)];
+}
+const tagPath = (x: number, y: number, w: number, h: number) => `M${x + 8} ${y}H${x + w}V${y + h}H${x + 8}L${x} ${y + h / 2}Z`;
+function cornerpieces(x: number, y: number, w: number, h: number) {
+  const i = 5;
+  return [
+    [x + i, y + i, 1, 1],
+    [x + w - i, y + i, -1, 1],
+    [x + i, y + h - i, 1, -1],
+    [x + w - i, y + h - i, -1, -1],
+  ]
+    .map(([cx, cy, sx, sy]) => `M${cx} ${cy + sy * 11}A11 11 0 0 ${sx === sy ? 0 : 1} ${cx + sx * 11} ${cy}M${cx + sx * 3.4} ${cy + sy * 3.4}m-0.9 0a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0`)
+    .join('');
+}
+const sheet = plate(W, H);
+
 const payload = JSON.stringify(
   scenes.map((s) => ({
     id: s.id,
@@ -89,28 +124,43 @@ const payload = JSON.stringify(
   <div class="study-scroll">
     <svg class="study-svg inkmap-svg" viewBox={`0 0 ${W} ${H}`} role="group" aria-label={title} style="min-width: 660px">
       <defs>
-        <pattern id={`${uid}-hatch`} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="5" stroke="currentColor" stroke-width="0.9" opacity="0.45" />
+        {/* Hatching from upper left to lower right, the way Leonardo's left hand ran. */}
+        <pattern id={`${uid}-hatch`} width="3.6" height="3.6" patternUnits="userSpaceOnUse" patternTransform={`rotate(${HATCH_TURN})`}>
+          <line x1="0" y1="0" x2="0" y2="3.6" stroke="currentColor" stroke-width="0.75" opacity="0.5" />
         </pattern>
-        <pattern id={`${uid}-chalk`} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="5" stroke="var(--sanguine-2)" stroke-width="1.2" opacity="0.6" />
+        <pattern id={`${uid}-chalk`} width="4" height="4" patternUnits="userSpaceOnUse" patternTransform={`rotate(${HATCH_TURN})`}>
+          <line x1="0" y1="0" x2="0" y2="4" stroke="var(--sanguine-2)" stroke-width="1.1" opacity="0.6" />
         </pattern>
-        <marker id={`${uid}-arrow`} viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M1 1.5 L9 5 L1 8.5" fill="none" style="stroke: var(--ink-3); stroke: context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        <marker id={`${uid}-arrow`} viewBox="0 0 12 10" refX="10.5" refY="5" markerWidth="8" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0.8 1.2 L11.2 5 L0.8 8.8 L3.6 5 Z" stroke="none" style="fill: var(--ink-3); fill: context-stroke" />
+        </marker>
+        <marker id={`${uid}-prick`} viewBox="0 0 6 6" refX="3" refY="3" markerWidth="3.2" markerHeight="3.2">
+          <circle cx="3" cy="3" r="2.2" stroke="none" style="fill: var(--ink-3); fill: context-stroke" />
         </marker>
         <filter id={`${uid}-ink`} x="-3%" y="-3%" width="106%" height="106%">
           <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7" result="n" />
-          <feDisplacementMap in="SourceGraphic" in2="n" scale="1.8" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="1.4" />
         </filter>
       </defs>
+      <g class="plate" aria-hidden="true">
+        <path d={sheet.ticks} />
+        <path d={sheet.corners} />
+      </g>
       {scenes.map((scene) => (
         <g class="scene" data-scene={scene.id} data-quiet={scene.flows.length >= 8 ? 'true' : undefined} display={scene.id === first.id ? undefined : 'none'}>
           {scene.decor && <g class="decor" aria-hidden="true" set:html={scene.decor} />}
+          {scene.emblem && (
+            <g class="emblem" aria-hidden="true">
+              <g transform={`translate(${scene.emblem.x} ${scene.emblem.y}) scale(${scene.emblem.size / 100})`} set:html={emblem(scene.emblem, uid)} />
+              {scene.emblem.label && <text class="label-hand emblem-label" x={scene.emblem.x} y={scene.emblem.y + scene.emblem.size / 2 + 16} text-anchor="middle">{scene.emblem.label}</text>}
+            </g>
+          )}
           <text class="label-hand motto" x={scene.mottoAt?.x ?? W - 18} y={scene.mottoAt?.y ?? H - 12} text-anchor={scene.mottoAt?.anchor ?? 'end'} aria-hidden="true">{scene.motto}</text>
           {scene.nodes.filter((n) => n.kind === 'frame').map((n) => (
             <g class="frame-g" data-node={n.id}>
-              <rect class="frame draw-on" x={n.x} y={n.y} width={n.w} height={n.h} rx="12" filter={`url(#${uid}-ink)`} style={`--len:${2 * ((n.w ?? 0) + (n.h ?? 0))}`} />
-              <rect class="frame-inner" x={n.x + 5} y={n.y + 5} width={(n.w ?? 0) - 10} height={(n.h ?? 0) - 10} rx="9" />
+              <rect class="frame draw-on" x={n.x} y={n.y} width={n.w} height={n.h} rx="3" filter={`url(#${uid}-ink)`} style={`--len:${2 * ((n.w ?? 0) + (n.h ?? 0))}`} />
+              <rect class="frame-inner" x={n.x + 5} y={n.y + 5} width={(n.w ?? 0) - 10} height={(n.h ?? 0) - 10} rx="1" />
+              <path class="frame-corners" d={cornerpieces(n.x, n.y, n.w ?? 0, n.h ?? 0)} />
               <text class="caps frame-title" x={n.x + 18} y={n.y + 26}>{n.label}</text>
             </g>
           ))}
@@ -118,7 +168,7 @@ const payload = JSON.stringify(
             const g = geometry(scene, fl);
             return (
               <g class="flow-g" data-flow={fl.id} data-from={fl.from} data-to={fl.to}>
-                <path class={`flow-line${fl.dashed ? ' dashed' : ''}`} d={g.d} marker-end={`url(#${uid}-arrow)`} style={`--len:${g.len}`} />
+                <path class={`flow-line${fl.dashed ? ' dashed' : ''}`} d={g.d} marker-start={`url(#${uid}-prick)`} marker-end={`url(#${uid}-arrow)`} style={`--len:${g.len}`} />
                 {particles && <circle class="particle" r="3"><animateMotion dur="2.4s" repeatCount="indefinite" path={g.d} /></circle>}
               </g>
             );
@@ -131,6 +181,7 @@ const payload = JSON.stringify(
                 <g class="node dot" data-node={n.id} tabindex="0" role="button" aria-label={label}>
                   <circle class="hit" cx={n.x} cy={n.y} r={(n.r ?? 8) + 9} />
                   <circle class="box" cx={n.x} cy={n.y} r={n.r ?? 8} />
+                  <circle class="boss" cx={n.x} cy={n.y} r={(n.r ?? 8) - 3.2} />
                   <circle class="pip" cx={n.x} cy={n.y} r="3" />
                   <text class="node-label" x={n.x + (n.lx ?? 0)} y={n.y + (n.ly ?? 0)} text-anchor={n.anchor ?? 'middle'}>{label}</text>
                 </g>
@@ -139,18 +190,40 @@ const payload = JSON.stringify(
             const w = n.w ?? 0;
             const h = n.h ?? 0;
             const ty = c.y + (n.sub ? -3 : 5);
+            const tx = c.x + (n.kind === 'tab' ? 4 : 0);
             return (
               <g class={`node ${n.kind}${n.dashed ? ' dashed' : ''}`} data-node={n.id} tabindex="0" role="button" aria-label={n.sub ? `${label}: ${n.sub}` : label}>
-                {n.kind !== 'tab' && <rect class="shade" x={n.x + 5} y={n.y + 5} width={w} height={h} rx="7" fill={`url(#${uid}-hatch)`} />}
-                <rect class="box draw-on" x={n.x} y={n.y} width={w} height={h} rx={n.kind === 'tab' ? 4 : 7} style={`--len:${2 * (w + h)}`} />
-                {n.kind === 'store' && (
+                {n.kind === 'box' && (
                   <>
-                    <path class="spine" d={`M${n.x + 12} ${n.y + 4}V${n.y + h - 4}M${n.x + 16} ${n.y + 4}V${n.y + h - 4}`} />
-                    <path class="pages" d={`M${n.x + 4} ${n.y + h + 3}H${n.x + w - 2}M${n.x + 8} ${n.y + h + 6}H${n.x + w - 6}`} />
+                    <rect class="shade" x={n.x + 4.5} y={n.y + 4.5} width={w} height={h} rx="2" fill={`url(#${uid}-hatch)`} />
+                    <rect class="box draw-on" x={n.x} y={n.y} width={w} height={h} rx="2" style={`--len:${2 * (w + h)}`} />
+                    <rect class="rule" x={n.x + 3.5} y={n.y + 3.5} width={w - 7} height={h - 7} rx="1" />
+                    <path class="ticks" d={overshoot(n.x, n.y, w, h)} />
                   </>
                 )}
-                <text class={n.kind === 'tab' ? 'node-label mono' : 'node-label'} x={c.x + (n.kind === 'store' ? 7 : 0)} y={n.kind === 'tab' ? c.y + 5 : ty} text-anchor="middle">{label}</text>
-                {n.sub && <text class="node-sub" x={c.x + (n.kind === 'store' ? 7 : 0)} y={ty + 17} text-anchor="middle">{n.sub}</text>}
+                {n.kind === 'store' && (
+                  <>
+                    <rect class="shade" x={n.x + ROLL / 2 + 4.5} y={n.y + 4.5} width={w - ROLL} height={h} fill={`url(#${uid}-hatch)`} />
+                    <rect class="box draw-on" x={n.x + ROLL / 2} y={n.y} width={w - ROLL} height={h} style={`--len:${2 * (w + h)}`} />
+                    <path class="rule" d={`M${n.x + ROLL + 4} ${n.y + 4.5}H${n.x + w - ROLL - 4}M${n.x + ROLL + 4} ${n.y + h - 4.5}H${n.x + w - ROLL - 4}`} />
+                    {scroll(n.x, n.y, w, h).map((r) => (
+                      <g class="roll">
+                        <path class="roll-body" d={r.body} />
+                        <path class="roll-shade" d={r.shade} fill={`url(#${uid}-hatch)`} />
+                        <path class="roll-end" d={r.end} />
+                        <path class="roll-fine" d={r.curl + r.knobs} />
+                      </g>
+                    ))}
+                  </>
+                )}
+                {n.kind === 'tab' && (
+                  <>
+                    <path class="box draw-on" d={tagPath(n.x, n.y, w, h)} style={`--len:${2 * (w + h)}`} />
+                    <circle class="eyelet" cx={n.x + 8.5} cy={n.y + h / 2} r="2" />
+                  </>
+                )}
+                <text class={n.kind === 'tab' ? 'node-label mono' : 'node-label'} x={tx} y={n.kind === 'tab' ? c.y + 5 : ty} text-anchor="middle">{label}</text>
+                {n.sub && <text class="node-sub" x={tx} y={ty + 17} text-anchor="middle">{n.sub}</text>}
               </g>
             );
           })}
@@ -183,13 +256,25 @@ const payload = JSON.stringify(
   .inkmap-svg .frame {
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.5;
+    stroke-width: 1.4;
   }
   .inkmap-svg .frame-inner {
     fill: none;
     stroke: currentColor;
+    stroke-width: 0.55;
+    opacity: 0.55;
+  }
+  .inkmap-svg .frame-corners {
+    fill: none;
+    stroke: currentColor;
     stroke-width: 0.6;
-    opacity: 0.5;
+    opacity: 0.6;
+  }
+  .inkmap-svg .plate {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.6;
+    opacity: 0.3;
   }
   .inkmap-svg .frame-title {
     fill: var(--ink-2);
@@ -208,14 +293,53 @@ const payload = JSON.stringify(
     fill: color-mix(in srgb, var(--paper-2) 80%, var(--paper));
   }
   .inkmap-svg .node .shade {
-    opacity: 0.7;
+    opacity: 0.8;
   }
-  .inkmap-svg .spine,
-  .inkmap-svg .pages {
+  .inkmap-svg .node .rule {
     fill: none;
     stroke: currentColor;
+    stroke-width: 0.5;
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  .inkmap-svg .node .ticks {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.6;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .inkmap-svg .roll-body {
+    fill: var(--paper-2);
+    stroke: currentColor;
+    stroke-width: 1.15;
+    transition: stroke 0.2s;
+  }
+  .inkmap-svg .roll-end {
+    fill: var(--paper-3);
+    stroke: currentColor;
+    stroke-width: 1;
+    transition: stroke 0.2s;
+  }
+  .inkmap-svg .roll-shade {
+    stroke: none;
+  }
+  .inkmap-svg .roll-fine {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.65;
+    stroke-linecap: round;
+  }
+  .inkmap-svg .eyelet {
+    fill: var(--paper-2);
+    stroke: currentColor;
     stroke-width: 0.8;
-    opacity: 0.6;
+  }
+  .inkmap-svg .node.dot .boss {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.5;
+    opacity: 0.55;
   }
   .inkmap-svg .node-label {
     font-size: 17px;
@@ -249,13 +373,18 @@ const payload = JSON.stringify(
     fill: none;
     stroke: currentColor;
     stroke-width: 0.6;
-    stroke-dasharray: 2 4;
-    opacity: 0.45;
+    opacity: 0.5;
+  }
+  .inkmap-svg :global(.ring-ticks) {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.6;
+    opacity: 0.55;
   }
   .inkmap-svg :global(.ring-arrow) {
     fill: none;
     stroke: var(--sanguine-2);
-    stroke-width: 1.6;
+    stroke-width: 1.2;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
@@ -271,7 +400,9 @@ const payload = JSON.stringify(
     outline: none;
   }
   .inkmap-svg .node:hover .box,
-  .inkmap-svg .node:focus-visible .box {
+  .inkmap-svg .node:focus-visible .box,
+  .inkmap-svg .node:hover :is(.roll-body, .roll-end),
+  .inkmap .inkmap-svg .node.lit :is(.roll-body, .roll-end) {
     stroke: var(--sanguine);
   }
   .inkmap-svg .node:focus-visible .box {
@@ -308,6 +439,14 @@ const payload = JSON.stringify(
   }
   .inkmap-svg .motto {
     opacity: 0.55;
+  }
+  .inkmap-svg .emblem {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .inkmap-svg .emblem-label {
+    font-size: 17px;
+    opacity: 0.85;
   }
   /* Lit: the parts a step or a chosen node is about. Everything else steps back. */
   .inkmap.focused .inkmap-svg .node:not(.lit),

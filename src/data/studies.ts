@@ -23,6 +23,7 @@ export const OBSERVABILITY: Scene[] = [
     id: 'path',
     name: 'The path',
     motto: 'de fluminibus',
+    emblem: { name: 'vortex', x: 748, y: 48, size: 62, label: 'vortex' },
     mottoAt: { x: 786, y: 462, anchor: 'end' },
     intro: 'Sources on the left, pipes in the middle, stores on the right, and the few alerts that reach a person. Follow any one signal: it ends in one place, never two.',
     nodes: obsNodes,
@@ -72,6 +73,7 @@ export const FRONT_DOOR: Scene[] = [
     id: 'server',
     name: 'To a server',
     motto: 'de portis',
+    emblem: { name: 'porta', x: 76, y: 332, size: 96, label: 'porta' },
     intro: 'One request from a visitor to a service on a server, one stop at a time. Step through it.',
     nodes: door(),
     flows: [
@@ -98,6 +100,7 @@ export const FRONT_DOOR: Scene[] = [
     id: 'bot',
     name: 'A bot',
     motto: 'de custodibus',
+    emblem: { name: 'scutum', x: 76, y: 332, size: 96, label: 'scutum' },
     intro: 'The same front door, met by a scraper or a credential-stuffing script. It never reaches the server.',
     nodes: door([{ id: 'stop', kind: 'tab', x: 444, y: 404, w: 120, h: 34, label: 'challenged', info: 'A managed challenge or a block: the request ends at the edge.' }]),
     flows: [
@@ -120,6 +123,7 @@ export const FRONT_DOOR: Scene[] = [
     id: 'vercel',
     name: 'To Vercel',
     motto: 'de via brevi',
+    emblem: { name: 'via', x: 250, y: 336, size: 140, label: 'via' },
     intro: 'Frontends on Vercel take a shorter path: a DNS-only record points straight at Vercel, which serves the site and manages its own certificates.',
     nodes: [
       ...door().filter((n) => ['visitor', 'dns'].includes(n.id)),

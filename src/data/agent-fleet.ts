@@ -2,6 +2,8 @@
 // plus a walk-through: numbered steps that light up the parts they talk about. Facts match the pages each view
 // illustrates (agent-fleet, hooks, agent-messaging, handoff-chains, cc-park, shared-brain).
 
+import type { Emblem } from '../diagrams/emblems';
+
 export type Kind = 'box' | 'frame' | 'store' | 'dot' | 'tab';
 export interface FNode {
   id: string;
@@ -50,6 +52,8 @@ export interface Scene {
   /** Extra ink drawn under the nodes (SVG markup), and where the motto sits. */
   decor?: string;
   mottoAt?: { x: number; y: number; anchor?: 'start' | 'middle' | 'end' };
+  /** A small ink sketch for an empty corner of the sheet (src/diagrams/emblems.ts). */
+  emblem?: Emblem;
 }
 
 const ring = (deg: number, r = 130, cx = 400, cy = 240) => ({
@@ -63,11 +67,34 @@ const ev = (id: string, deg: number, label: string, info: string): FNode => {
   return { id, kind: 'dot', ...p, r: 9, label, lx: out.x - p.x, ly: out.y - p.y + 4, anchor: side, info };
 };
 
+/** The hooks view's ring, drawn as an astrolabe's dial: a degree every five, a longer mark every thirty, between two
+ * rings, and an arrow struck outside it to say which way the session runs. */
+function dial(cx = 400, cy = 240) {
+  const at = (deg: number, r: number) => {
+    const a = (deg * Math.PI) / 180;
+    return `${(cx + r * Math.sin(a)).toFixed(1)} ${(cy - r * Math.cos(a)).toFixed(1)}`;
+  };
+  const ticks = Array.from({ length: 72 }, (_, i) => `M${at(i * 5, 121.5)}L${at(i * 5, i % 6 === 0 ? 127.5 : 124.5)}`).join('');
+  const head = (deg: number, r: number) => {
+    const a = (deg * Math.PI) / 180;
+    const [x, y] = [cx + r * Math.sin(a), cy - r * Math.cos(a)];
+    const [tx, ty] = [Math.cos(a), Math.sin(a)];
+    const barb = (s: number) => `${(x - tx * 6.5 + -ty * s * 3.2).toFixed(1)} ${(y - ty * 6.5 + tx * s * 3.2).toFixed(1)}`;
+    return `M${barb(1)}L${x.toFixed(1)} ${y.toFixed(1)}L${barb(-1)}`;
+  };
+  return (
+    `<circle cx="${cx}" cy="${cy}" r="130" class="ring" /><circle cx="${cx}" cy="${cy}" r="121.5" class="ring-fine" />` +
+    `<path d="${ticks}" class="ring-ticks" />` +
+    `<path d="M${at(7, 146)}A146 146 0 0 1 ${at(27, 146)}${head(27, 146)}" class="ring-arrow" />`
+  );
+}
+
 export const SCENES: Scene[] = [
   {
     id: 'fleet',
     name: 'The fleet',
     motto: 'de machinis',
+    emblem: { name: 'rotae', x: 400, y: 148, size: 70, label: 'rotae' },
     intro: 'The machines, the agents on them, and what ties them together. Pick a view above, or step through the tour.',
     nodes: [
       { id: 'phone', kind: 'box', x: 30, y: 26, w: 170, h: 62, label: 'Phone', sub: 'Termius · Drover app · watch', info: 'Cole checks in from the phone: Termius for a shell (SSH over Tailscale, Alt bindings and all), the Drover app and watch for who is waiting.' },
@@ -105,6 +132,7 @@ export const SCENES: Scene[] = [
     id: 'hooks',
     name: 'Hooks',
     motto: 'de vita sessionis',
+    emblem: { name: 'clepsydra', x: 62, y: 318, size: 76, label: 'clepsydra' },
     intro: 'A session’s life runs clockwise from the top. Each mark is a moment Claude Code runs Cole’s hooks; pick one to see what runs and where it writes.',
     nodes: [
       { id: 'core', kind: 'box', x: 330, y: 205, w: 140, h: 66, label: 'A session', sub: 'Claude Code, start to end', info: 'Claude Code (and Codex, which runs the same hooks) calls out at each of these moments.' },
@@ -143,9 +171,7 @@ export const SCENES: Scene[] = [
       { id: 'h-end-mem', from: 'e-end', to: 's-memory', bend: 30, label: 'last reflection', ldx: -9, ldy: 3 },
       { id: 'h-end-trace', from: 'e-end', to: 's-langfuse', bend: -10, label: 'one trace', ldy: -9 },
     ],
-    decor:
-      '<circle cx="400" cy="240" r="130" class="ring" /><circle cx="400" cy="240" r="124" class="ring-fine" />' +
-      '<path d="M436 113 l9 -3 l-5 8" class="ring-arrow" />',
+    decor: dial(),
     mottoAt: { x: 400, y: 462, anchor: 'middle' },
     hooks: {
       'e-start': [
@@ -193,6 +219,7 @@ export const SCENES: Scene[] = [
     id: 'messaging',
     name: 'Messages',
     motto: 'de nuntiis',
+    emblem: { name: 'epistola', x: 400, y: 58, size: 76, label: 'epistola' },
     intro: 'A message’s path from one agent to another: on one machine straight into the other session’s inbox, across machines through Drover, and into the truth file on the way.',
     nodes: [
       { id: 'm', kind: 'frame', x: 20, y: 40, w: 320, h: 320, label: 'Mac mini' },
@@ -227,6 +254,7 @@ export const SCENES: Scene[] = [
     id: 'handoff',
     name: 'Handoff',
     motto: 'de successione',
+    emblem: { name: 'fax', x: 412, y: 60, size: 80, label: 'fax' },
     intro: 'One handoff: the passer writes its brief, the successor’s window opens beside it, the history is echoed into the new window, the successor replies, and the passer’s window closes once nothing holds it open.',
     nodes: [
       { id: 'tab-1', kind: 'tab', x: 40, y: 28, w: 140, h: 30, label: '3:worker ⤳', info: 'The passer’s window, flagged with the handoff badge while its successor starts.' },
@@ -260,6 +288,7 @@ export const SCENES: Scene[] = [
     id: 'parking',
     name: 'Parking',
     motto: 'de quiete',
+    emblem: { name: 'luna', x: 96, y: 356, size: 112, label: 'luna' },
     intro: 'Two outcomes for an idle session: parked in place with its last screen and resume command, or, when it had finished, parked with its window closed and the way back kept in the ledger.',
     nodes: [
       { id: 'idle', kind: 'box', x: 24, y: 150, w: 220, h: 120, label: 'A session idle 6 h', sub: 'still holding its memory', info: 'Claude Code (about 300 MB), its MCP servers (about 260 MB) and any language server it started (up to gigabytes) stay resident until the session exits.' },
@@ -288,6 +317,7 @@ export const SCENES: Scene[] = [
     id: 'brain',
     name: 'The brain',
     motto: 'de memoria communi',
+    emblem: { name: 'nodus', x: 96, y: 212, size: 108, label: 'nodus' },
     intro: 'Memory at three levels: each machine’s sessions keep notes per repository; dotsync carries the reflection store and curated memory between machines; and the brain is the one place every agent, everywhere, sees the same facts.',
     nodes: [
       { id: 'b-core', kind: 'store', x: 250, y: 30, w: 300, h: 96, label: 'The shared brain', sub: 'hybrid search · facts that keep their history', info: 'Every entry stored as written, labeled with who wrote it, when it became true, and how far to trust it. Open source as badland-brain.' },
