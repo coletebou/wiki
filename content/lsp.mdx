@@ -1,0 +1,104 @@
+---
+title: Language Servers
+summary: >-
+  The Language Server Protocol puts go-to-definition, references and live type errors behind one standard. How Cole's
+  Claude Code sessions use language servers to see their own mistakes right after each edit, and what they cost.
+table: workshop
+folio: 46
+aliases: [LSP, Language Server Protocol, language servers]
+updated: 2026-10-28
+sources:
+  - title: Language Server Protocol (Microsoft)
+    url: https://microsoft.github.io/language-server-protocol/
+  - title: Claude Code code intelligence plugins
+    url: https://code.claude.com/docs/en/plugins/code-intelligence
+  - title: Claude Code plugin components, LSP servers
+    url: https://code.claude.com/docs/en/plugins/components
+  - title: Anthropic's official plugins (LSP plugins)
+    url: https://github.com/anthropics/claude-plugins-official
+---
+
+A language server is the program behind an editor's code smarts: autocomplete, go to definition, find all
+references, hover documentation, rename, and the red squiggle under a type error. The Language Server Protocol (LSP)
+is the standard that lets one language server work in every editor, and [[claude-code|Claude Code]] speaks it too.
+With a language server attached, Claude sees the type errors and missing imports its own edit introduced right after
+making it, and finds definitions and callers by symbol instead of by searching text. Cole runs the TypeScript, Python
+and Swift servers in every session.
+
+## What the protocol solved
+
+Before LSP, every editor had to implement every language's features itself: m editors times n languages. LSP splits
+that in two. A language server knows one language deeply; an editor knows how to talk to any server over JSON-RPC.
+Write a server once and it works in VS Code, Neovim, Emacs and now coding agents. The
+[[mcp|Model Context Protocol]] took its inspiration from exactly this design, for agents and their tools.
+
+## Language servers in Claude Code
+
+Claude Code connects to language servers through code intelligence plugins from Anthropic's official marketplace.
+Each plugin says which command starts the server and which file extensions it handles; the server binary itself you
+install separately. Cole's base settings enable three:
+
+| Plugin | Server binary | Install the binary |
+|---|---|---|
+| `typescript-lsp` | `typescript-language-server` | `npm install -g typescript-language-server typescript` |
+| `pyright-lsp` | `pyright-langserver` | `npm install -g pyright` (or `pip install pyright`) |
+| `swift-lsp` | `sourcekit-lsp` | Comes with Xcode or the Swift toolchain |
+
+The Rust plugin is listed but switched off. Official plugins also cover C and C++, C#, Go, Java, Kotlin, Lua, PHP
+and Ruby, and a plugin can declare any other server in an `.lsp.json` file.
+
+```text
+/plugin install typescript-lsp@claude-plugins-official
+```
+
+The server starts the first time Claude edits a file it handles. Two things change from then on:
+
+- **Diagnostics after every edit.** Each time Claude edits or writes a file, it gets the server's errors and warnings
+  for it, and the conversation shows a line like `Found 2 new diagnostic issues in 1 file` (<kbd>Ctrl</kbd>+<kbd>o</kbd>
+  expands it). A wrong import or a type mismatch gets fixed in the same turn, before any build runs.
+- **An LSP tool.** Claude gets a read-only tool that looks up definitions, references and symbols through the server.
+  "Who calls this function?" gets the real callers, not every line that happens to contain the name.
+
+If a server binary is already on your `PATH` and its plugin is not installed, Claude Code offers to install it in an
+"LSP plugin recommendation" dialog, at most once per session.
+
+<ColesTake>
+
+Type errors should show up in the edit that caused them, not three steps later in a build. That is the whole reason
+the language servers stay on.
+
+</ColesTake>
+
+## What they cost
+
+Language servers are not small. Measured on Cole's Mac in October 2026, a TypeScript server averaged about 700 MB in a
+large monorepo and reached 4 GB, and pyright took about 200 MB. Each session that has edited a matching file runs its
+own copy, and it keeps running until the session exits, idle or not. With dozens of sessions open, that adds up to
+tens of gigabytes, which is a large part of why [[cc-park]] parks idle sessions: `/exit` stops the language servers
+along with the session.
+
+[[drover|Drover]]'s vitals count each session's whole process tree, MCP servers and language servers included, so the
+machine that is out of memory can see which sessions are holding it.
+
+## LSP or grep
+
+The two answer different questions, and agents need both:
+
+| Question | Better tool |
+|---|---|
+| Where is this function defined, and who calls it? | The LSP tool |
+| Which overload, which re-export, which implementation of this interface? | The LSP tool |
+| Where does this string, flag, URL or config key appear? | Text search ([[grep-ripgrep-ugrep\|ripgrep]]) |
+| What mentions this in comments, docs, YAML or shell scripts? | Text search |
+| Did my edit break the types? | The diagnostics, automatically |
+
+## Gotchas
+
+- **The binary must be on the `PATH` of the shell that started `claude`.** If you install it while a session is
+  running, start a new session from a shell that can see it. `/plugin` lists `Executable not found in $PATH` under its
+  Errors tab when it is missing.
+- **Monorepos can report false errors.** A server that does not see the right `tsconfig.json` or virtual environment
+  flags imports that are fine. The fix is configuration (per-package project files, the interpreter path), not
+  ignoring the diagnostics.
+- **Indexing takes memory and time.** The first edit in a big repository can be slow while the server indexes it.
+- **Cloud sessions do not start plugin language servers,** so the same task gets no diagnostics there.

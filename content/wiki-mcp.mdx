@@ -1,0 +1,91 @@
+---
+title: Editing the Wiki with Agents
+summary: The wiki's MCP server lets any agent search, read and follow backlinks across every folio, and propose edits that become pull requests, checked and merged automatically.
+table: library
+folio: 3
+aliases: [wiki mcp, the wiki's mcp, propose_edit, agent edits]
+updated: 2026-10-28
+sources:
+  - title: Model Context Protocol specification
+    url: https://modelcontextprotocol.io/specification
+  - title: Connect Claude Code to tools via MCP
+    url: https://code.claude.com/docs/en/mcp
+  - title: GitHub auto-merge for pull requests
+    url: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/automatically-merging-a-pull-request
+---
+
+This wiki is kept by agents as much as by people. A small [[mcp|MCP]] server in the repository gives any agent, [[claude-code|Claude Code]], [[codex|Codex]] or anything else that speaks MCP, the same library you are reading: search, every page's full source, its links and backlinks. And it lets the agent propose an edit, which becomes a pull request that checks itself and, when it passes, merges itself.
+
+Cole asked for exactly that: a public wiki, an MCP so agents can edit it, and automatic merging. A richer system can come later (see [[#later|later]]); this page is the version that runs today.
+
+## The tools
+
+| Tool | What it does |
+|---|---|
+| `search` | Ranked full-text search over titles, aliases, summaries, headings and text, with a snippet for each hit. Optional: limit, one table. |
+| `list_pages` | Every page in folio order, or one table of the [Pinakes](/pinakes/), with slug, title, summary and URL. |
+| `read_page` | One page by slug, title or alias: its metadata, headings, links, backlinks, the git blob `sha` of its file, and the full MDX source. |
+| `backlinks` | Who cites a page, and what it cites. |
+| `editing_guide` | The page format, components, wiki-link syntax, tables and [[#the-public-safety-rules\|the public-safety rules]], plus the next free folio number and every price id. |
+| `propose_edit` | Changes one or more pages, or adds new ones, as a pull request labelled `agent-edit`. |
+
+The read tools are marked read-only in MCP terms, so a client can allow them without asking. `propose_edit` is the one that writes, and it writes only to GitHub, through a pull request.
+
+## Setting it up
+
+The server runs on your machine over stdio and needs Node.js 20 or later. Clone the repository and install the server's few dependencies (the site's are not needed):
+
+```sh
+git clone https://github.com/coletebou/wiki.git ~/code/wiki
+npm --prefix ~/code/wiki/mcp install
+```
+
+**Claude Code.** Register it once for every project:
+
+```sh
+claude mcp add --scope user coletebou-wiki -- node ~/code/wiki/mcp/server.mjs
+```
+
+**Codex.** Either `codex mcp add coletebou-wiki -- node ~/code/wiki/mcp/server.mjs`, or the same thing in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.coletebou-wiki]
+command = "node"
+args = ["/home/you/code/wiki/mcp/server.mjs"]
+```
+
+By default the server reads the live site's `/api/wiki.json`, a single file with every page's source, so there is nothing to build and reads are always one fetch away. `WIKI_DIR` points it at a local checkout instead. Proposing edits needs GitHub credentials: the server uses `GITHUB_TOKEN` or `GH_TOKEN` from its environment, and otherwise asks the `gh` [[clis|CLI]] for the token it is logged in with. The token never appears in any tool's output.
+
+## How an edit becomes a page
+
+1. **Read first.** The agent calls `read_page` and keeps the `sha` it returns.
+2. **Propose.** `propose_edit` takes a summary (the pull request's description), an optional title in [Conventional Commits](https://www.conventionalcommits.org/) form, and a list of changes. Each change is either the whole new file or exact find-and-replace pairs, where each `find` must occur exactly once, so an edit can never land in the wrong place. Up to ten pages go in one proposal, so a new page can arrive together with the links that point to it.
+3. **Checked on the spot.** Before anything is sent, the server applies the change to the current page on `master` and validates the wiki as it would be afterwards, with the same code CI runs: frontmatter, MDX syntax, components, price ids, every wiki link, unique folio numbers and the public-safety lint. If the page changed since the agent read it, the `sha` no longer matches and the proposal is refused. `dry_run: true` stops here and says what would be opened.
+4. **One commit.** The server writes the changed files as blobs, builds one tree on the current `master`, and makes one commit authored by the token's owner, on a branch named `agent-edit/<slug>-<timestamp>`. It opens the pull request and labels it `agent-edit`.
+5. **Checked again.** GitHub Actions runs the four required checks: **build**, **links**, **gitleaks** and **public-safety**.
+6. **Merged, or held.** A workflow looks at every `agent-edit` pull request. If it was opened by the repository owner's account, from a branch of this repository (never a fork), targets `master`, is not a draft, and changes nothing but pages in `content/`, it turns on GitHub's auto-merge, squash, pinned to that exact head commit. When the checks pass, GitHub merges it and [[vercel|Vercel]] redeploys the site. Anything else waits for a human, and a pull request that stops qualifying (a later commit touching a workflow, say) has its auto-merge switched off again.
+
+The result is that an agent with Cole's credentials can fix a typo or add a section in one call, and the change is live a minute later, while anything that touches code, comes from someone else, or fails a check needs a person.
+
+## The public-safety rules
+
+The site and its repository are public, and agent edits merge without a human, so some rules are hard. The `public-safety` check enforces them on every file in the repository, on the built site, and on every pull request's title, description and commit messages, and the MCP server checks a proposal against them before it sends anything, so a violation never even reaches GitHub.
+
+- **No secrets:** tokens, keys, passwords, private keys, wallet keys or seed phrases, connection strings.
+- **No contact details or identifiers:** phone numbers, email addresses other than `example.com` ones, account and project ids, wallet addresses, home directories with a user name in them.
+- **Nothing that locates a machine:** host names, IP addresses, private network names or addresses. [[servers|Servers]] are described by what they are for, never by which machine does what or how many there are.
+- **Nothing about anyone's employer or its systems,** and no customer, tenant or other people's personal data.
+
+Most of these are patterns: the shapes of keys, phone numbers, addresses and Tailscale's `100.64.0.0/10` range. Specific phrases that must never appear are kept as a deny-list of salted SHA-256 hashes, so the check can prove a phrase is absent without the repository ever containing the phrase. Its messages say what kind of thing was found and where, with the match masked, because the CI logs of a public repository are public too.
+
+## Writing for it
+
+The page format is the same for people and agents, and [the editing guide](https://github.com/coletebou/wiki/blob/master/docs/EDITING.md) is the full reference. The short version: one `.mdx` file per page in `content/`, frontmatter with a title, a summary, a table and a unique folio, a first paragraph that says what the thing is, and `[[wiki links]]` for anything with a page of its own. Cole's opinions go in `<ColesTake>`, prices only through `<Price id="..." />`, and the interactive drawings through `<Diagram name="..." />`.
+
+Try it from Claude Code with a plain request: "using the coletebou-wiki MCP, find the page about tmux keybindings and propose a sentence explaining why prefix z sends Ctrl+Z." The agent searches, reads the page, proposes with `dry_run` to see that it passes, proposes for real, and returns the pull request's link.
+
+## Later
+
+The next version is designed but not built: editing over a network service instead of a local process, a database with hybrid search (keyword matching and vector search over a multimodal embedding model, plus an agent that searches on your behalf) and live updates over WebSockets. The design record, [ADR 0001](https://github.com/coletebou/wiki/blob/master/docs/adr/0001-v2-search-and-editing.md), lays out what it would take and in what order, for Cole to review before any of it is built.
+
+For how the rest of the site is made, see [[about-this-wiki]].

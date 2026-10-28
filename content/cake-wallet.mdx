@@ -1,0 +1,109 @@
+---
+title: Cake Wallet
+summary: >-
+  A free, open-source, non-custodial wallet for iPhone, Android, Mac and Linux, best known for Monero, with Bitcoin
+  silent payments, PayJoin and built-in Tor. The phone wallet on Cole's list, and how to set it up privately.
+table: mint
+folio: 80
+aliases: [Cake, Monero.com wallet]
+updated: 2026-10-28
+sources:
+  - title: Cake Wallet
+    url: https://cakewallet.com/
+  - title: Cake Wallet on GitHub (README and features)
+    url: https://github.com/cake-tech/cake_wallet
+  - title: Cake Wallet releases and change log
+    url: https://github.com/cake-tech/cake_wallet/releases
+  - title: Cake Wallet documentation
+    url: https://docs.cakewallet.com/
+  - title: Prove a Monero payment (Cake Wallet docs)
+    url: https://docs.cakewallet.com/tutorials/prove-a-monero-payment
+  - title: Monero FAQ (remote nodes, backups)
+    url: https://www.getmonero.org/get-started/faq/
+---
+
+Cake Wallet is a free, open-source wallet for iPhone, Android, Mac and Linux that holds many coins and is best known
+for Monero. It is non-custodial ("only you hold your private keys and seed phrase, and Cake never takes custody of
+your funds"), "100% open source under the MIT license," and charges nothing to send or receive
+(<Price id="cake-wallet" />). On Cole's list it is the phone wallet, next to [[sparrow-wallet|Sparrow]] on the
+desktop: the natural home for [[monero|Monero]], with privacy features for [[bitcoin|Bitcoin]] too (silent payments,
+PayJoin and built-in Tor). Nothing here is financial advice.
+
+## What it holds
+
+Monero, Bitcoin (with Lightning since version 6.0 in February 2026), Litecoin, Zcash (since January 2026), Ethereum
+and its tokens, and a growing list of other chains, including Solana, Polygon, Base, Arbitrum, BNB Smart Chain, Tron,
+Bitcoin Cash, Nano, Zano and Decred. The same team also publishes Monero.com, a Monero-only version of the app.
+
+## The privacy features
+
+For Monero:
+
+- **The view key stays on the device**, so no service learns which incoming payments are yours.
+- **Subaddresses and accounts** give every payer a different address.
+- **Your choice of node**, a restore height for faster syncing, and a proxy setting for Monero nodes that works with
+  Tor and I2P.
+
+For Bitcoin:
+
+- **Silent payments** (BIP 352) since May 2024: publish one reusable address without the payments to it being linkable
+  on-chain.
+- **PayJoin** since May 2025: the receiver contributes an input, which breaks the "all inputs belong to the sender"
+  assumption that chain analysis leans on.
+- **Coin control**, automatically generated fresh addresses, and batch sending.
+- **Built-in Tor**, added as an experimental feature in June 2025 and upgraded since, alongside a Tor-only connections
+  privacy setting.
+
+For Litecoin, it supports MWEB, Litecoin's optional privacy extension. Hardware wallets work too: Ledger, BitBox and
+Trezor, including Trezor for Monero since June 2026. [[bitcoin#privacy-tools-and-how-far-they-go|The Bitcoin page]]
+explains what each Bitcoin technique does and does not hide.
+
+## Setting it up privately
+
+1. **Install it from the official source**: the App Store, Google Play, F-Droid, Accrescent or GitHub releases. Cake
+   publishes its Android signing certificate fingerprint so an APK can be verified, the same habit as checking a
+   signed release with [[pgp]].
+2. **Create the wallet and write down the seed** it shows, on paper, offline. Whoever has the seed has the money.
+3. **Pick your node.** For Monero, your own node is best; if it runs at home, the phone can reach it from anywhere over
+   [[tailscale|Tailscale]]. A remote node cannot see amounts or recipients, but the
+   Monero FAQ notes its operator "is able to see from what IP address a transaction comes from"; if you use one,
+   reach it over Tor.
+4. **Turn on Tor-only connections** in the privacy settings, so the app's traffic goes over Tor.
+5. **Receive to fresh addresses.** Let the app generate a new subaddress (Monero) or address (Bitcoin) for each payer,
+   or share a silent payment address for Bitcoin.
+
+## Swaps and purchases
+
+Cake has a built-in exchange for dozens of pairs and can buy and sell crypto with cards and bank transfers. Those
+features run through third-party providers, which, as Cake says, "carry those providers' rates," and which set their
+own rules. A swap is a hop where another company sees both sides, so treat it the way you would an exchange account
+when privacy matters.
+
+## Proving a Monero payment
+
+Because Monero hides amounts and recipients, a merchant cannot check your payment on the blockchain the way they
+could with Bitcoin. Monero has a way to prove one payment without exposing anything else, and Cake's docs walk
+through it:
+
+1. Open the sent transaction in Cake Wallet and copy three values: the transaction ID, the recipient address and the
+   transaction key.
+2. Give them to whoever needs proof, or check them yourself on Cake's Monero explorer under "I sent Monero," which
+   returns a receipt for the amount sent to that address in that transaction.
+
+The transaction key "only reveals this one payment — it does not give access to your wallet or funds." The catch is
+that the key and the recipient address exist only on the phone that sent the payment, recorded at the moment it was
+sent. A wallet restored from its seed on another device, or rescanned, no longer has them, so a payment you may need
+to prove later should be documented before you wipe or restore anything. Cake's docs also include a guide to
+hardening the app on a phone, worth reading once.
+
+## Gotchas
+
+- **Backups in the cloud.** Cake can back up wallets to an external location or to iCloud. Keep the seed itself
+  offline anyway; the Monero FAQ's warning is "If you backup your seed in the cloud, you'll be poorer soon."
+- **Restore height.** Restoring a Monero wallet from a height after its first transaction can hide older funds; when
+  in doubt, pick an earlier height and wait for the scan.
+- **Many coins, many networks.** Each chain has its own fees, address formats and failure modes. Double-check which
+  network a token is on before sending.
+- **Privacy features are per coin.** Silent payments and PayJoin are Bitcoin features; Monero is private by default;
+  Ethereum and most other chains here are fully public.
+- **Updates matter.** The release notes are long lists of sync, Tor and hardware wallet fixes. Keep the app current.

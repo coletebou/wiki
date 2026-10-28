@@ -1,0 +1,36 @@
+# Links to the rest of the web, checked weekly rather than in every pull request, so a slow or bot-shy vendor page
+# never blocks an edit. A failed run is the signal to fix or replace a link.
+name: external-links
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  external-links:
+    name: external-links
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          fail: true
+          args: >-
+            --no-progress --max-concurrency 4 --max-retries 3 --timeout 30
+            --scheme https --scheme http
+            --accept '200..=299,403,429'
+            --exclude '^https://wiki\.coletebou\.com'
+            'dist/**/*.html'

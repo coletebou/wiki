@@ -1,0 +1,222 @@
+---
+title: yu and the Claude Launchers
+summary: >-
+  yu starts Claude Code with permission prompts off and maximum effort on Opus 5.5, in two letters. Its family: yuc to
+  continue, yur and cr to resume by a fragment of the session id, yuma for Amazon Bedrock, and tmux keys for agent windows.
+table: shell
+folio: 17
+aliases: [yuma, yur, yuc, claude launchers]
+updated: 2026-10-28
+sources:
+  - title: Permission modes (Claude Code docs)
+    url: https://code.claude.com/docs/en/permission-modes
+  - title: CLI reference (Claude Code docs)
+    url: https://code.claude.com/docs/en/cli-reference
+  - title: Model configuration and effort levels (Claude Code docs)
+    url: https://code.claude.com/docs/en/model-config
+  - title: The launchers in Cole's aliases.sh (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/aliases.sh
+  - title: Claude Code on Amazon Bedrock (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/infra/aws.md
+---
+
+`yu` is how Cole starts an agent: two letters that launch [[claude-code|Claude Code]] with its permission prompts
+switched off, at maximum reasoning effort when the model is Opus 5.5. In Cole's words, these are "custom aliases for
+`yu` to automatically start Claude in dangerously bypassed permissions mode". Around it sits a small family of
+launchers for continuing, resuming and changing providers, plus tmux keys that open a fresh agent window in one chord.
+
+## The family
+
+| Command | What it runs |
+|---|---|
+| `yu` | `claude --dangerously-skip-permissions`, plus `--effort=max` when the session starts on Opus 5.5 |
+| `yuc` | The same, continuing the most recent conversation in this directory (`--continue`) |
+| `yur 3f9a2` | The same, resuming a session by its full id, its last few characters, or a search term |
+| `cr 3f9a2` | Resume the same way, with permission prompts on |
+| `yuma` | `yu` on Amazon Bedrock, through a settings overlay |
+| `yolo-unsafe` | The plain alias for `claude --dangerously-skip-permissions` |
+| <kbd>Alt</kbd>+<kbd>a</kbd> in tmux | A new window named `yolo` running the same, in the current directory |
+
+All of them live in [base/aliases.sh](https://github.com/coletebou/dx/blob/master/base/aliases.sh). They are shell
+functions rather than aliases, so arguments pass straight through: `yu "fix the failing test"` starts a session with
+that first message, and `yu --model sonnet` picks a model.
+
+```zsh
+# Claude with dangerous permissions (and max effort on Opus 5.5).
+yu() {
+    local effort
+    effort="$(_claude_effort_arg "" "$@")"
+    claude --dangerously-skip-permissions ${effort:+"$effort"} "$@"
+}
+```
+
+<ColesTake>
+
+Two letters and the agent is running, no permission prompts in the way.
+
+</ColesTake>
+
+## What skipping permissions means
+
+By default Claude Code asks before it runs a command or edits a file. `--dangerously-skip-permissions` is the same as
+the `bypassPermissions` mode, which the docs describe plainly: it "disables permission prompts and safety checks so tool
+calls execute immediately". A few things still stop it. Removing critical paths with `rm` still prompts, and on Linux
+and macOS Claude Code refuses to start in this mode as root or under `sudo`. The first time you use it, a dialog asks
+you to accept responsibility for what runs without checks.
+
+The docs are just as plain about the risk. They recommend the mode only in isolated environments like containers and
+VMs, and warn that it "offers no protection against prompt injection or unintended actions". For fewer prompts with a
+safety net, they point to `auto` mode instead, where a separate classifier model reviews each action before it runs.
+
+The point of skipping the prompts is that an agent which stops every few minutes for approval cannot work through a
+long task unattended. Cole's setup takes that trade and adds guards of its own around it:
+
+- **Rules every agent loads.** Cole's global rules file, public as
+  [CLAUDE.base.md](https://github.com/coletebou/dx/blob/master/base/claude/CLAUDE.base.md), forbids destructive git
+  operations unless asked, says to stop and ask before deleting or renaming unexpected files, and never to edit or
+  delete tests to make them pass.
+- **Work happens in git.** Agents work on branches and in [[git-worktrees|worktrees]], so every change is a reviewable
+  diff before it lands, and [[parallel-worktrees]] keeps parallel agents out of each other's files.
+- **Secrets stay out of reach.** Keys live in `~/.env_secrets`, never in settings files or on command lines, and the
+  base Claude Code settings blank the password manager's session variable, so an unlocked vault in Cole's shell never
+  reaches an agent. Git hooks scan every commit and push for secrets and refuse to run without the scanner.
+- **The flag is never hidden.** The abbreviation below expands `dsp` into the full flag before you press Enter, so
+  shell history always shows what ran.
+
+If that trade is not right for your machine, the same launcher pattern works with `--permission-mode auto`.
+
+## Maximum effort, automatically
+
+Claude Code has reasoning effort levels: `low`, `medium`, `high`, `xhigh` and `max`. Opus 5.5 defaults to `medium`. The
+docs note that `max` "may show diminishing returns and is prone to overthinking", and Claude Code keeps it
+session-only: `max` "isn't accepted as a level" in the saved settings, and outside the `CLAUDE_CODE_EFFORT_LEVEL`
+environment variable it applies to the current session only. That variable would force one level onto every model,
+override an explicit `--effort` and lock `/effort`, which is why the launchers do not use it.
+
+So each launcher works it out per launch. A helper, `_claude_effort_arg`, figures out which model the session will
+start on and prints `--effort=max` only when that is Opus 5.5:
+
+1. An `--effort` you passed yourself always wins; the helper adds nothing.
+2. A `--model` you passed decides the model.
+3. Otherwise it reads the settings layers Claude Code itself would read, lowest first: your user settings (where
+   `/model` saves a new default), the project's shared and local settings in the current directory, the repository top
+   and a worktree's main checkout, and finally the launcher's own `--settings` overlay. A model set in a layer's
+   environment block beats a plain `model` key.
+4. The model names that earn `max` are a zsh pattern, `CLAUDE_MAX_EFFORT_MODELS`, defaulting to the `opus` alias and
+   any Opus 5.5 id.
+
+A resumed session starts on the configured model too, so `yur` and `yuc` get the same treatment. The
+[[claude-code-status-line|status line]] shows the result: `opus5.5·max`, with `max` in several colors so it is
+impossible to miss.
+
+## Resuming by a fragment
+
+Every status line shows the last five characters of its session id (`desk:3f9a2`). `cr` and `yur` turn those back into
+a conversation:
+
+- **No argument** opens Claude Code's own resume picker.
+- **A full id** resumes that session directly.
+- **Anything else** is matched against the end of every transcript file name under `~/.claude/projects`. One match
+  resumes it ("Matched session: ..."), several show a numbered list to pick from, and none passes the text to the
+  picker as a search term.
+
+The function carries one hard-won line: `emulate -L bash`. It indexes its matches the bash way, from zero, and zsh
+arrays start at one, so without that line the lookup silently came back empty and every resume fell through to the
+picker.
+
+Fragments matter because sessions end in many ways. [[cc-park]] parks idle sessions and leaves the exact resume
+command typed at the prompt. A tmux restore types `claude --resume <id>` into each pane it rebuilds, and records
+whether the session was started with permissions off, or with `yuma`, so it comes back the same way. For anything
+else, the five characters on the status line are enough.
+
+## yuma: the same agent, billed through AWS
+
+Claude Code can run on a Claude subscription or through Amazon Bedrock. Cole's
+[Bedrock notes](https://github.com/coletebou/dx/blob/master/docs/infra/aws.md) describe Bedrock as "a second route for
+when you want usage billed to an AWS account, or a fallback when a subscription's allowance runs out mid fan-out".
+`yuma` is `yu` on that route:
+
+```zsh
+yuma() {
+    local effort
+    effort="$(_claude_effort_arg "$YUMA_SETTINGS" "$@")"
+    command claude --dangerously-skip-permissions --settings "$YUMA_SETTINGS" ${effort:+"$effort"} "$@"
+}
+```
+
+Three details are worth copying:
+
+- **The name.** Not `yum`, which would shadow the Linux package manager.
+- **A full overlay, not one switch.** `--settings` loads an overlay file that turns the Bedrock route on, turns the
+  other routes off, and pins every model alias (`opus`, `sonnet`, `haiku`, `fable`) to an id that route serves. The
+  tempting shortcut, a one-key `--settings` that only flips the route on, keeps the machine's own alias pins, and a pin
+  the route does not serve fails with `model_not_found`, including in places you never chose a model yourself: a
+  subagent started with `model: haiku`, or the summarizer behind web fetches.
+- **`command claude`.** It skips any machine-local `claude` wrapper function, for example one that strips Bedrock
+  credentials so a plain `claude` uses the subscription, which would leave this route with no credential.
+
+On Cole's own machines a guarded variant, `yub`, checks that the Bedrock key is actually set and says so plainly when
+it is not, instead of failing deep inside Claude Code. Fan-outs can use the route too:
+`PW_CLAUDE_CMD=yuma pw launch m.tsv` starts every [[parallel-worktrees|parallel worktree]] window on Bedrock, and the
+[[handoff-chains|handoff]] launcher starts a successor with the launcher that matches its predecessor's route.
+
+## Agent windows in tmux
+
+The [[tmux-keymap#agent-windows|agent window keys]] are `yu` without typing: <kbd>Alt</kbd>+<kbd>a</kbd> (or prefix
+<kbd>a</kbd>) opens a window named `yolo` in the current directory, running Claude Code with prompts off. The command
+runs inside `zsh -lic`, a login, interactive zsh, so it reads the current credentials from the shell startup files
+rather than the stale environment the tmux server captured when it started. The same reasoning puts the secrets file
+in `zshenv`, which every zsh reads: tools like [[codex|Codex]] run their commands through `zsh -c`, which skips
+`.zshrc`, and Codex strips variables with `TOKEN` in the name from its tool shells. Loading secrets from `zshenv` puts
+them back for every command, so a `claude` started from anywhere has its keys.
+
+## dsp: the flag, typed for you
+
+Typing `--dangerously-skip-permissions` by hand gets old. A plain alias only expands as the first word of a command,
+and a zsh global alias expands everywhere, including inside `echo` and `grep` arguments, which is a bad property for a
+flag that disables safety prompts. Cole's dotfiles use a small line-editor widget instead:
+
+```zsh
+    ABBRS=(
+        dsp  '--dangerously-skip-permissions'
+    )
+```
+
+When you press space or Enter, the widget expands `dsp` if it is a whole word at the start of the line or after a
+space. The full flag lands in the command line before it runs, so you see it, and so does your history. To type a
+literal `dsp`, quote it or press <kbd>Ctrl</kbd>+<kbd>Space</kbd>. The known trade-off is written down in the file: an
+unquoted `grep dsp file` expands too, and you see that before pressing Enter.
+
+## Cleaning up orphans
+
+A Claude Code session whose terminal went away (a closed window, a dropped SSH connection) can keep running with no
+one attached, holding memory and its helper processes. Three commands handle that:
+
+| Command | What it does |
+|---|---|
+| `claude-orphans` | Lists interactive sessions started with permissions off that have had no terminal for more than five minutes, with their age and memory |
+| `cko` | Kills only those orphans, then force-kills any that ignored the polite signal |
+| `ck` | The last resort: language servers, MCP servers, Playwright browsers, every Claude process, and the tmux sessions you list in `CLAUDE_KILL_TMUX_SESSIONS` |
+
+Headless runs (`claude -p`) never count as orphans, since they have no terminal by design. The first interactive shell
+prints a warning with the orphans' process IDs when any exist, so they get noticed.
+
+## Where the launchers fit
+
+`yu` is the bottom layer of Cole's [[agent-fleet|agent fleet]]. Everything above it, the tmux keys, the parallel
+launcher, the handoff launcher, the restore hook, ends up running `claude` the way `yu` does, with
+[[hooks]] that track context, record reflections and name windows, and a [[claude-code-status-line|status line]] that
+reports back. Codex gets the same treatment where it applies: tmux restores its sessions with `codex resume`, with the
+right provider profile.
+
+## Set it up
+
+1. Install Claude Code and log in once with plain `claude`.
+2. Copy `yu`, `yuc`, `yur`, `cr` and `_claude_effort_arg` from
+   [base/aliases.sh](https://github.com/coletebou/dx/blob/master/base/aliases.sh) into your zsh config. The effort
+   helper needs `jq` to read settings files; without it, only an explicit `--model` counts.
+3. Decide on the permission trade for your machine, and read the
+   [permission modes](https://code.claude.com/docs/en/permission-modes) page before you skip anything.
+4. For Bedrock, copy `yuma` with its overlay file and put your Bedrock key in `~/.env_secrets`.
+
+The [[dotfiles]] page covers the files these functions live in, and [[tmux]] covers where the agents they start run.

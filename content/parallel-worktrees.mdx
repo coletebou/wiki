@@ -1,0 +1,207 @@
+---
+title: Parallel Worktrees
+summary: >-
+  Cole's fan-out launcher: one manifest line per task, and pw gives each its own git worktree, tmux window and Claude
+  Code or Codex session, with a merged log every session reports to and a teardown that cleans up after.
+table: workshop
+folio: 40
+aliases: [pw, parallel worktrees launcher]
+updated: 2026-10-28
+sources:
+  - title: parallel-worktrees skill (dx)
+    url: https://github.com/coletebou/dx/blob/master/plugins/worktrees/skills/parallel-worktrees/SKILL.md
+  - title: The worktrees plugin (dx)
+    url: https://github.com/coletebou/dx/tree/master/plugins/worktrees
+  - title: Parallel work (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/workflow/parallel.md
+  - title: git-worktree(1)
+    url: https://git-scm.com/docs/git-worktree
+  - title: Claude Code, run parallel sessions with worktrees
+    url: https://code.claude.com/docs/en/worktrees
+---
+
+Parallel worktrees is Cole's launcher for fanning one plan out to many agents at once. You write one line per task in
+a manifest; `pw launch` gives each task its own [[git-worktrees|git worktree]], its own [[tmux]] window and its own
+[[claude-code|Claude Code]] or [[codex|Codex]] session with the task's prompt already loaded, and opens a merged log
+that every session appends its summary to when it finishes. When the work is merged, `pw teardown` removes exactly
+what that launch made.
+
+It is a skill and a set of small scripts in the public [worktrees plugin](https://github.com/coletebou/dx/tree/master/plugins/worktrees):
+`pw` (launch, watch, broadcast, tear down), `pw-append` (the locked writer for the log), and underneath them
+`wt-helper`, the same primitive behind the solo `wt` command.
+
+<Diagram name="worktree-fanout" />
+
+The diagram follows one launch. A manifest's rows become worktrees branched from the remote's default branch, each
+bootstrapped with the files a fresh checkout lacks; each worktree gets a tmux window running its agent; window 0
+follows the merged log, and every agent's summary arrives there between sentinel lines.
+
+## When to use it
+
+Cole's rule for parallel work is to pick the axis first:
+
+- **Subagents in one session** when the work is read-only or the coordinator will pick between drafts: one tree,
+  nothing to merge.
+- **Parallel worktrees** when several writers would touch the same files, share `node_modules` or a build directory,
+  run the same Docker Compose project, or add database migrations. Each lane gets hard isolation: its own branch, its
+  own files, its own build state.
+- **Both** when each lane is big enough to split again: a worktree session can run its own subagents.
+
+A plan with three to seven independent slices is the sweet spot. Slices that depend on each other's interfaces need a
+contract first; the `contract-fanout` skill in the same plugin runs that variant, with versioned contracts posted
+before anyone builds and two reviewers per slice.
+
+<ColesTake>
+
+Worktree per task, tmux window per worktree, one merged log. Once the prompts are written, the whole fan-out is one
+command, and every agent reports to the same place.
+
+</ColesTake>
+
+## The manifest
+
+A manifest is a tab-separated file, one row per lane: a tag, a branch, the prompt, and optionally the engine. The
+example in the repository:
+
+```text
+search	feat/search-filters	@/path/to/prompts/01-search-filters.md
+export	feat/csv-export	@/path/to/prompts/02-csv-export.md
+docs	docs/api-reference	@/path/to/prompts/03-api-reference.md
+audit	review/security	@/path/to/prompts/04-security-audit.md	codex:sol:xhigh
+```
+
+- **Tag**: a filesystem-safe name (letters, digits, dashes). It names the worktree and the tmux window.
+- **Branch**: created if it does not exist.
+- **Prompt**: `@` and an absolute path to a prompt file, or a literal one-line prompt. A missing prompt file stops the
+  launch before any worktree is made.
+- **Engine** (optional): empty or `claude` for Claude Code; `codex`, `codex:MODEL` or `codex:MODEL:EFFORT` for Codex,
+  where `sol` and `luna` are short aliases for two GPT models and the effort is Codex's reasoning effort.
+
+Manifests go in a known directory, so a later session can find a run's log and tear it down.
+
+## Launching
+
+```sh
+pw validate m.tsv                     # lint: missing prompts, missing log footer
+pw launch m.tsv                       # every lane, Claude Code by default
+pw launch m.tsv --engine=codex        # every lane on Codex
+pw launch m.tsv --test                # sandboxed names: test- worktrees, test/ branches
+PW_CLAUDE_CMD='yu --model opus --effort max' pw launch m.tsv
+```
+
+`PW_CLAUDE_CMD` sets the command typed into each Claude window (by default `claude --dangerously-skip-permissions`).
+Pointing it at a launcher like [[yu]], or at the Bedrock launcher, moves the whole fleet onto a different route or
+effort. Codex windows always use the ChatGPT login (the launcher unsets any API key in the window) and run with
+Codex's approvals and sandbox bypassed by default, because unattended lanes need `git` and `gh` with network access.
+
+### What happens for each lane
+
+1. **A worktree.** `pw` asks `wt-helper` for one branched from `origin/HEAD`, the remote's default branch, at a
+   tag-based path nested inside the repository under `.claude/worktrees/`, which is git-ignored. A repository can move
+   its worktrees elsewhere, such as an external drive, with the same `worktree.baseDirectory` setting the solo `wt`
+   command reads.
+2. **A bootstrap.** A fresh checkout lacks every ignored file that made the main one work, so `pw` copies the ones
+   that exist: `.env`, `.env.keys`, `.env.local`, `.npmrc`, `.tool-versions`, `.nvmrc`, `.node-version` and
+   `docker-compose.override.yml`. It writes an `.envrc` with `COMPOSE_PROJECT_NAME=<repo>-<tag>`, runs `npm install`
+   when there is a `package.json`, and finally runs `PW_BOOTSTRAP_HOOK` if you set one. See
+   [[git-worktrees#what-to-carry-over|what to carry over]] and [[env-files]].
+3. **A tmux window.** The window exports the lane's details (`PARALLEL_TAG`, `PARALLEL_BRANCH`, `PARALLEL_LOG`,
+   `PARALLEL_APPEND`, the session id and the transcript path, and `COMPOSE_PROJECT_NAME`), then starts the agent with
+   a fixed session id and the prompt as its first message. The session is interactive and stays open for follow-ups.
+4. **A log header.** Each lane's transcript path is written into the merged log's header, so a reviewer can open any
+   session's full transcript later without hunting for it.
+
+Window 0 is named `log` and follows the merged log; the agents live in windows 1 to N.
+
+## The merged log
+
+Every prompt must end with the same footer, which writes the session's summary between sentinel lines:
+
+```sh
+{
+  printf '\n<<SESSION tag=%s branch=%s worktree=%s finished_at=%s>>\n' \
+    "$PARALLEL_TAG" "$PARALLEL_BRANCH" "$PWD" "$(date -Iseconds)"
+  cat <<'SUMMARY_EOF'
+<YOUR UNDER-150-WORD SUMMARY HERE — include: what you changed, tests status, any deviations>
+SUMMARY_EOF
+  printf '<<END SESSION %s>>\n' "$PARALLEL_TAG"
+} | "$PARALLEL_APPEND"
+```
+
+`pw-append` takes a lock before writing, so two sessions that finish in the same millisecond never interleave. The
+lock is a directory created with `mkdir`, which is atomic on every local POSIX filesystem; `flock` would have been
+simpler but does not ship on macOS. The sentinels make the log machine-readable: a merge agent can pull one lane's
+summary out with a single `grep`.
+
+`pw log` opens the log in `less +F`, which follows new lines like `tail -F` until you press <kbd>Ctrl</kbd>+<kbd>c</kbd>
+to scroll and search.
+
+## Watching the lanes
+
+```sh
+pw status <session>                   # one line per pane: target, state, command
+pw broadcast <session> followup.md    # the same prompt to every Claude pane
+pw log
+```
+
+`pw status` classifies each pane as `claude` (input box, safe to type into), `shell`, `permission` (a tool permission
+prompt), `workflow-prompt` (a confirmation to run a dynamic workflow) or `unknown`, and exits 2 when any pane is waiting
+on a human. Run it a few minutes after an unattended launch: a session can sit at a confirmation for an hour with no
+error, and nothing moves until someone answers. For lanes on several machines, [[drover|Drover]]'s board shows the
+same thing fleet-wide, and its `files.wait` op lets a coordinator block on the lanes' status files instead of polling.
+
+`pw broadcast` sends one prompt to every Claude pane in a session, for a refinement after launch or a fleet-wide
+instruction. It skips panes at a shell and never types into a pane that is waiting on a human, because the option
+preselected in a permission prompt would be approved by the broadcast's closing Enter. Long prompts are chunked;
+anything over ten thousand characters is written to a file and the panes get a one-line "Read this file" pointer
+instead. Afterwards it checks that each pane actually started working.
+
+## Tearing down
+
+```sh
+pw teardown m.tsv                     # this manifest's sessions and worktrees
+pw teardown m.tsv --delete-branches   # and its branches
+```
+
+Teardown reads the repository and the worktree paths from the run's log header, so it works from any directory and
+removes only what that manifest's launches made: its own tmux sessions (never another manifest's that shares a name),
+and only directories git lists as linked worktrees of that repository.
+
+## Gotchas
+
+- **Launch from the main checkout.** From inside a linked worktree, the new worktrees would nest inside that worktree
+  and copy its env files instead of the main checkout's.
+- **tmux matches `-t name` by prefix.** With only `app-parallel-test` running, `tmux kill-session -t app-parallel`
+  kills the test session. `pw` targets its sessions as `-t "=name"`, which matches exactly; scripts of your own should
+  too (in zsh, quote it).
+- **The first prompt runs immediately.** Slash commands such as `/effort` or `/model` are client commands, not text the
+  agent can act on, so they cannot be part of the launch prompt. For a lane that needs one, launch with a standby
+  prompt ("Reply READY and wait"), send the command, then point the session at its brief.
+- **Under heavy load, the Enter after a paste can be dropped.** The prompt sits in the input box below the separator
+  with no spinner. One extra Enter fixes it and is harmless on an empty box; never paste the prompt again.
+- **The bootstrap installs with npm.** In a [[package-managers|Bun]] repository that builds a second, divergent
+  dependency tree. Launch with `PW_NPM_INSTALL=0 PW_BOOTSTRAP_HOOK='bun install --frozen-lockfile'`.
+- **Budget disk first.** A Bun-installed worktree of a mid-size monorepo is about 1.9 GB, so five lanes need about
+  10 GB. Check `df -h` and skip the install for lanes that only write docs.
+- **Your shell can override `.env`.** Docker Compose fills `${VAR}` from the invoking shell's environment before the
+  `.env` file, so a region or credential exported in your shell silently wins. Compare `env` with `.env` when a
+  container behaves as if it had the wrong settings.
+
+## After the fan-out
+
+A launch is half the job. Each lane ends with a pushed branch and a summary in the log; then the coordinator reviews
+each branch at a pinned commit with two independent reviewers, verifies every finding against the real code before
+asking the lane to fix it, and merges what passed (see [[testing]] for what "verified" has to mean). A lane that runs
+low on context mid-task hands itself off like any other session ([[handoff-chains]]). The review side is described in Cole's
+[review docs](https://github.com/coletebou/dx/blob/master/docs/workflow/review.md), and the [[agent-fleet]] page covers
+the roles.
+
+To try it:
+
+```text
+/plugin marketplace add coletebou/dx
+/plugin install worktrees@dx
+```
+
+The plugin puts `pw` on the Bash tool's `PATH` while it is enabled; `wt-helper` comes with the dotfiles part of the
+repository (`./install.sh --with worktrees`).

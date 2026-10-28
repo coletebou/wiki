@@ -1,0 +1,153 @@
+---
+title: S3 and Glacier
+summary: >-
+  Where Cole's files go to last: S3 for state and live objects, Glacier Flexible Retrieval and Deep Archive for cold
+  archives, what each costs per gigabyte, the minimum storage durations, and the verify-then-delete routine.
+table: works
+folio: 60
+aliases: [Amazon S3, S3, Glacier, Deep Archive, Glacier Deep Archive, archives]
+updated: 2026-10-28
+sources:
+  - title: Amazon S3 pricing
+    url: https://aws.amazon.com/s3/pricing/
+  - title: Amazon S3 storage classes
+    url: https://aws.amazon.com/s3/storage-classes/
+  - title: Understanding archive retrieval options (AWS docs)
+    url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/restoring-objects-retrieval-options.html
+  - title: Checking object integrity (AWS docs)
+    url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity.html
+  - title: Managing the lifecycle of objects (AWS docs)
+    url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html
+  - title: Uploading objects (AWS docs)
+    url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/upload-objects.html
+---
+
+Amazon S3 is where Cole's files go to last. S3 Standard holds what is read often, such as OpenTofu's state. The S3
+Glacier archive classes hold what should exist but will almost never be read: old release builds, retired backup sets,
+cold project folders moved off a server's disk. Deep Archive costs about a dollar per terabyte per month, which makes
+keeping something cheaper than deciding whether to delete it.
+
+## The storage classes
+
+The Glacier tiers Cole uses are storage classes inside ordinary S3 buckets, not a separate service. You choose the
+class per object when you upload it, or let a lifecycle rule move objects later. Prices are per gigabyte per month in
+US East (N. Virginia), from AWS's pricing page on October 28, 2026:
+
+| Class | Price | First byte | Minimum storage duration | Good for |
+|---|---|---|---|---|
+| S3 Standard | <Price id="aws-s3-standard" format="bare" /> | Milliseconds | None | State, app files, anything read often |
+| S3 Glacier Flexible Retrieval | <Price id="aws-s3-glacier-flexible" format="bare" /> | 1 minute to 12 hours, after a restore | 90 days | Backups you might want back within a day |
+| S3 Glacier Deep Archive | <Price id="aws-s3-glacier-deep-archive" format="bare" /> | Within 12 hours (48 for bulk), after a restore | 180 days | Archives you hope never to read |
+
+Between Standard and the archives sit the infrequent-access classes (30-day minimum, billed at 128 KB per object at
+least) and Glacier Instant Retrieval (archive pricing with millisecond reads, 90-day minimum). Intelligent-Tiering moves
+objects between tiers by itself, for a small monitoring fee per object.
+
+Two rules come with the cheap classes:
+
+- **Minimum storage duration.** An object deleted, overwritten or moved before 90 days (Flexible Retrieval) or 180 days
+  (Deep Archive) is billed for the rest of that period anyway.
+- **Restore before reading.** A Flexible Retrieval or Deep Archive object cannot be downloaded directly. A restore
+  request makes a temporary copy, for as many days as you ask. Flexible Retrieval restores take 1 to 5 minutes
+  (Expedited, for small objects), 3 to 5 hours (Standard) or 5 to 12 hours (Bulk, free). Deep Archive has no Expedited
+  tier: Standard finishes within 12 hours, Bulk within 48.
+
+Per gigabyte, Deep Archive is about one twenty-third the price of S3 Standard. The trade is time: you plan a read a day
+ahead.
+
+## What Cole keeps where
+
+- **OpenTofu state** sits in S3 Standard, in a bucket that is versioned, encrypted with a KMS key and reachable over TLS
+  only (see [[opentofu]]).
+- **Cold archives** go to Deep Archive: release folders older than the newest few, retired backup sets, caches and
+  imports that nothing running still reads.
+- **Backups** run daily on the servers as consistent dumps and an encrypted snapshot offsite, and a second copy of the
+  backup sets that matter goes to Glacier.
+- **Files served to users** (app assets, media) live in Cloudflare's R2 instead, next to the DNS and rules that serve
+  them (see [[cloudflare]]).
+
+The archive work usually starts with a full disk. When a server's data volume passes its target, the oldest cold data
+is the first thing to leave, and the server keeps only what it uses. In one pass in October 2026, moving a server's
+cold release folders to Deep Archive took its data disk from above 80% full to about half.
+
+## Verify, then delete
+
+Nothing is deleted locally until the archive copy is proven. The routine, one folder at a time:
+
+1. **Pick candidates** that nothing running references, and write down why each one is cold.
+2. **Pack each folder into one file.** Every archived object carries about 40 KB of overhead (8 KB billed at S3
+   Standard rates and 32 KB at archive rates), so a folder of small files should be one tar file, not thousands of
+   objects.
+3. **Upload it with a checksum**, so S3 verifies the bytes on arrival:
+
+   ```sh
+   tar -C /data/releases -cf /data/stage/release-2026-03.tar release-2026-03
+   aws s3api put-object --bucket example-archive \
+     --key releases/release-2026-03.tar --body /data/stage/release-2026-03.tar \
+     --storage-class DEEP_ARCHIVE --checksum-algorithm SHA256
+   ```
+
+4. **Check it from S3's side**, with the checksum S3 stored:
+
+   ```sh
+   aws s3api head-object --bucket example-archive \
+     --key releases/release-2026-03.tar --checksum-mode ENABLED
+   ```
+
+5. **Record it** in an archive manifest: what it was, the bucket and key, the size, the checksum, the date.
+6. **Only then delete the local copy**, and confirm the disk actually got the space back.
+
+A single `put-object` is limited to 5 GB. Larger archives go up as multipart uploads (`aws s3 cp` does that by
+itself), and their checksums are calculated per part, so compare them with the same tool that made them.
+
+## Lifecycle rules
+
+For data that starts warm and cools down, upload to Standard and let a lifecycle rule move it. A rule can also expire
+old versions in a versioned bucket and clean up multipart uploads that never finished, which otherwise cost storage
+forever:
+
+```json
+{
+  "Rules": [
+    {
+      "ID": "cool-down-backups",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "backups/" },
+      "Transitions": [{ "Days": 30, "StorageClass": "DEEP_ARCHIVE" }],
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 90 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+    }
+  ]
+}
+```
+
+```sh
+aws s3api put-bucket-lifecycle-configuration --bucket example-archive \
+  --lifecycle-configuration file://lifecycle.json
+```
+
+Lifecycle transitions are billed per request, which is one more reason to archive a few large objects rather than many
+small ones.
+
+## Gotchas
+
+- **Make the archive hard to destroy.** The server that uploads should not be able to delete: give its IAM role
+  `s3:PutObject` without `s3:DeleteObject`, or use Object Lock, so a compromised box cannot erase its own history.
+  Deletions happen from somewhere else, on purpose.
+- **Keep the keys elsewhere.** If an archive is encrypted with a key or password that lived only on the server, losing
+  the server loses the archive. Cole's go in the password manager.
+- **Versioning keeps deleted things.** In a versioned bucket, a delete adds a marker and the old version is still
+  billed until a lifecycle rule expires it.
+- **A restore is a temporary copy.** It disappears after the days you asked for; copy it somewhere permanent if you
+  need it for longer.
+- **Regions differ.** The prices above are for US East (N. Virginia).
+
+[[what-it-costs]] puts typical amounts of S3 and Deep Archive into the monthly bill, and [[observability]] covers the
+backup alerts that watch all of this.
+
+<ColesTake>
+
+We have S3 and Glacier. When a server's disk fills up, the old stuff goes to Glacier: it costs almost nothing to keep,
+and it's there if we ever need it.
+
+</ColesTake>

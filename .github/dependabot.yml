@@ -1,0 +1,7 @@
+# Keeps the SHA-pinned actions current. Dependabot's pull requests are not agent edits: they wait for review.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

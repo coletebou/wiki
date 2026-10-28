@@ -1,0 +1,183 @@
+---
+title: Git Worktrees
+summary: >-
+  Several working directories on one repository, each on its own branch: Cole's unit of isolation for agents, how wt
+  and Claude Code create them, and what a fresh worktree is missing that you have to carry over.
+table: workshop
+folio: 41
+aliases: [worktrees, git worktree, wt]
+updated: 2026-10-28
+sources:
+  - title: git-worktree(1)
+    url: https://git-scm.com/docs/git-worktree
+  - title: Claude Code, run parallel sessions with worktrees
+    url: https://code.claude.com/docs/en/worktrees
+  - title: wt-helper (dx)
+    url: https://github.com/coletebou/dx/blob/master/scripts/wt-helper
+  - title: claude-worktree-hook (dx)
+    url: https://github.com/coletebou/dx/blob/master/scripts/claude-worktree-hook
+  - title: Parallel work (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/workflow/parallel.md
+---
+
+A git worktree is another working directory attached to the same repository: its own files, its own branch, its own
+index, but one shared history and one set of remotes. For Cole it is the unit of isolation for agents. Every session
+that writes code gets its own worktree, so a dozen of them can edit the same repository at once without stepping on
+each other, without stashing, and without a single container.
+
+The worktree itself is the easy part. What takes care is everything git does not track, which a fresh worktree does
+not have: env files, installed dependencies, tool pins, the Docker Compose project name. This page covers both.
+
+## What a worktree is
+
+```sh
+git worktree add ../app-feature -b feature     # a new worktree on a new branch
+git worktree add ../app-fix fix-issue-456      # a worktree on an existing branch
+git worktree list                              # every worktree of this repository
+git worktree remove ../app-feature             # remove one (refuses if it has changes)
+git worktree prune                             # forget worktrees whose directories are gone
+```
+
+The repository's object store, refs and config are shared; `HEAD`, the index and a few other files are per worktree.
+A commit made in any worktree is immediately visible to the others, because there is only one history.
+
+Two rules follow from that design:
+
+- **One branch, one worktree.** By default `git worktree add` refuses to check out a branch that another worktree has
+  checked out. Two sessions on one branch would fight over it, so git stops you.
+- **Remove, do not delete.** Deleting a worktree's directory by hand leaves its records behind until `git worktree
+  prune` (or garbage collection) cleans them up. `git worktree lock` keeps a worktree's records even when its
+  directory is missing, which matters for worktrees on removable or network storage.
+
+## Why agents need them
+
+Two agents in one checkout share one set of files. One edits a module while the other's test run reads it half
+written; one switches branches and the other's work goes with it; both run `npm install` into the same
+`node_modules`; both bring up the same Compose project. Worktrees remove all of that: each session gets its own files
+and build state, and the coordination left is about merging branches, which git is good at.
+
+Cole's rules put it as a decision: read-only work (research, audits, reviews) can share a tree as subagents; writers
+that would touch the same files, dependencies, build output, Compose state or migrations each get a worktree. See
+[[agent-fleet]] and [[parallel-worktrees]].
+
+## Cole's layout
+
+Worktrees live inside the repository they belong to, at `<repo>/.claude/worktrees/<branch>`. That directory is
+git-ignored, so worktrees never show up as untracked files in the main checkout, and it is the same place Claude Code
+puts its own worktrees. (If the repository builds Docker images, add the directory to `.dockerignore` too, or every
+worktree ends up in the build context.) Slashes in a branch name become dashes in the path only; the branch keeps its
+name.
+
+The layout can move without anyone changing their habits:
+
+| Lever | Effect |
+|---|---|
+| `--target <path>` | Exactly this path (the parallel launcher uses it for tag-based names) |
+| `WT_BASE_DIR=<dir>` | All worktrees in `<dir>/<branch>` |
+| `WT_LAYOUT=sibling` | The old flat layout next to the repository: `<parent>/<repo>-<branch>` |
+| `worktree.baseDirectory` | A per-repository setting in `.claude/settings.local.json` or `.claude/settings.json`, for example an external drive |
+
+A `worktree.baseDirectory` on a volume that is not mounted is refused, rather than quietly filling the root disk.
+
+## wt
+
+`wt <branch>` is the solo command: a shell function over `wt-helper` that creates or attaches a worktree and `cd`s
+into it. It looks at the branch's state and asks only what it needs to:
+
+| The branch | What `wt` does |
+|---|---|
+| Does not exist | Asks whether to branch from `origin/HEAD` (fresh, the remote's default branch) or your local `HEAD` |
+| Exists, not checked out | Attaches a worktree to it |
+| Already checked out in another worktree | Offers to `cd` there, copy it to a new branch, or recreate it |
+
+`--from fresh` or `--from head` skips the question for scripts, `--no-fetch` works offline, and `wt-helper
+--print-base-dir` prints where new worktrees go, which is how the [[parallel-worktrees|parallel launcher]] places its
+own. All prompts go to the terminal and only the final path goes to standard output, so the function can capture it.
+Before creating anything, `wt-helper` prunes stale worktree records, except while a registered worktree sits on a
+volume that is not mounted: there it only looks stale, and pruning would make git forget it.
+
+## Claude Code's own worktrees
+
+[[claude-code|Claude Code]] creates worktrees too:
+
+- `claude --worktree feature-auth` (or `-w`) starts a session in `.claude/worktrees/feature-auth` on a new branch named
+  `worktree-feature-auth`. `claude --worktree "#1234"` starts one on a pull request's head.
+- During a session, "work in a worktree" makes Claude create one and move into it with the `EnterWorktree` tool.
+- A subagent can run in a temporary worktree of its own, by request or permanently with `isolation: worktree` in its
+  definition.
+- On exit, a clean worktree from an unnamed session is removed; one with work in it prompts you to keep or remove it.
+  A periodic sweep removes old subagent and background-session worktrees that hold no work.
+
+Several things are shared with the main checkout automatically: plugins installed at project scope, permission
+approvals you save in a worktree (they go to the main checkout's settings), untracked project skills, and auto memory,
+which Claude Code keys by repository, so every worktree of a repository reads the same notes.
+
+### Following Cole's layout
+
+Claude Code reads no `worktree.baseDirectory`; it always uses `.claude/worktrees/`. The only lever is a
+`WorktreeCreate` [[hooks|hook]], and a configured one replaces Claude Code's creation for every worktree it applies to.
+Cole's `claude-worktree-hook` is that hook pair: it creates worktrees where the repository's setting says, doing every
+step Claude Code's own creation does (the base branch, the `.worktreeinclude` copy, switching off repository-local
+filter drivers), and its remove half deletes only worktrees it or Claude Code made. Because a buggy hook would break
+every worktree creation, it is enabled per repository (`claude-worktree-hook enable <repo>`), never in user
+settings. Once a day it also prunes its worktrees that are clean, unused, idle for a week and hold no commits of their
+own.
+
+## What to carry over
+
+A new worktree is a clean checkout of tracked files. Everything ignored is missing. Here is what Cole carries over,
+and how:
+
+| Missing | Why it matters | How it gets there |
+|---|---|---|
+| `.env`, `.env.local` | The app will not start, or Compose warns about every unset variable | Copied by the parallel launcher's bootstrap, or by Claude Code's `.worktreeinclude` |
+| `.env.keys` | The private keys that decrypt an encrypted `.env` | Copied the same way; never committed (see [[env-files]]) |
+| `node_modules` | Nothing builds or tests | A fresh install per worktree with the repository's own package manager (see [[package-managers]]) |
+| `.npmrc`, `.nvmrc`, `.node-version`, `.tool-versions` | Registry auth and tool versions | Copied |
+| `docker-compose.override.yml` | Local mounts and settings Compose loads automatically | Copied; without it a stack silently loses its overrides |
+| A unique `COMPOSE_PROJECT_NAME` | Otherwise Compose attaches to the main checkout's project and mounts the main checkout's code | Written to `.envrc` as `<repo>-<tag>` and exported in the window |
+| Database migrations | Compose does not re-run a finished migration job when new migration files appear | Compare the migrations folder with the default branch and re-run the job |
+| `CLAUDE.local.md` | Personal instructions exist only in the worktree that created them | Import a file from your home directory instead |
+| Git LFS files | A repository-local LFS setup leaves pointer files in Claude Code's worktrees | `git lfs pull` in the worktree |
+
+Claude Code's version of the copy step is a `.worktreeinclude` file at the repository root, in `.gitignore` syntax.
+Only files that match a pattern and are also ignored are copied, so tracked files are never duplicated:
+
+```text
+.env
+.env.local
+config/secrets.json
+```
+
+<ColesTake>
+
+The worktree is the easy part. What bites is everything git does not track: the env files, the installed
+dependencies, the Compose project name. Carry those over on purpose, every time, or the agent wastes its first ten
+minutes rediscovering them.
+
+</ColesTake>
+
+## Gotchas
+
+- **The Compose collision is the classic one.** You edit a file in the worktree, the watcher says it restarted, and
+  nothing changes, because the containers mount the main checkout's code. Check a container's mounts with
+  `docker inspect`, and give every worktree its own project name.
+- **Garbage collection can reap live worktrees.** A worktree on storage that is sometimes absent (an unmounted drive,
+  a WSL mount, an instance store wiped on reboot) looks dangling to `git gc` and gets pruned mid-life, stranding its
+  branch. Cole's git config sets `gc.worktreePruneExpire = never`; an explicit `git worktree prune` still works.
+- **A symlinked `node_modules` is not a directory to git.** A repository's `node_modules/` ignore rule (trailing slash)
+  does not match a symlink, so a worktree that links to the main install shows it as untracked. Cole's global ignore
+  lists `node_modules` without the slash.
+- **Launch tools from the main checkout.** Inside a linked worktree, `git rev-parse --show-toplevel` names the
+  worktree, so a tool that nests worktrees or copies env files from "the repository" would use the wrong one.
+- **Folder trust is per folder.** A new worktree can show Claude Code's trust dialog even in bypass mode.
+  [[drover|Drover]]'s launcher records the folder as trusted first; by hand, accept it once.
+- **Moving a lane to another machine.** Make its state legible rather than cleaning it up: stop new work, write a
+  handoff file at the worktree root with the branch, `git rev-parse HEAD`, `git status`, untracked directories, scratch
+  paths outside the repository and running jobs, then let whoever moves it start exactly one successor.
+
+## Related
+
+The [[parallel-worktrees]] launcher turns a manifest into many worktrees at once. [[git]] covers Cole's other git
+habits, [[testing]] uses a detached worktree to prove a regression test fails before its fix, and [[handoff-chains]]
+covers moving a session, rather than a worktree, to a fresh context.

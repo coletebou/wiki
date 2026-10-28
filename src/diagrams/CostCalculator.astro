@@ -1,0 +1,378 @@
+---
+// Study: what it costs. Every line is a price from src/data/prices.json, read on the vendor's own page on the date
+// shown. Pick a preset or set each line; the totals follow. Taxes, overages beyond the lines here, and usage-billed
+// extras are not included.
+import prices from '../data/prices.json';
+
+type P = { label: string; amount: number; period: string; unit?: string; display: string; asOf: string; source: string; note?: string; unverified?: boolean };
+const all = prices as Record<string, P>;
+const pick = (ids: string[]) => Object.fromEntries(ids.map((id) => [id, all[id]]));
+
+// Each line: a control and how it turns into a cost. `kind`: count (number × price), plan (one of several ids, ×
+// quantity), toggle (on/off), minutes (GitHub Actions overage), gb (storage per GB-month).
+const lines = [
+  { id: 'com', group: 'Domains', label: '.com domains', kind: 'count', price: 'domain-com', max: 50 },
+  { id: 'ai', group: 'Domains', label: '.ai domains', kind: 'count', price: 'domain-ai', max: 20, note: 'two-year minimum term' },
+  { id: 'org', group: 'Domains', label: '.org domains', kind: 'count', price: 'domain-org', max: 20 },
+  { id: 'dev', group: 'Domains', label: '.dev domains', kind: 'count', price: 'domain-dev', max: 20 },
+  { id: 'cloudflare', group: 'The edge', label: 'Cloudflare', kind: 'plan', options: ['cloudflare-free', 'cloudflare-pro', 'cloudflare-business'], qty: 'zones' },
+  { id: 'vercel', group: 'The edge', label: 'Vercel', kind: 'plan', options: ['vercel-hobby', 'vercel-pro'], qty: 'seats' },
+  { id: 'tailscale', group: 'The edge', label: 'Tailscale', kind: 'plan', options: ['tailscale-personal', 'tailscale-standard', 'tailscale-premium'], qty: 'users' },
+  { id: 'github', group: 'Code', label: 'GitHub', kind: 'plan', options: ['github-free', 'github-pro'] },
+  { id: 'minutes', group: 'Code', label: 'Actions minutes, private repos', kind: 'minutes', price: 'github-actions-linux-minute', max: 100000, note: 'public repos are free' },
+  { id: 'apple', group: 'Code', label: 'Apple Developer Program', kind: 'toggle', price: 'apple-developer-program' },
+  { id: 'claude', group: 'Agents', label: 'Claude', kind: 'plan', options: ['none', 'claude-pro', 'claude-max-5x', 'claude-max-20x'] },
+  { id: 'chatgpt', group: 'Agents', label: 'ChatGPT', kind: 'plan', options: ['none', 'chatgpt-plus', 'chatgpt-pro'] },
+  { id: 'sentry', group: 'Watching', label: 'Sentry', kind: 'plan', options: ['sentry-developer', 'sentry-team'] },
+  { id: 'langfuse', group: 'Watching', label: 'Langfuse', kind: 'plan', options: ['none', 'langfuse-hobby', 'langfuse-core', 'langfuse-pro'], none: 'Self-hosted' },
+  { id: 'datadog', group: 'Watching', label: 'Datadog', kind: 'plan', options: ['datadog-free', 'datadog-infra-pro'], qty: 'hosts' },
+  { id: 'servers', group: 'AWS', label: 'Small servers (t3.small)', kind: 'count', price: 'aws-ec2-small', max: 50 },
+  { id: 's3', group: 'AWS', label: 'S3 Standard, GB', kind: 'gb', price: 'aws-s3-standard', max: 100000 },
+  { id: 'deep', group: 'AWS', label: 'Glacier Deep Archive, GB', kind: 'gb', price: 'aws-s3-glacier-deep-archive', max: 1000000 },
+  { id: 'wispr', group: 'Desk apps', label: 'Wispr Flow Pro', kind: 'toggle', price: 'wispr-flow-pro' },
+  { id: 'screens', group: 'Desk apps', label: 'Screens 5', kind: 'toggle', price: 'screens-5' },
+  { id: 'termius', group: 'Desk apps', label: 'Termius Pro', kind: 'toggle', price: 'termius-pro' },
+  { id: 'macmini', group: 'Once', label: 'Mac mini', kind: 'toggle', price: 'mac-mini' },
+  { id: 'mouse', group: 'Once', label: 'MX Master', kind: 'toggle', price: 'mx-master' },
+] as const;
+
+// Presets, the same line items as the three setups on the what-it-costs page. "Cole’s setup" leaves servers and host counts
+// out on purpose, because how many machines run is not published.
+const presets: Record<string, { name: string; note: string; values: Record<string, string | number | boolean> }> = {
+  start: {
+    name: 'Just starting',
+    note: 'One domain, free tiers everywhere, one AI plan. The same lines as the table below.',
+    values: { com: 1, ai: 0, org: 0, dev: 0, cloudflare: 'cloudflare-free', 'cloudflare:qty': 1, vercel: 'vercel-hobby', 'vercel:qty': 1, tailscale: 'tailscale-personal', 'tailscale:qty': 1, github: 'github-free', minutes: 0, apple: false, claude: 'claude-pro', chatgpt: 'none', sentry: 'sentry-developer', langfuse: 'langfuse-hobby', datadog: 'datadog-free', 'datadog:qty': 1, servers: 0, s3: 0, deep: 0, wispr: false, screens: false, termius: false, macmini: false, mouse: false },
+  },
+  most: {
+    name: 'Most people',
+    note: 'A couple of domains, one small server, an app in the App Store, free tiers where they are enough.',
+    values: { com: 2, ai: 0, org: 0, dev: 0, cloudflare: 'cloudflare-free', 'cloudflare:qty': 1, vercel: 'vercel-hobby', 'vercel:qty': 1, tailscale: 'tailscale-personal', 'tailscale:qty': 1, github: 'github-free', minutes: 0, apple: true, claude: 'claude-max-5x', chatgpt: 'none', sentry: 'sentry-developer', langfuse: 'langfuse-hobby', datadog: 'datadog-free', 'datadog:qty': 1, servers: 1, s3: 50, deep: 0, wispr: false, screens: false, termius: false, macmini: false, mouse: false },
+  },
+  cole: {
+    name: 'Cole’s setup',
+    note: 'The services in Cole’s setup this month, as in the table below. Langfuse is self-hosted, the storage amounts are estimates, and the servers are left out on purpose.',
+    values: { com: 8, ai: 2, org: 1, dev: 0, cloudflare: 'cloudflare-pro', 'cloudflare:qty': 1, vercel: 'vercel-pro', 'vercel:qty': 1, tailscale: 'tailscale-standard', 'tailscale:qty': 1, github: 'github-pro', minutes: 0, apple: true, claude: 'claude-max-20x', chatgpt: 'chatgpt-pro', sentry: 'sentry-team', langfuse: 'none', datadog: 'datadog-free', 'datadog:qty': 1, servers: 0, s3: 100, deep: 1000, wispr: false, screens: false, termius: false, macmini: false, mouse: false },
+  },
+};
+
+// What a free plan allows, from the vendor's page (see each price's unit): past it, the plan is not an option.
+const LIMITS: Record<string, { max: number; what: string }> = {
+  'datadog-free': { max: 5, what: 'hosts' },
+  'tailscale-personal': { max: 6, what: 'users' },
+  'vercel-hobby': { max: 1, what: 'seat' },
+};
+const used = [...new Set(lines.flatMap((l: any) => (l.options ? l.options.filter((o: string) => o !== 'none') : [l.price])))];
+const priceData = pick([...used, 'github-actions-free-minutes', 'github-pro-actions-minutes']);
+const data = JSON.stringify({ lines, presets, prices: priceData, limits: LIMITS }).replace(/</g, '\\u003c');
+const groups = [...new Set(lines.map((l) => l.group))];
+const host = (u: string) => new URL(u).hostname.replace(/^www\./, '');
+const fmtDate = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const short = (id: string, none = 'None') => (id === 'none' ? none : all[id].label.replace(/^(Cloudflare|Vercel|Tailscale|GitHub|Claude|ChatGPT|Sentry|Langfuse|Datadog) /, ''));
+---
+<figure class="study calc" data-pagefind-ignore aria-labelledby="calc-title">
+  <figcaption class="study-head">
+    <p class="study-title" id="calc-title"><b>Studium</b>What it costs</p>
+    <p class="study-hint">Start from a preset, then change any line. Every price links to the page it was read on.</p>
+  </figcaption>
+  <div class="study-tools" role="group" aria-label="Presets">
+    {Object.entries(presets).map(([id, p], i) => (
+      <button type="button" class="ink-btn" data-preset={id} aria-pressed={i === 2 ? 'true' : 'false'}>{p.name}</button>
+    ))}
+  </div>
+  <p class="calc-note" aria-live="polite">{presets.cole.note}</p>
+
+  <div class="calc-totals" aria-live="polite">
+    <div><span class="t-label">Each month</span><span class="t-value" data-total="month">$0</span></div>
+    <div><span class="t-label">Each year</span><span class="t-value" data-total="year">$0</span></div>
+    <div><span class="t-label">Once</span><span class="t-value" data-total="once">$0</span></div>
+  </div>
+
+  <form class="calc-form" onsubmit="return false">
+    {groups.map((g) => (
+      <fieldset>
+        <legend>{g}</legend>
+        {lines.filter((l) => l.group === g).map((l: any) => {
+          const priceId = l.options ? l.options.find((o: string) => o !== 'none') : l.price;
+          const p = all[priceId];
+          return (
+            <div class="calc-line" data-line={l.id}>
+              <label class="c-label" for={`c-${l.id}`}>{l.label}{l.note && <small>{l.note}</small>}</label>
+              <span class="c-control">
+                {l.kind === 'plan' && (
+                  <select id={`c-${l.id}`} data-field={l.id}>
+                    {l.options.map((o: string) => <option value={o}>{short(o, l.none)}</option>)}
+                  </select>
+                )}
+                {l.kind === 'plan' && l.qty && (
+                  <label class="qty"><span class="visually-hidden">{l.label} {l.qty}</span><input type="number" min="1" max="500" step="1" value="1" data-field={`${l.id}:qty`} inputmode="numeric" /> {l.qty}</label>
+                )}
+                {(l.kind === 'count' || l.kind === 'gb' || l.kind === 'minutes') && (
+                  <input id={`c-${l.id}`} type="number" min="0" max={l.max} step="1" value="0" data-field={l.id} inputmode="numeric" />
+                )}
+                {l.kind === 'toggle' && <input id={`c-${l.id}`} type="checkbox" data-field={l.id} />}
+              </span>
+              <span class="c-price" data-price-for={l.id}>
+                <a href={p.source} rel="noopener" data-src>{p.display}</a>
+                <small>as of <time datetime={p.asOf}>{fmtDate(p.asOf)}</time> · {host(p.source)}{p.unverified ? ' · unverified' : ''}</small>
+              </span>
+              <span class="c-sub" data-sub={l.id}>$0</span>
+            </div>
+          );
+        })}
+      </fieldset>
+    ))}
+  </form>
+  <p class="calc-warn" hidden aria-live="polite"></p>
+  <p class="calc-foot">Monthly figures include yearly prices divided by twelve. Not included: taxes, usage beyond what is listed (bandwidth, overages, metered AI), and the first-year discounts some registries offer. Read each line’s note on the vendor’s page before you buy.</p>
+  <script type="application/json" class="calc-data" set:html={data} />
+</figure>
+
+<style>
+  .calc-note {
+    margin: 0 0 0.8rem;
+    font-style: italic;
+    color: var(--ink-2);
+    font-size: 0.98rem;
+  }
+  .calc-totals {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+  }
+  .calc-totals > div {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--paper);
+    text-align: center;
+  }
+  .t-label {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .t-value {
+    display: block;
+    font-size: 1.6rem;
+    line-height: 1.2;
+    font-variant-numeric: lining-nums tabular-nums;
+    color: var(--sanguine);
+  }
+  .calc-form fieldset {
+    margin: 0 0 0.9rem;
+    padding: 0.2rem 0 0.4rem;
+    border: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .calc-form legend {
+    padding-right: 0.6rem;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+  }
+  .calc-line {
+    display: grid;
+    grid-template-columns: minmax(9rem, 1.2fr) minmax(8rem, 1fr) minmax(10rem, 1.5fr) 5.2rem;
+    gap: 0.25rem 0.8rem;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px dashed color-mix(in srgb, var(--rule) 60%, transparent);
+    font-size: 0.98rem;
+  }
+  .c-label small,
+  .c-price small {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--ink-3);
+  }
+  .c-price a {
+    color: var(--verdigris);
+    font-size: 0.92rem;
+  }
+  .c-sub {
+    text-align: right;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  .calc-line.zero .c-sub {
+    color: var(--ink-3);
+  }
+  .calc-form select,
+  .calc-form input[type='number'] {
+    max-width: 100%;
+    padding: 0.25rem 0.4rem;
+    font: inherit;
+    font-size: 0.95rem;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+  }
+  .calc-form input[type='number'] {
+    width: 5.5rem;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  .calc-form .qty input {
+    width: 3.6rem;
+  }
+  .calc-form .qty {
+    margin-left: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+  .calc-form input[type='checkbox'] {
+    width: 1.2rem;
+    height: 1.2rem;
+    accent-color: var(--sanguine);
+  }
+  .calc-warn {
+    margin: 0.6rem 0 0;
+    padding: 0.5rem 0.8rem;
+    border-left: 3px solid var(--sanguine);
+    background: var(--sanguine-wash);
+    font-size: 0.95rem;
+  }
+  .calc-line.over .c-sub {
+    color: var(--sanguine);
+    font-weight: 600;
+  }
+  .calc-foot {
+    margin: 0.6rem 0 0;
+    font-size: 0.86rem;
+    color: var(--ink-3);
+  }
+  @media (max-width: 44rem) {
+    .calc-line {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .c-price {
+      grid-column: 1;
+    }
+    .c-sub {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
+    }
+    .c-control {
+      grid-column: 1;
+    }
+    .calc-totals .t-value {
+      font-size: 1.2rem;
+    }
+  }
+</style>
+
+<script>
+  type Price = { label: string; amount: number; period: string; display: string; asOf: string; source: string; unverified?: boolean };
+  type Line = { id: string; kind: 'count' | 'plan' | 'toggle' | 'minutes' | 'gb'; price?: string; options?: string[]; qty?: string };
+  const money = (n: number) => (n === 0 ? '$0' : n < 10 ? `$${n.toFixed(2)}` : `$${Math.round(n).toLocaleString('en-US')}`);
+  const fmtDate = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+
+  for (const fig of document.querySelectorAll<HTMLElement>('.calc')) {
+    const { lines, presets, prices, limits }: { lines: Line[]; presets: Record<string, { name: string; note: string; values: Record<string, unknown> }>; prices: Record<string, Price>; limits: Record<string, { max: number; what: string }> } = JSON.parse(fig.querySelector('.calc-data')!.textContent!);
+    const warn = fig.querySelector<HTMLElement>('.calc-warn')!;
+    const field = (k: string) => fig.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-field="${k}"]`)!;
+    const num = (k: string) => Math.max(0, Number((field(k) as HTMLInputElement).value) || 0);
+
+    /** A price as a cost per month, per year and once, for `qty` of it. */
+    function cost(p: Price | undefined, qty: number) {
+      const out = { month: 0, year: 0, once: 0 };
+      if (!p || !qty) return out;
+      if (p.period === 'month') out.month = p.amount * qty;
+      else if (p.period === 'year') out.year = p.amount * qty;
+      else if (p.period === 'once') out.once = p.amount * qty;
+      else if (p.period === 'gb-month') out.month = p.amount * qty;
+      return out;
+    }
+
+    function showPrice(lineId: string, id: string) {
+      const el = fig.querySelector<HTMLElement>(`[data-price-for="${lineId}"]`)!;
+      const p = prices[id];
+      if (!p) {
+        el.innerHTML = '<small>no plan</small>';
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = p.source;
+      a.rel = 'noopener';
+      a.textContent = p.display;
+      const s = document.createElement('small');
+      s.textContent = `as of ${fmtDate(p.asOf)} · ${new URL(p.source).hostname.replace(/^www\./, '')}${p.unverified ? ' · unverified' : ''}`;
+      el.replaceChildren(a, s);
+    }
+
+    function update() {
+      const total = { month: 0, year: 0, once: 0 };
+      const over: string[] = [];
+      for (const l of lines) {
+        let c = { month: 0, year: 0, once: 0 };
+        if (l.kind === 'plan') {
+          const id = (field(l.id) as HTMLSelectElement).value;
+          showPrice(l.id, id);
+          const qty = l.qty ? Math.max(1, num(`${l.id}:qty`)) : 1;
+          c = cost(prices[id], qty);
+          const limit = limits[id];
+          const exceeded = Boolean(limit && qty > limit.max);
+          fig.querySelector(`[data-line="${l.id}"]`)!.classList.toggle('over', exceeded);
+          if (exceeded) over.push(`${prices[id].label} allows ${limit.max} ${limit.what}`);
+          if (l.id === 'github') {
+            const included = prices[id === 'github-pro' ? 'github-pro-actions-minutes' : 'github-actions-free-minutes'].amount;
+            fig.dataset.included = String(included);
+          }
+        } else if (l.kind === 'toggle') {
+          c = cost(prices[l.price!], (field(l.id) as HTMLInputElement).checked ? 1 : 0);
+        } else if (l.kind === 'minutes') {
+          const included = Number(fig.dataset.included ?? 2000);
+          c = { month: Math.max(0, num(l.id) - included) * prices[l.price!].amount, year: 0, once: 0 };
+        } else {
+          c = cost(prices[l.price!], num(l.id));
+        }
+        const monthly = c.month + c.year / 12;
+        const sub = fig.querySelector<HTMLElement>(`[data-sub="${l.id}"]`)!;
+        const isOver = sub.parentElement!.classList.contains('over');
+        sub.textContent = isOver ? 'over the limit' : c.once ? `${money(c.once)} once` : monthly ? `${money(monthly)}/mo` : '$0';
+        sub.parentElement!.classList.toggle('zero', !c.once && !monthly);
+        total.month += c.month;
+        total.year += c.year;
+        total.once += c.once;
+      }
+      warn.hidden = !over.length;
+      warn.textContent = over.length ? `Past a free plan's limit: ${over.join('; ')}. Choose a paid plan for those lines; the totals leave them out.` : '';
+      const perMonth = total.month + total.year / 12;
+      fig.querySelector('[data-total="month"]')!.textContent = money(perMonth);
+      fig.querySelector('[data-total="year"]')!.textContent = money(perMonth * 12);
+      fig.querySelector('[data-total="once"]')!.textContent = money(total.once);
+    }
+
+    function apply(id: string) {
+      const p = presets[id];
+      for (const [k, v] of Object.entries(p.values)) {
+        const el = field(k);
+        if (!el) continue;
+        if (el instanceof HTMLInputElement && el.type === 'checkbox') el.checked = Boolean(v);
+        else el.value = String(v);
+      }
+      for (const b of fig.querySelectorAll<HTMLButtonElement>('[data-preset]')) b.setAttribute('aria-pressed', String(b.dataset.preset === id));
+      fig.querySelector('.calc-note')!.textContent = p.note;
+      update();
+    }
+
+    fig.addEventListener('click', (e) => {
+      const b = (e.target as Element).closest<HTMLButtonElement>('[data-preset]');
+      if (b) apply(b.dataset.preset!);
+    });
+    fig.addEventListener('input', () => {
+      for (const b of fig.querySelectorAll<HTMLButtonElement>('[data-preset]')) b.setAttribute('aria-pressed', 'false');
+      fig.querySelector('.calc-note')!.textContent = 'Your own mix.';
+      update();
+    });
+    apply('cole');
+  }
+</script>

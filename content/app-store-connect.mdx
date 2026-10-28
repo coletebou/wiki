@@ -1,0 +1,191 @@
+---
+title: App Store Connect
+summary: >-
+  Apple's console and API for everything after the build: app records, uploads, TestFlight, the store page, App
+  Review and release. How Cole sets it up, scripts it with an API key, and which parts still need a person.
+table: atelier
+folio: 69
+aliases: [ASC, App Store, App Review, App Store Connect API]
+updated: 2026-10-28
+sources:
+  - title: App Store Connect Help
+    url: https://developer.apple.com/help/app-store-connect/
+  - title: Upload builds
+    url: https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds
+  - title: Creating API keys for the App Store Connect API
+    url: https://developer.apple.com/documentation/appstoreconnectapi/creating-api-keys-for-app-store-connect-api
+  - title: App Review
+    url: https://developer.apple.com/distribute/app-review/
+  - title: App Review Guidelines
+    url: https://developer.apple.com/app-store/review/guidelines/
+  - title: Manage app privacy
+    url: https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy
+  - title: Release a version update in phases
+    url: https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases
+  - title: ITSAppUsesNonExemptEncryption
+    url: https://developer.apple.com/documentation/bundleresources/information-property-list/itsappusesnonexemptencryption
+  - title: Upcoming requirements
+    url: https://developer.apple.com/news/upcoming-requirements/
+  - title: Drover's signing script (Cole's public repo)
+    url: https://github.com/coletebou/drover/blob/master/native/script/ci-sign.sh
+---
+
+App Store Connect is Apple's web console, and REST API, for everything that happens to an app after it is built:
+the app record, uploaded builds, [[testflight|TestFlight]] testers, the App Store product page, App Review, release,
+and the sales and crash numbers afterward. It comes with the paid Apple Developer Program
+(<Price id="apple-developer-program" />). Cole's list put it right between the developer fee and "test flight," and
+in practice it is where most of the waiting in [[ios-development]] happens. This page covers setting it up, scripting
+it, and the parts that still need a person at a browser.
+
+## What lives there
+
+| Section | What you do there |
+|---|---|
+| Apps | Create app records, manage versions, pick the build for each version, fill in the store page |
+| TestFlight | Tester groups, builds under test, feedback and crash reports from testers |
+| App Review | Submissions, messages from reviewers, rejection details |
+| Users and Access | Team members and roles, API keys, sandbox testers |
+| Business | Agreements, tax and banking, which selling apps and in-app purchases require |
+| Analytics, Sales and Trends | Downloads, retention, crashes, revenue |
+
+There is also an App Store Connect app for iPhone and iPad, handy for checking review status away from the desk.
+
+## Creating the app record
+
+An app record has to exist before the first upload. In Apps, choose the add button, then New App, and fill in:
+
+- **Platforms**: iOS, macOS, or both.
+- **Name**: the store name. A name another developer already uses is not available; if you hold the trademark, you
+  can file a claim with Apple.
+- **Primary language.**
+- **Bundle ID**: the same identifier as the app target in [[xcode|Xcode]] (for example `com.example.MyApp`). Xcode
+  registers it for you when automatic signing is on.
+- **SKU**: your own tracking code, never shown to customers.
+- **User access**: full, or limited to chosen team members.
+
+Creating records takes the Account Holder, Admin or App Manager role, or a Developer or Marketing user who has been
+allowed to create apps. One prerequisite catches new accounts: you cannot add an app until the Account Holder signs
+the latest agreement in the Business section, and Apple updates that agreement from time to time.
+
+## People and roles
+
+Everyone on the team signs in with their own Apple Account and gets a role: Account Holder (one person, who signs
+the agreements), Admin, App Manager, Developer, Marketing, plus Sales, Finance and Customer Support. Two roles matter
+most in a small setup:
+
+- **Internal TestFlight testers must be team members** with the Account Holder, Admin, App Manager, Developer or
+  Marketing role. Cole's pattern for friends and family who test: invite them as Marketing, the narrowest of those,
+  with access limited to the apps they should see, then add them to the internal group once they accept.
+- **Only the Account Holder can create Developer ID certificates** for [[mac-apps|Mac apps]] distributed outside the
+  store.
+
+When one of Cole's apps also had its own sign-in and waitlist, giving someone access meant three separate things: a
+grant in the app's own admin, an App Store Connect role, and a place in a TestFlight group. Granting one proves
+nothing about the other two, so check each.
+
+## API keys
+
+The App Store Connect API automates almost everything the console does, and the same key is what lets scripts and
+CI upload builds, create provisioning profiles and notarize Mac apps without a browser. Create a team key in Users
+and Access, under Integrations, App Store Connect API:
+
+- **Team keys** reach all apps with the role you give the key. Creating one needs the Admin role.
+- **Individual keys** carry one user's access and cannot use the provisioning endpoints, sales and finance, or
+  `notarytool`.
+- **The private key downloads exactly once.** Apple keeps only the public half. Store the `.p8` file the way you
+  store any credential (see [[env-files]] and [[pgp]]), never in a repository, and revoke it if it leaks.
+
+Drover's manual signing workflow shows the safe shape in CI: the key lives in GitHub secrets, a step writes it to the
+runner's temporary directory with mode `600`, only the steps that need it receive it, and a final step deletes it
+even when the run fails. Here is a generic version of the upload its script performs:
+
+```sh
+xcodebuild -exportArchive \
+  -archivePath build/MyApp.xcarchive \
+  -exportOptionsPlist ExportOptions.plist \
+  -exportPath build/upload \
+  -authenticationKeyPath "$ASC_KEY_PATH" \
+  -authenticationKeyID "$ASC_KEY_ID" \
+  -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+```
+
+The export options name the method (`app-store-connect`) and the destination (`upload`), so the "export" sends the
+signed build straight to Apple.
+
+## Getting a build in
+
+Apple lists several ways to upload: Xcode's Organizer (Distribute App), `xcodebuild` as above, the Transporter app,
+`xcrun altool`, the API, and Xcode Cloud, which builds and uploads in Apple's own CI. Expo's EAS Submit does it from
+any operating system ([[capacitor-expo-swift]]).
+
+After an upload, Apple processes the build, emails you when it is ready, and the build appears in TestFlight. Three
+details decide whether that goes smoothly:
+
+- **A new build number every time.** The version (1.4) can repeat across builds; the build string identifies one
+  build "throughout the system" and cannot. Keep it identical across the app and its widgets and extensions.
+- **Export compliance.** Without the `ITSAppUsesNonExemptEncryption` key in `Info.plist`, App Store Connect asks the
+  encryption questionnaire on every upload. Tide sets it to `false`. Apple says encryption built into the operating
+  system, such as HTTPS through `URLSession`, is typically exempt; proprietary encryption is not.
+- **A released Xcode.** Uploads must be built with Xcode 26 or later against an iOS 26 SDK (since April 28, 2026),
+  and builds made with a beta Xcode get refused.
+
+## The store page and App Review
+
+A version needs its store page filled in before it can be submitted: name, subtitle, description, keywords,
+screenshots, a support URL, a privacy policy URL (required for every app), the app privacy details (what data the app
+collects, including through third-party SDKs it embeds), and the age-rating questionnaire, which produces one of 4+,
+9+, 13+, 16+ or 18+. In the European Union, apps without a verified trader status under the Digital Services Act are
+removed from the store.
+
+App Review reads the build against the [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/).
+Apple says it "typically" reviews "at least 50% of submissions in less than 24 hours and 90% in less than 48 hours."
+The fastest way to fail is a reviewer who cannot get in: if anything requires signing in, put a working demo account
+and notes in App Review Information. For a critical bug fix, or a launch tied to an event, you can request an
+expedited review.
+
+## Releasing
+
+When a version is approved you choose how it goes out:
+
+- **Manually**, whenever you press the button. Apple emails a reminder if a version sits in Pending Developer Release
+  for more than 30 days.
+- **Automatically** on approval, or automatically but no earlier than a date you set.
+- **In phases**, for updates: automatic updates reach 1, 2, 5, 10, 20, 50 and then 100 percent of users over seven
+  days. You can pause for up to 30 days in total, and anyone can still download the update manually from the store
+  during the rollout.
+
+## Scripting the release
+
+One of Cole's apps ships TestFlight builds with one command. Its release script archives the app, signs it, uploads
+it, waits for processing, adds the build to the public beta group and submits it for Beta App Review, and it runs
+unattended in about seven minutes once the Mac is free. The interesting parts are the failure handling, all learned
+from real releases:
+
+- **Ask before uploading.** The script checks App Store Connect for the build number first, so a rerun after a
+  failure only checks status instead of colliding with a build that already landed.
+- **Watch uploads for stalls.** An upload sometimes hangs with no output and no CPU. The script watches the upload
+  log, the size of Xcode's distribution logs and the process's CPU time, and kills the upload only when all three stop
+  moving, because a slow legitimate upload writes nothing for long stretches.
+- **Name Apple's own errors.** "An unexpected error occurred on the server side" is transient: wait 10 to 15 minutes
+  and retry the upload with the same signed archive.
+- **Keep a fallback.** Export an App Store package from the archive and upload it with `xcrun altool` and the API key.
+
+<ColesTake>
+
+Script the release. Once archive, upload, add to the group and submit for review is one command, shipping a build
+stops being an event and starts being a habit.
+
+</ColesTake>
+
+## Gotchas
+
+- **Web sessions expire.** Some tasks (adding team members, agreements, a few TestFlight fixes) only exist in the
+  browser and need a person signed in. Everything the API can do, do with the API.
+- **Missing keys are easy to lose.** If nobody saved the `.p8` file when it was created, revoke the key and make a new
+  one; Apple cannot send it again.
+- **A stuck tester.** A tester who shows "No Builds Available" while the role, the group and the build all look right
+  was fixed in Cole's case by deleting and recreating the tester, not by widening their role.
+- **Every platform releases separately.** An approved iOS version and an approved macOS version each need their own
+  release.
+- **Build processing can lag.** A build may take a while to show up after a successful upload; check App Store Connect
+  for its state before uploading it again.

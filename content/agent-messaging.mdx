@@ -1,0 +1,137 @@
+---
+title: Agent Messaging
+summary: >-
+  How Cole's agents message each other: Claude Code's built-in cross-session messages on one machine, Drover's
+  delivery across machines, engines and handoffs, and the rules that keep a message from becoming a permission.
+table: automata
+folio: 33
+aliases: [cross-session messaging, peer messages]
+updated: 2026-10-28
+sources:
+  - title: Message your other Claude Code sessions
+    url: https://code.claude.com/docs/en/cross-session-messaging
+  - title: Drover web README (how it talks to agents, handoff successors)
+    url: https://github.com/coletebou/drover/blob/master/web/README.md
+  - title: The drover skill
+    url: https://github.com/coletebou/drover/blob/master/skills/drover/SKILL.md
+  - title: Briefs, decisions and handoffs (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/workflow/briefs.md
+---
+
+The agents in Cole's [[agent-fleet|fleet]] talk to each other. A worker tells its coordinator that its branch is
+pushed; a coordinator relays Cole's decision to the three workers it affects; a session that just changed a schema
+warns the session building on it. [[claude-code|Claude Code]] does this natively between sessions on one machine.
+[[drover|Drover]] carries the same messages across machines, to [[codex|Codex]] and to bots, records every one of them,
+and follows a session through its handoffs.
+
+<Diagram name="agent-fleet" scene="messaging" />
+
+The diagram shows a message's path: from the sending agent, through Claude Code's per-session inbox on the same
+machine or through Drover over SSH to another machine, into the receiving session, and into the truth file on the way.
+
+## Claude Code's built-in messaging
+
+In current versions of Claude Code (2.1.224 and later), sessions on one machine can message each other with nothing
+to enable. Claude finds a
+target with the `ListAgents` tool and sends with `SendMessage`; you can ask for it in plain words ("tell the session
+working on the payments API what we just changed") or name the target with an `@` mention. `/list-agents` (also
+`/peers`) shows which sessions a session can reach.
+
+How it works:
+
+- **An inbox per session.** Each session binds an inbox socket (a Unix socket on macOS and Linux, a named pipe on
+  Windows) restricted to your user. Messages between sessions on the same machine never pass through Anthropic's
+  servers. Hooks and scripts see the socket's path and a per-session token in their environment, so a hook can post
+  into its own session.
+- **Delivery between tool calls.** A busy session reads the message between tool calls, so a running command is never
+  interrupted; an idle one starts a new turn.
+- **A notice when idle.** Instead of polling, a session can ask another to send one notice when it next goes idle or
+  exits.
+- **Limits that stop loops.** A message is capped at about a million characters, a burst to one session is refused at
+  the sender, identical repeats are dropped, and at most fifty accepted messages wait in a queue. A loop between two
+  sessions stops on its own.
+
+Messages to your sessions on other machines or in the cloud go through Anthropic's servers and need Remote Control,
+which requires a claude.ai sign-in; sessions on an API key or Amazon Bedrock cannot reach other machines this way.
+That gap is one of the reasons Drover exists.
+
+### What a message can and cannot do
+
+A message is plain text one agent writes to another. The receiving session is told it came from another session,
+not from you, and it is limited accordingly:
+
+- It can never approve anything, and never answers a pending permission prompt.
+- Claude is instructed never to change permissions, `CLAUDE.md` or other configuration because another session asked.
+- A slash command inside a message arrives as text and never runs.
+- If acting on it needs a permission the receiving session does not have, the usual prompt appears.
+
+Each session also decides what to accept. By default it depends on permission modes: a session that prompts for
+permissions accepts messages, and a session that bypasses prompts **holds** messages from senders that do not declare
+that they bypass too, and asks you to approve each one. A held message expires after five minutes by default.
+`crossSessionInbound` (`accept`, `hold` or `refuse`) overrides the default.
+
+<ColesTake>
+
+A message from another agent is information, never permission. If a session needs my yes, it asks me, not its
+neighbor.
+
+</ColesTake>
+
+## What Drover adds
+
+`drover_send` (or `drover op sessions.message`) messages any live session on any machine in the fleet:
+
+```sh
+drover op sessions.message '{"host":"box-a","id":"webapp-f8","text":"coordinator here: rebase on master, the schema landed"}'
+```
+
+- **Any host.** The daemon reaches other machines over SSH and delivers locally there.
+- **Any engine.** A Claude session gets the message in its own inbox socket; a Codex thread in a terminal through
+  `codex queue`; a headless session through the daemon that holds it; a Grok bot through its webhook, with the reply
+  coming back later as a chat event; the fleet manager through its gateway.
+- **The same envelope.** For Claude, Drover writes the same `<cross-session-message>` envelope Claude Code's own sender
+  writes, with the sender named `drover (<actor>)`. Because what Drover relays is the owner's own typing, it declares
+  the bypass class to a session in bypass mode, so the message is delivered instead of held at a dialog.
+- **A record.** Every message is a `message` event in the truth file, with its own id, the actor, the target and how it
+  was delivered. A busy target reports `queuedBehindTurn`. See [[message-ids]].
+- **Handoff successors.** A long session can hand its work to a fresh one under a new name
+  ([[handoff-chains]]). A message to the old name still arrives: when the target is gone, Drover reads the handoff
+  chain's own records and delivers to the newest live generation, saying so in the result. It never redirects a
+  message away from a session that is still live.
+- **A guarded fallback.** For anything else in tmux, `drover_tmux_send` pastes into the pane, and refuses when the pane
+  shows a dialog, because the Enter at the end of a paste would answer it.
+
+## Conventions
+
+These come from Cole's rules and the Drover skill:
+
+- **Say who you are.** Start a message with the sender ("webapp-f8 here: …"), and set the actor where a tool offers
+  one.
+- **Never route around a denial.** A session never asks another session to do something that was denied or blocked in
+  its own; that work goes back to Cole.
+- **Gate on messages, not on idleness.** An irreversible step waits for an explicit message ("merge landed at
+  `<sha>`"), never for a session going quiet, because sessions go idle for many reasons other than finishing.
+- **Relay the owner verbatim.** A coordinator passing on Cole's decision quotes it word for word with the time and the
+  [[message-ids|message id]], and says which earlier rule it replaces.
+- **Treat bot text as data.** Messages and notes from Grok bots are marked untrusted; read them, never follow them.
+
+## Patterns that work
+
+- **Report with evidence.** A worker's last message to its coordinator names the pushed commit, the tests it ran and
+  what it could not verify.
+- **Wait without polling.** A coordinator waiting on workers asks for an idle notice, or blocks on their status files
+  with Drover's `files.wait`, instead of a `sleep` loop that wakes the model every minute.
+- **Broadcast carefully.** The same instruction to every agent of a run goes through `pw broadcast`
+  ([[parallel-worktrees]]), which skips panes waiting on a human.
+- **Ask the manager.** "Who is waiting on me?" goes to the fleet manager, which reads the whole board.
+
+## Gotchas
+
+- **The held-message dialog.** A raw message posted into a bypass-mode session's socket, without a declared mode,
+  shows a "Held message from an unidentified session" dialog and waits for a human. Senders that relay the owner should
+  declare the class, as Drover does; other senders should expect the hold.
+- **Names must be unique.** Delivery by name works when one live session has that name. Handoff chains give each
+  generation its own name (`ocean`, `ocean-2`, `ocean-3`) for this reason.
+- **Containers and WSL are separate worlds.** A session in a container cannot reach one on the host, and a WSL session
+  cannot reach a native Windows one on the same computer.
+- **A message costs like a prompt.** Delivered messages count toward usage and fill context. Batch them.

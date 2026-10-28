@@ -1,0 +1,133 @@
+---
+title: Servers
+summary: >-
+  How Cole uses AWS servers: long agent sessions, CI jobs, production bots and self-hosted tools run there instead of
+  on the laptop, reached only over Tailscale, published only through Cloudflare tunnels, and managed as code.
+table: works
+folio: 51
+aliases: [AWS servers, EC2, server, production servers]
+updated: 2026-10-28
+sources:
+  - title: Amazon EC2 On-Demand pricing
+    url: https://aws.amazon.com/ec2/pricing/on-demand/
+  - title: Amazon EC2 instance types
+    url: https://aws.amazon.com/ec2/instance-types/
+  - title: A personal fleet over Tailscale (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/infra/tailscale.md
+  - title: Cloudflare in front of self-hosted services (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/infra/cloudflare.md
+---
+
+Cole's servers are AWS servers, and they do the work that should keep going when the laptop lid closes: agent sessions
+that run for hours, builds and test suites that would stall a laptop, the production bots, and the self-hosted tools
+such as [[langfuse|Langfuse]]. The [[mac-mini|Mac mini]] is where Cole sits. The servers are where things run.
+
+## What runs where
+
+| Runs on a server | Stays at the desk |
+|---|---|
+| Long [[claude-code\|Claude Code]] and [[codex\|Codex]] sessions in [[tmux]], and fan-outs of parallel agents | Xcode, the iOS simulators and anything that needs a screen |
+| Private repositories' Linux CI jobs (see [[github-actions]]) | macOS CI jobs, when the Mac mini has room |
+| Production bots and APIs | Local development servers |
+| Self-hosted tools: Langfuse, the collectors in front of it, databases | The browser and the apps Cole uses directly |
+
+Frontends do not run on servers at all: they are on [[vercel|Vercel]]. Neither do DNS, the firewall or email routing:
+those are [[cloudflare|Cloudflare]]. A server only runs what needs a long-lived process or a real filesystem.
+
+The rule of thumb is the one from [[agent-fleet]]: if it should keep running when the laptop sleeps, it runs on a
+server. An agent working through the night on a server keeps going whether or not anyone is watching, and Cole checks
+in from the phone with [[termius|Termius]] or from [[ghostty|Ghostty]] at the desk, over [[tailscale|Tailscale]].
+
+## How a server is built
+
+Every server follows the same shape, so any agent that has seen one knows its way around the next:
+
+- **Accounts.** No root login. An admin user with full sudo, a deploy user with one narrow sudo rule (exact commands
+  with exact arguments, nothing that can open an editor or a pager), and one system account per service.
+- **SSH only over the tailnet.** Keys only, no passwords, and the firewall admits SSH on the Tailscale interface only.
+  The AWS security group denies all inbound traffic as well. See [[ssh]] and [[tailscale]].
+- **No public ports.** The public reaches a service only through a [[cloudflare-front-door|Cloudflare Tunnel]]: the
+  server dials out, and every service binds to `127.0.0.1`. One table per server, the port map, says which local port
+  is which service.
+- **systemd for everything long-lived.** Production services are system units with a restart policy, a start limit
+  (so a crash loop gives up instead of flooding the journal) and an `OnFailure=` hook that alerts a human. Side work
+  runs in a capped slice, so it cannot starve production of memory.
+- **Docker Compose for stacks**, such as the Langfuse stack, with every port published on loopback only.
+- **Backups every day**: consistent dumps of each datastore, one encrypted snapshot offsite, and a restore drill on a
+  schedule. Cold data goes to [[s3-and-glacier|Glacier]].
+- **An inventory per server**, in a private repository: its services, ports, units, tunnel routes, file locations and
+  a change log. It is updated in the same change as the server, because the next one to touch the box is often an
+  agent with none of the context.
+
+A unit file in that style:
+
+```ini
+# /etc/systemd/system/app.service
+[Unit]
+Description=app: HTTP API on 127.0.0.1:3100
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+OnFailure=alert@%n.service
+
+[Service]
+User=app
+EnvironmentFile=/etc/app/app.env
+ExecStart=/srv/app/current/bin/app --listen 127.0.0.1:3100
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Managed as code
+
+The servers are part of the [[opentofu|OpenTofu]] estate like everything else. Their root holds the instances, their
+volumes, public IPs and firewalls, each with termination protection and `prevent_destroy`, because a rebuilt server
+comes back with a new IP and nothing on its disks. Hand-built servers are *pets*: their root ignores the image, the
+user data and the SSH keys, which would otherwise force a replacement. New servers start from cloud-init. What runs
+*on* a server (units, nginx, Compose files, cron) stays as scripts next to the code it runs, outside OpenTofu.
+
+The AWS side has its own roots: the organization (accounts, service control policies, single sign-on, the audit trail,
+a budget and cost anomaly alerts), and the bootstrap account that holds OpenTofu's encrypted state.
+
+## Burst capacity
+
+When the fleet needs more room than the standing servers have (a large fan-out of agents, a heavy build, a target for
+a session handoff, overflow CI), Cole's `burst-ec2` tool starts short-lived EC2 instances instead. Each one boots with
+Node, Claude Code and Codex and a copy of the [[dotfiles]] without their history. It runs Claude Code on Amazon
+Bedrock with the instance's own IAM role, so no key is ever copied onto it. It stops itself when idle and is
+terminated once it passes its expiry. A hard instance cap, a CPU quota check, a CloudWatch alarm and a monthly AWS
+budget bound what it can cost.
+
+## Sizing and cost
+
+A small general-purpose instance, a t3.small with 2 vCPUs and 2 GiB of memory running all month, costs
+<Price id="aws-ec2-small" /> on demand. The Arm equivalent (t4g) costs less, Savings Plans less again, and disk, data
+transfer and public IPv4 addresses are billed on top.
+
+Size agent servers by memory, not CPU. Each Claude Code session brings its own MCP servers and language servers along,
+and a dozen sessions on one box add up quickly; [[cc-park]] exists to park the idle ones and give that memory back.
+The [[what-it-costs]] page puts a server next to the rest of the bill.
+
+## Gotchas
+
+- **Docker ignores UFW.** A published container port opens on every address, ahead of UFW's rules. Publish on
+  `127.0.0.1` and check from outside.
+- **sshd keeps the first value it reads.** Ubuntu includes `sshd_config.d/*.conf` in name order, and cloud images ship
+  a file that can turn password login back on. A `00-` file wins; check what sshd will really use with `sshd -T`, not
+  by reading the file.
+- **Keep a second session open** while changing sshd or the firewall, and test a fresh login before closing it.
+- **User units flap on a server.** Without `loginctl enable-linger`, a user's services start with each SSH login and
+  stop with the last one. Production services are system units.
+- **Alert on silence, not only on failure.** A daily check that the last good backup is less than about a day old
+  catches the timer that stopped running, which `OnFailure=` never sees.
+
+<ColesTake>
+
+They're all AWS servers. The laptop is for me; anything that has to keep running, like the production bots or an agent
+working through the night, runs on a server.
+
+</ColesTake>

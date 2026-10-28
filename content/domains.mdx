@@ -1,0 +1,123 @@
+---
+title: Domains
+summary: >-
+  What a domain costs and where to buy one: Cloudflare Registrar's at-cost prices for .com, .ai, .io, .dev, .app, .org
+  and .xyz, why .com is still the default, and the .ai two-year minimum, checked against Cole's guesses.
+table: works
+folio: 57
+aliases: [domain names, TLDs, registrar, Cloudflare Registrar, .ai domains]
+updated: 2026-10-28
+sources:
+  - title: Cloudflare Registrar
+    url: https://www.cloudflare.com/products/registrar/
+  - title: Cloudflare domain search
+    url: https://domains.cloudflare.com/
+  - title: Cloudflare Registrar FAQ (Cloudflare docs)
+    url: https://developers.cloudflare.com/registrar/faq/
+  - title: Transfer a domain to Cloudflare (Cloudflare docs)
+    url: https://developers.cloudflare.com/registrar/get-started/transfer-domain-to-cloudflare/
+  - title: The .ai registry
+    url: https://nic.ai/
+  - title: Why .AI domains cannot be registered for one year (Dynadot help center)
+    url: https://www.dynadot.com/help/question/ai-domains-year-restrictions
+---
+
+A domain is the name everything else hangs on: the site, the API, the email addresses, the links inside an app. Cole
+buys domains at Cloudflare's registrar, which sells them at cost, and runs every one of them as a zone on
+[[cloudflare|Cloudflare]] DNS. A .com costs <Price id="domain-com" />, and most of the common endings cost about the
+same.
+
+## How domain pricing works
+
+Three parties set the price of a domain:
+
+- The **registry** runs the top-level domain (TLD), keeps the master list of names under it, and sets the wholesale
+  price. Verisign runs .com; country-code TLDs such as .ai, .io and .uk are run for their countries and set their own
+  rules.
+- The **registrar** sells the name to you and renews it every year. Most registrars add a markup, and many discount
+  the first year and make it back on renewals.
+- **ICANN** adds a small fee to generic TLDs such as .com and .org.
+
+Cloudflare's registrar charges exactly what the registry and ICANN charge it, with no markup, so the price you see is
+the renewal price too. When a first year is cheaper there, as it is for several TLDs this month, the discount comes from
+the registry itself. Names the registry classes as **premium** (short words, common terms) are priced one by one and
+can cost far more, and names bought from another owner on the aftermarket cost whatever the seller asks.
+
+## What the common endings cost
+
+Cloudflare's at-cost prices on its own domain search, as of October 28, 2026:
+
+| TLD | Price | Notes |
+|---|---|---|
+| .com | <Price id="domain-com" format="bare" /> | The default. The same price every year. |
+| .org | <Price id="domain-org" format="bare" /> | Nonprofits, communities, open-source projects |
+| .xyz | <Price id="domain-xyz" format="bare" /> | Short names are still easy to find |
+| .dev | <Price id="domain-dev" format="bare" /> | HTTPS only: browsers refuse to load it over plain HTTP |
+| .app | <Price id="domain-app" format="bare" /> | HTTPS only, like .dev |
+| .io | <Price id="domain-io" format="bare" /> | A favorite of developer tools, and priced like it |
+| .ai | <Price id="domain-ai" format="bare" /> | Anguilla's country code; the registry requires two years at a time |
+
+Compare **renewal** prices, not first-year prices. A cheap first year is a discount; the renewal is what the name costs
+for as long as you keep it.
+
+## Which one to buy
+
+- **.com is the gold standard.** People type it by default, autocomplete suggests it, and an email address at a .com
+  looks normal to everyone. If the .com of your name is available at the standard price, buy it.
+- **Match the ending to the audience when the .com is gone.** .ai says "AI product" before anyone reads a word;
+  .dev and .app suit developer tools and apps, and come with HTTPS enforced; .org suits a community or a nonprofit; a
+  country code suits a local business.
+- **Short and spellable beats clever.** If you have to spell it out loud, it will be mistyped.
+- **Buy the obvious neighbors of a name that matters**, such as the .com of your .ai, and redirect them with one rule
+  on a proxied record.
+- **A name for a side project can be anything.** Cole's own collection is a couple of .ai names for AI products, a
+  handful of .coms, and a tail of novelty endings for side projects and jokes, nearly all of them on Cloudflare's
+  free plan.
+
+### Checking Cole's numbers
+
+Cole said a domain "could be anywhere from $5 to $50 probably really generally... Really $5 to $30 most commonly."
+At Cloudflare's at-cost prices that holds. The cheapest common name in the search was a .uk at about five dollars,
+.com is <Price id="domain-com" />, most of the other common endings sit close to it, and .io's renewal,
+<Price id="domain-io" />, is the top of the everyday range.
+
+On .ai, Cole said: "I think it's $100 a year maybe and you have to do 2 years." The two years are right: the registry
+requires a two-year minimum, Cloudflare's search shows ".ai ... 2-year minimum" with the note that the registry
+requires it, and Dynadot's help center says renewals need two years as well. The price is lower than the guess, at
+least at cost: <Price id="domain-ai" />. Registrars that add a markup charge more, so a guess near a hundred a year is
+fair for most of them.
+
+## Buying and moving domains at Cloudflare
+
+- **Search** at [domains.cloudflare.com](https://domains.cloudflare.com/); buying needs a Cloudflare account.
+- **Nameservers are Cloudflare's.** A domain registered with Cloudflare must use Cloudflare's nameservers. To point it
+  somewhere else, you would have to move the registration to another registrar first. (For Cole's setup that is the
+  point: every domain's DNS lives at Cloudflare anyway.)
+- **Privacy and safety are included.** WHOIS redaction is free, DNSSEC is one click, and domains are locked against
+  transfer by default.
+- **Transferring a domain in** takes about half an hour of work and up to ten days. The domain has to be active on
+  Cloudflare DNS first, most transfers add a year to the registration, and ICANN blocks a transfer within 60 days of a
+  registration, a previous transfer or a change to the registrant contact.
+- **Verify the registrant email.** ICANN requires it; an unverified address puts the domain on hold.
+
+## Domains in Cole's setup
+
+A new domain gets the same treatment every time:
+
+1. Register it at Cloudflare, or transfer it there.
+2. Add the zone to the [[opentofu|OpenTofu]] code, usually to the shared root for small zones.
+3. If it receives mail, turn on [[cloudflare-email-routing|Email Routing]]; if it sends none, publish the no-mail
+   records (`MX 0 .`, `v=spf1 -all`, a DMARC reject policy), so nobody can send mail as it.
+4. Point it at whatever serves it: a DNS-only record for a frontend on [[vercel|Vercel]], or a proxied record through
+   a tunnel for a service on one of the [[servers]] (see [[cloudflare-front-door]]).
+5. Turn on DNSSEC only together with the DS record at the registrar, and never turn it off while the DS record is still
+   published, or the zone stops resolving.
+
+The yearly renewals are on [[what-it-costs]], next to everything else.
+
+<ColesTake>
+
+.com is kind of the gold standard, but it depends on what you're doing. If it's AI, .ai is really good too. Just know
+that you pay for two years up front.
+
+</ColesTake>

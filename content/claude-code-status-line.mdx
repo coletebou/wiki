@@ -1,0 +1,180 @@
+---
+title: The Claude Code Status Line
+summary: >-
+  One row under every Claude Code session: machine and session id, the branch the agent is really on, model and effort,
+  context used, cache hit ratio, last activity, handoff state and cost. A tested bash script that forks almost nothing.
+table: shell
+folio: 15
+aliases: [statusline.sh, claude statusline]
+updated: 2026-10-28
+sources:
+  - title: Customize your status line (Claude Code docs)
+    url: https://code.claude.com/docs/en/statusline
+  - title: statusline.sh (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/claude/statusline.sh
+  - title: statusline.test.sh
+    url: https://github.com/coletebou/dx/blob/master/base/claude/statusline.test.sh
+  - title: track-cwd.sh
+    url: https://github.com/coletebou/dx/blob/master/base/claude/track-cwd.sh
+  - title: issue-focus-hook.sh
+    url: https://github.com/coletebou/dx/blob/master/base/claude/issue-focus-hook.sh
+---
+
+Under every [[claude-code|Claude Code]] session, Cole's status line packs the session's state into one row: which
+machine and session this is, the repository and branch the agent is really working in, the model and its effort level,
+how full the context window is, how well the prompt cache is doing, when the transcript last moved, and what the
+conversation has cost. It is a single bash script,
+[statusline.sh](https://github.com/coletebou/dx/blob/master/base/claude/statusline.sh), with a test suite, and it is
+the agent-side twin of the [[tmux-status-line|tmux status line]].
+
+## What it shows
+
+A typical line, colors stripped:
+
+```text
+desk:3f9a2 site:login-fix*2↑1 #142 | opus5.5·max | 34% | ⚡92% | ✎21:14Z | 🟢 2 | 📝3 | 2h | $1.84
+```
+
+Segments that have nothing to say stay hidden, so most of the time the line is shorter than this. In order:
+
+| Segment | What it means |
+|---|---|
+| `⤳ HANDED OFF → target` | Red, first in line: this session handed its work to a successor (see below) |
+| `desk:3f9a2` | The machine's short label and the last five characters of the session id, enough to resume it with `cr 3f9a2` |
+| `⤷3` | The session's generation in a handoff chain, shown from the second session on |
+| `site:login-fix` | The folder (repository or worktree) and branch the agent is working in |
+| `*2` and `↑1` | Uncommitted files, and commits not pushed yet |
+| `#142` | A clickable link to the issue this session is about |
+| `opus5.5·max` | The model, short, and its reasoning effort: `lo`, `md`, `hi`, `xh` or a multicolored `max` |
+| `34%` | Context window used: green, then yellow from 40 percent, orange from 60, red from 80 |
+| `↻handoff?` | The context advisor thinks this is a good point for a fresh session |
+| `⚠ retry 2` | An API error streak is in progress and being retried |
+| `⚡92%` | Prompt cache hit ratio: green from 70 percent, yellow from 40, orange below |
+| `✎21:14Z` | When the transcript last changed, in UTC: green within 5 minutes, yellow within 30, grey after |
+| `🟢 2` | Other Claude sessions on this machine that are busy right now |
+| `📝3` | Open items in this repository's [[reflection-store|reflection store]] |
+| `5h 62%`, `7d 81%` | Subscription usage windows, only once they pass 50 and 75 percent |
+| `2h` | How long the session has been running |
+| `$1.84` | What this conversation has cost so far, shown on personal machines only |
+
+<ColesTake>
+
+If a session is stuck, filling up or burning money, the status line shows it before I have to ask.
+
+</ColesTake>
+
+### The handoff segments
+
+Three segments belong to [[handoff-chains|handoff chains]], where a long session hands its work to a fresh one through
+a written brief. `↻handoff?` is the suggestion, from a context advisor hook that watches how full the window is (see
+[[context-and-compaction]]). Once the launcher runs, the red badge takes over the front of the line: `HANDOFF?` while
+the successor is starting, `HANDED OFF` once it has started and replied, and `HELD (jobs)` when this session's
+background jobs are keeping its window open until they finish. The successor's line shows `⤷2`, `⤷3` and so on, so a
+long chain of sessions stays legible.
+
+## How Claude Code runs it
+
+The script is wired in Claude Code's user settings:
+
+```json
+"statusLine": {
+  "type": "command",
+  "command": "bash ~/.dotfiles/base/claude/statusline.sh"
+}
+```
+
+Claude Code runs the command when a session starts and again after each new assistant message, after `/compact`, when
+the permission mode changes, and on a few other events. It sends the session's state as JSON on standard input:
+model, working directory, session id, transcript path, cost, context window usage, effort level, rate limits. It shows
+whatever the script prints, ANSI colors and OSC 8 links included. Updates are debounced at 300 milliseconds, and if a
+new update arrives while the script is still running, Claude Code cancels the running one. That last rule shapes the
+whole script: it has to be fast, and it has to survive being killed halfway.
+
+## Built to fork nothing
+
+A status line that runs after every message has to be cheap, and most of the script's comments are about cost:
+
+- **One jq call, not nine.** Every field comes out of the JSON in a single `jq` process. Nine separate calls measured
+  66 milliseconds per render; the consolidated one, 6.7.
+- **No subprocesses in the hot path.** Parsing the model name uses bash pattern matching only, because a single
+  command substitution with `tr` costs about 10 milliseconds on macOS, more than the whole jq pass. Small files are
+  read with the `read` builtin instead of `cat`.
+- **A delimiter that cannot collapse.** The jq output is split on the unit separator character, not a tab. Bash treats
+  tab as whitespace, so one empty field (no effort level set, say) would shift every later field left, and the
+  transcript path would land in the effort variable.
+- **Caches for anything slow.** Counting busy peer sessions calls `claude agents --json` with a one-second timeout and
+  is cached for 10 seconds. Counting open reflections takes about 70 milliseconds, so it runs in the background at
+  most every two minutes and the line shows the last count.
+- **No lock fights with the agent.** `git status` normally refreshes the index and writes it back under
+  `index.lock`. Since the script runs in whatever repository the session is in, the agent's own `git commit` a moment
+  later used to fail with "index.lock: File exists". The script sets `GIT_OPTIONAL_LOCKS=0`, which skips that optional
+  write.
+
+## Finding where the agent really is
+
+Agents often start in a main checkout and then do their work in a [[git-worktrees|git worktree]] next to it. The
+script's comments describe the problem: the directory Claude Code reported was where the session started, so the line
+showed the wrong branch and the wrong dirty count. Two fixes, in order of preference:
+
+1. **A hook tracks it.** [track-cwd.sh](https://github.com/coletebou/dx/blob/master/base/claude/track-cwd.sh) runs after
+   every Bash tool call. When the command starts with `cd <path>`, it records that path in a small per-session file,
+   and the status line reads it.
+2. **A careful guess.** Before the hook has seen any `cd`, the script lists the repository's worktrees and switches to
+   a sibling only if its HEAD moved more than five minutes after the session's own. Smaller leads are noise, since
+   HEAD's timestamp also changes on a fetch, and a sloppier rule would flip the line to whichever worktree another
+   agent touched last.
+
+The issue link has its own source. A number at the start of the branch name wins (`142-login-fix`, `feat/142-fix`).
+Otherwise [issue-focus-hook.sh](https://github.com/coletebou/dx/blob/master/base/claude/issue-focus-hook.sh) remembers
+the last issue you mentioned in a prompt, a `#142` or an issue URL, and the script turns it into a link to that issue
+on GitHub. Inside [[tmux]], links only survive because the tmux config turns on its hyperlinks feature.
+
+## A sensor for the rest of the setup
+
+The status line receives something hooks do not: the exact live token count of the context window. So the script
+publishes it, writing a small JSON file per session whenever the count changes. The context advisor reads that file
+instead of estimating, and can skip its Python work entirely while a session is small.
+
+It also introduces each pane to tmux. Once per session it sets a pane option with the Claude process ID and the
+transcript path, which is how the tmux window list can color a Claude window by real transcript activity instead of by
+screen redraws.
+
+## Machine labels and work machines
+
+The machine label comes from a hosts file shared with the tmux bar and the [[starship|Starship]] prompt: a hostname
+pattern, a short label, and optionally the word `work`. A work machine gets an orange background behind its label and
+no cost segment. The cost shown is what the conversation has cost since the line first rendered for it: the script
+stores the session's running total at that first render and subtracts it from every later one.
+
+## Tested like code
+
+[statusline.test.sh](https://github.com/coletebou/dx/blob/master/base/claude/statusline.test.sh) has two suites. The
+first is a table of every model id seen in practice, with the short name each should produce: plain ids, region and
+provider prefixes like `global.` and `us.`, the `[1m]` long-context marker, date stamps and revision suffixes, legacy
+version-first ids, empty and unknown values. The second feeds realistic JSON through the whole script and checks the
+output with colors stripped, which guards the segment order and the hidden-when-empty rules. It exits non-zero on any
+failure, so it can gate a commit:
+
+```sh
+bash base/claude/statusline.test.sh
+```
+
+The tests caught real portability bugs, which are worth knowing if you write your own:
+
+- **`date -r` is a false friend.** On macOS it formats a timestamp; on GNU systems it means "use this file's time".
+  The script probes which `date` it has instead of trying one and falling back.
+- **`stat` differs too.** `stat -c %Y` is GNU, `stat -f %m` is BSD. One helper handles both, because a bare `stat -c` on
+  a Mac made every cache look 56 years old.
+- **Shared cache files leak between sessions.** Every cache file is keyed by session id, and segments that need one are
+  skipped without it.
+
+## Set it up
+
+1. Install `jq` (`brew install jq` or `sudo apt install jq`).
+2. Copy `statusline.sh` and point `statusLine` in `~/.claude/settings.json` at it, as above.
+3. Optionally add the two hooks, `track-cwd.sh` after Bash tool calls and `issue-focus-hook.sh` on prompt submit, and
+   a hosts file for your machine labels.
+4. Run the tests after any change.
+
+The [[hooks]] page covers the rest of the hooks this line reads from, and [[dotfiles]] covers how Cole's settings file
+is generated.

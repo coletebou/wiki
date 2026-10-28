@@ -1,0 +1,165 @@
+---
+title: Mac Apps and Menu Bar Apps
+summary: >-
+  Shipping software on the Mac: the Mac App Store or direct download with Developer ID and notarization, menu bar
+  apps built on SwiftUI's MenuBarExtra, and command line tools. Cole's examples are Drover's Mac apps and imsg.
+table: atelier
+folio: 74
+aliases: [menu bar apps, menubar apps, macOS apps, MenuBarExtra, Developer ID, notarization]
+updated: 2026-10-28
+sources:
+  - title: Notarizing macOS software before distribution
+    url: https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution
+  - title: Create Developer ID certificates
+    url: https://developer.apple.com/help/account/certificates/create-developer-id-certificates
+  - title: MenuBarExtra (SwiftUI)
+    url: https://developer.apple.com/documentation/swiftui/menubarextra
+  - title: LSUIElement
+    url: https://developer.apple.com/documentation/bundleresources/information-property-list/lsuielement
+  - title: SMAppService
+    url: https://developer.apple.com/documentation/servicemanagement/smappservice
+  - title: App Sandbox
+    url: https://developer.apple.com/documentation/security/app-sandbox
+  - title: Drover menu bar app README (Cole's public repo)
+    url: https://github.com/coletebou/drover/blob/master/native/Apps/MenuBar/README.md
+  - title: Drover for macOS README (Cole's public repo)
+    url: https://github.com/coletebou/drover/blob/master/native/Apps/macOS/README.md
+  - title: imsg (Cole's fork)
+    url: https://github.com/coletebou/imsg
+---
+
+A Mac app can reach people two ways: through the Mac App Store, or as a download you sign with a Developer ID and
+have Apple notarize. Some of the most useful Mac software is not a window at all but an icon in the menu bar, or a
+command line tool. Cole builds all three: Drover's Mac app and its menu bar app (both in
+[Drover's native folder](https://github.com/coletebou/drover/tree/master/native)), and Swift command line tools like
+[imsg](https://github.com/coletebou/imsg). Mac apps are built with the same [[xcode|Xcode]] and Swift as the rest of
+[[ios-development]]; what differs is how they are signed and shipped.
+
+## Two ways to ship
+
+| | Mac App Store | Direct download (Developer ID) |
+|---|---|---|
+| Signing | Through [[app-store-connect\|App Store Connect]] | A Developer ID Application certificate |
+| Apple checks | App Review | Notarization, an automated malware and signing scan |
+| Sandbox | Required: "you must enable the App Sandbox capability" | Optional; the hardened runtime is required |
+| Updates | The App Store | Your own update mechanism |
+| Betas | [[testflight\|TestFlight]] for Mac | Any download link |
+| Best for | Reach and trust for consumer apps | Developer tools and apps that need system access |
+
+Both need the Apple Developer Program (<Price id="apple-developer-program" />). Developer ID certificates can be
+created only by the team's Account Holder, up to five Developer ID Application and five Developer ID Installer
+certificates, and Apple puts signing for direct distribution in the Account Holder's hands.
+
+## Notarization
+
+Notarization is how a downloaded app gets past Gatekeeper without a scary warning. Apple is clear that it "is not App
+Review": an automated service scans the app for malicious content and signing problems and, if it passes, issues a
+ticket. Since macOS 10.15, all software built after June 1, 2019 and distributed with Developer ID must be notarized
+to run.
+
+To pass, every executable must be signed with a Developer ID certificate (not a development or Mac Distribution
+one), with the hardened runtime on, a secure timestamp, and no `get-task-allow` entitlement. Xcode's Organizer does
+the whole thing: archive, Distribute App, Developer ID, Upload, and Xcode staples the ticket when Apple is done,
+which "usually takes less than an hour." From the command line, the shape is what Drover's CI signing script runs:
+
+```sh
+ditto -c -k --keepParent MyApp.app MyApp.zip
+xcrun notarytool submit MyApp.zip --key "$ASC_KEY_PATH" --key-id "$ASC_KEY_ID" \
+  --issuer "$ASC_ISSUER_ID" --wait --timeout 30m
+xcrun stapler staple MyApp.app                          # attach the ticket to the app
+spctl --assess --type execute --verbose=2 MyApp.app     # ask Gatekeeper what it thinks
+```
+
+The key flags use an [[app-store-connect#api-keys|App Store Connect API key]]. The old `altool` route stopped working
+for notarization on November 1, 2023; use `notarytool`.
+
+Drover's manual `signed` workflow builds both Mac apps this way in [[github-actions|GitHub Actions]] and publishes the
+notarized, stapled ZIPs as a downloadable artifact.
+
+## Menu bar apps
+
+A menu bar app is an icon on the right side of the menu bar with a menu or a small window behind it. SwiftUI has had
+a scene for it since macOS 13, `MenuBarExtra`. A utility that lives only in the menu bar is a few lines, from Apple's
+documentation:
+
+```swift
+@main
+struct UtilityApp: App {
+    var body: some Scene {
+        MenuBarExtra("Utility App", systemImage: "hammer") {
+            AppMenu()
+        }
+    }
+}
+```
+
+Three more pieces make it feel right:
+
+- **No Dock icon.** Set `LSUIElement` to true in `Info.plist` and the app becomes an agent app, absent from the Dock
+  and the app switcher. A menu-bar-only app quits automatically if the user removes its icon.
+- **A window, not a menu.** `.menuBarExtraStyle(.window)` turns the menu into a popover-like window that can hold
+  any SwiftUI view.
+- **Launch at login.** `SMAppService` (macOS 13 and later) registers the app as a login item, replacing the older
+  login item APIs.
+
+### The worked example: Drover's menu bar app
+
+Drover's menu bar app is the smallest of its Apple clients and the one that is always in view:
+
+- **The icon is the status.** It shows how many agent sessions are waiting on Cole, amber when something is waiting
+  and brick red when the daemon is offline or the token is rejected. Idle and working stay monochrome, like any other
+  menu bar icon.
+- **The popover answers things.** The fleet manager comes first, then each waiting session with its dialog's options
+  as buttons ("1 Yes," "2 Yes, don't ask again," "3 No," Enter, Esc), host health dots, Mute for an hour, and settings.
+- **Notifications can answer too.** Each dialog alert carries one action per option, plus Reply and Open, so most
+  questions are answered from the notification banner.
+- **A global shortcut without Accessibility.** Its shortcut (Control-Option-A by default) is registered with the
+  Carbon `RegisterEventHotKey` API, which does not need the Accessibility permission that key-watching apps ask for.
+- **It feeds the widgets.** Every changed summary is written into the shared App Group container, and the desktop
+  widgets read it from there.
+
+## A full Mac app
+
+Drover for macOS is the full client: SwiftUI on macOS 14, three columns like the web board (sidebar, board, detail),
+a chat view that groups tool calls, a live screen view of a session's terminal, and a floating manager panel that sits
+over every app and Space (<kbd>Shift</kbd>+<kbd>⌘</kbd>+<kbd>M</kbd>).
+
+One design choice saves a lot of grief: it has exactly one window. SwiftUI can open a fresh window when an app
+receives a URL, so Drover uses a single `Window` scene and handles `drover://` links (from the menu bar app, the
+widgets and the Safari extension) in its own app delegate, which brings the one window forward or reopens it. Closing the window leaves the app running for alerts and the
+manager panel.
+
+For agents, the app has a separate development build made with `swiftc` instead of Xcode: a different bundle ID,
+its own `droverdev://` URL scheme, ad hoc signing, and no writes to the live daemon unless explicitly allowed. An
+agent can run and screenshot the real app on the Mac without any risk of answering a real session.
+
+## Command line tools are Mac apps too
+
+Not every Mac tool needs a window. [imsg](https://github.com/coletebou/imsg) is a Swift command line tool for
+Messages.app: it reads the local Messages database read-only, streams new messages, and sends through Messages.app's
+AppleScript automation, with JSON output built for scripts and agents. It is an open-source project that Cole keeps a
+fork of, and it is a good tour of the Mac's privacy gates:
+
+- **Full Disk Access** is required to read the Messages database, and it attaches to the app that launched the tool,
+  not to the tool. Run it from [[ghostty|Ghostty]] and Ghostty needs the grant; run it from a script, an editor or
+  over [[ssh|SSH]], and that parent process needs it.
+- **Automation** permission is required to send. macOS asks once ("Terminal wants to control Messages"), and the
+  toggle lives in System Settings afterward.
+- **macOS re-reads Full Disk Access only at launch**, so quit and reopen the parent app after changing it.
+
+Command line tools install well through [[homebrew|Homebrew]], and they can be signed with Developer ID and notarized
+like any app.
+
+## Gotchas
+
+- **Quarantine attributes block uploads.** Since February 18, 2025, App Store Connect refuses Mac apps whose files
+  carry the `com.apple.quarantine` attribute, which files pick up when they are downloaded.
+- **Notarize what you ship, then check it.** `spctl --assess` says what Gatekeeper will do before your users find
+  out.
+- **The sandbox needs entitlements for everything.** A Mac App Store app must declare network access, file access and
+  hardware access as entitlements, or the system refuses those calls at runtime.
+- **Capabilities need the portal.** Drover's menu bar app asks for time-sensitive notifications, and its archive
+  failed until that capability was enabled for its bundle ID in the developer portal; the API that creates the other
+  capabilities refuses to create that one.
+- **Swift 6 concurrency meets old frameworks.** Callbacks that system frameworks deliver on their own queues can trap
+  in a main-actor view; see [[safari-extensions#gotchas|the Safari extension gotchas]] for a real case.

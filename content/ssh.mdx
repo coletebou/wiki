@@ -1,0 +1,218 @@
+---
+title: SSH
+summary: >-
+  SSH carries everything between Cole's machines: phone to Mac, Mac to servers, agents handing work across machines.
+  Keys, one alias per machine, scripts that never prompt, tmux and shell tricks that make remote sessions feel local.
+table: shell
+folio: 25
+aliases: [secure shell, openssh, ssh config]
+updated: 2026-10-28
+sources:
+  - title: ssh_config(5) manual
+    url: https://man.openbsd.org/ssh_config
+  - title: sshd_config(5) manual
+    url: https://man.openbsd.org/sshd_config
+  - title: A personal fleet over Tailscale, ssh config section (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/infra/tailscale.md
+  - title: tmux-ssh-inherit.sh (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/tmux-ssh-inherit.sh
+  - title: Cole's base/zshrc (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/zshrc
+  - title: Ghostty terminfo help
+    url: https://ghostty.org/docs/help/terminfo
+---
+
+SSH, the Secure Shell, is how one machine gets a terminal on another. In Cole's setup it carries nearly everything:
+the phone reaching the [[mac-mini|Mac mini]], the Mac reaching the [[servers]], agents handing work to another machine,
+the dotfiles syncing themselves everywhere, the login dashboard gathering every machine's status. This page covers the
+basics, the config file, the tricks in Cole's [[tmux]] and shell that make a remote session feel local, and the rules
+that keep servers closed to everyone else.
+
+## How SSH works
+
+SSH opens an encrypted connection from a client (the `ssh` command) to a server (`sshd`, on the remote machine) and
+runs a shell or a command through it. Two kinds of keys make it trustworthy:
+
+- **The host key** proves the server is the machine you think it is. The first time you connect, your client records
+  it in `~/.ssh/known_hosts`; if it ever changes, `ssh` refuses to connect and warns you.
+- **Your key pair** proves you are you. The private key stays on your machine; the public key goes into
+  `~/.ssh/authorized_keys` on every server you log in to. No password crosses the network.
+
+Making a key and installing it takes two commands:
+
+```sh
+ssh-keygen -t ed25519            # a modern key; protect it with a passphrase
+ssh-copy-id you@server.example   # append the public key to the server's authorized_keys
+```
+
+An agent (`ssh-agent`, or the macOS keychain) holds the unlocked key in memory, so you type the passphrase once per
+login rather than once per connection.
+
+## One alias per machine
+
+`~/.ssh/config` turns long commands into short names. One block per machine, named the way scripts will call it,
+pointing at a name rather than an address:
+
+```text
+IgnoreUnknown UseKeychain,AddKeysToAgent
+Include ~/.ssh/config.local
+
+Host box-a
+  HostName box-a
+  User you
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
+```
+
+Now `ssh box-a` is all anyone types. Cole goes one step further with one-word shell shortcuts per machine, each just
+`ssh` and an alias. With [[tailscale|Tailscale]], `HostName box-a` resolves to the machine's private tailnet address
+from anywhere, so the same alias works at home, on a train and from a phone.
+
+The options in that block are each there for a reason:
+
+- **`IdentitiesOnly yes`** offers only the named key. Without it, an agent holding many keys can hit the server's limit
+  on attempts before it gets to the right one.
+- **`StrictHostKeyChecking accept-new`** adds a new host's key without asking, but still refuses a host whose key
+  changed. That is the right default for scripts: new machines just work, and a swapped machine still stops cold.
+- **`IgnoreUnknown`** lets one file carry macOS-only options without breaking older Linux clients.
+- **`Include ~/.ssh/config.local`** first, because of the rule below.
+
+The rule that bites everyone: **for every option, ssh uses the first value it finds.** The manual says it plainly:
+"for each parameter, the first obtained value will be used". A hand-written `Host` block near the top silently masks a
+generated one further down, so give each host one owner, and put the most specific blocks first. Your config file
+lists your whole fleet, so keep it private, in your [[dotfiles]]' identity layer or in `~/.ssh/config.local`.
+
+Two more patterns from Cole's [Tailscale notes](https://github.com/coletebou/dx/blob/master/docs/infra/tailscale.md)
+are worth knowing. A `Match` block with an `exec` test can fall back to a public jump host when the tailnet name does
+not answer, using `ProxyJump`, while still authenticating against the target machine with your key. And a `Match host`
+alias for a deploy key (say, `github-deploy` pointing at github.com with its own `IdentityFile`) keeps a narrow key
+out of everyday use.
+
+## Scripts never prompt
+
+When a script runs `ssh`, there is nobody there to type a password or answer "are you sure?". So the scripts in
+Cole's setup that reach other machines run ssh with `BatchMode=yes`, which turns off every prompt and fails fast
+instead. That one setting
+shapes the rest: whatever a script reaches must accept a key without asking anything. No passwords, no key passphrase
+without an agent, and no Tailscale SSH rule in "check" mode, which wants a browser login.
+
+What runs that way:
+
+- **[[handoff-chains|Handoffs]] to another machine.** `cc-handoff launch --host <alias>` moves a long agent session
+  into a fresh one on a different machine, over SSH.
+- **[[parallel-worktrees]] status.** A coordinator checks a fan-out of agents on another machine with
+  `ssh <host> pw status`.
+- **dotsync.** One command commits, pushes, then logs in to every other machine with the same identity and syncs it
+  ([[dotfiles]]).
+- **The login dashboard.** [porchlight](https://github.com/coletebou/porchlight) can make one machine a hub that pulls
+  every other machine's status "in one SSH round trip each, over your existing `~/.ssh/config`", with no agent and no
+  open port.
+- **[[drover]].** The fleet control plane addresses machines by their SSH aliases too.
+
+## Making remote sessions feel local
+
+### New tmux windows follow you
+
+In Cole's tmux, prefix <kbd>c</kbd> in a pane that is running `ssh` opens a new window already connected to the same
+host, in the same remote directory. Prefix <kbd>&#124;</kbd> and <kbd>-</kbd> do the same for splits, and prefix
+<kbd>Ctrl</kbd>+<kbd>c</kbd> forces a plain local window (see the [[tmux-keymap]]). The helper behind it,
+[tmux-ssh-inherit.sh](https://github.com/coletebou/dx/blob/master/base/tmux-ssh-inherit.sh), is careful in ways that
+are instructive:
+
+- **It reads the real command.** tmux knows a pane is running `ssh` but not with which arguments, so the helper reads
+  them back from the process table.
+- **Only direct children.** With a jump host, `ssh -J jump box` starts a second `ssh -W` underneath it, the transport.
+  Replaying that would open a bare tunnel with no shell, a hung window. Looking only at the pane shell's direct
+  children cannot pick it.
+- **Connection options, not the remote command.** An alias might end with a command that starts an agent. The helper
+  keeps the connection options, drops the remote command, and asks for a login shell instead. It also drops a
+  `-S` control socket, so the new window does not die with someone else's connection.
+- **Plain `ssh` only.** `sshpass`, `autossh` and `mosh` parse their arguments differently. Read as ssh's, the password
+  in `sshpass -p PASSWORD ssh host` would become ssh's port, and ssh's "Bad port" error would print it on screen. Those
+  panes get a plain local window.
+
+### The remote directory travels with you
+
+The remote directory comes from the remote shell itself. On every prompt, Cole's zsh sends an OSC 7 escape sequence,
+`file://host/path`, which rides the SSH connection back to the local tmux. tmux stores it per pane, and the helper uses
+it only if the host in it matches the SSH destination, so a path from some other machine is never applied. The path is
+percent-encoded byte by byte, so folders with spaces or accents survive the trip.
+
+### The terminal type and the locale
+
+Two invisible settings decide whether a remote session renders properly:
+
+- **`TERM`.** [[ghostty|Ghostty]] identifies itself as `xterm-ghostty`, and a server without that terminal's
+  description shows errors like "missing or unsuitable terminal: xterm-ghostty", broken backspace and odd colors.
+  Cole's Ghostty config turns on two shell integration features, `ssh-env` and `ssh-terminfo`, which install the
+  terminfo entry on the remote machine on first connect (or fall back to a common terminal type).
+- **The locale.** Some connection paths drop the `LANG` and `LC_*` variables ssh normally forwards, and the remote
+  shell falls back to the plain ASCII "C" locale, which turns every box-drawing character and glyph in tmux and Claude
+  Code into garbage. Cole's `zshenv` forces a UTF-8 locale in every shell on every machine, and an interactive check
+  repairs a shell, and its tmux server, that still ends up in the wrong one.
+
+### A dead connection cannot wreck your terminal
+
+When a connection dies abruptly, a laptop going to sleep or a dropped network, remote tmux never gets the chance to
+switch your local terminal back out of the modes it turned on. The leftover mouse mode then sprays mouse reports like
+`35;140;1M` into your prompt every time the mouse moves, and <kbd>Ctrl</kbd>+<kbd>c</kbd> cannot stop it. `reset`
+fixes it but wipes your scrollback. Cole's `base/zshrc` wraps `ssh` instead: whenever ssh exits, cleanly or not, the
+wrapper sends the matching mode-off sequences and runs `stty sane`.
+
+```zsh
+  printf '\e[?1000l\e[?1002l\e[?1003l\e[?1006l\e[?2004l\e[?1049l\e[?25h\e[0m'
+```
+
+It only does that when its output is a terminal, so `$(ssh host cmd)`, pipes and `scp` never get escape bytes in
+their output. And because Ghostty's shell integration defines its own `ssh` wrapper later, at the first prompt, Cole's
+is installed by a one-time hook that runs after Ghostty's and chains to it, with a check that stops it from wrapping
+itself into an infinite loop when the config is reloaded.
+
+## From the phone
+
+On the phone, [[termius]] is the SSH client. Over Tailscale, the phone reaches the Mac mini and every server by the
+same aliases, `tm` picks a tmux session, and the phone-friendly tmux bindings take it from there. For the Mac's
+desktop rather than its terminal, [[screens-5|Screens 5]] does the same job graphically.
+
+## Keeping servers closed
+
+The other side of SSH is the server, and Cole's servers follow a short list of rules:
+
+- **Keys only.** Password and keyboard-interactive logins are off, root cannot log in, and only named users may.
+  `sshd -T` prints the configuration sshd will actually use, which is what to check after a change.
+- **First value wins here too.** On Ubuntu, `sshd_config` reads its `sshd_config.d/*.conf` files first, in name order,
+  and cloud images can ship a file there that turns password login back on. A file named with a low number, read
+  first, wins.
+- **SSH over the tailnet only.** The firewall allows incoming traffic only on the Tailscale interface, and the cloud
+  firewall (an AWS security group) denies inbound traffic too. Public web traffic arrives through a
+  [[cloudflare-front-door|Cloudflare Tunnel]] instead, so a server needs no open port at all.
+- **Firewall, not `ListenAddress`.** Binding sshd to the tailnet address sounds tidier, but that address does not exist
+  yet when sshd starts at boot, and sshd then listens nowhere.
+- **Keep a second session open** while changing sshd or the firewall, and test a fresh login before closing it.
+
+### Tailscale SSH or OpenSSH
+
+Tailscale has its own SSH server, which authenticates with your tailnet identity instead of keys. Cole uses plain
+OpenSSH with keys for everything a script drives, because scripts need `BatchMode`, and leaves Tailscale SSH off on
+those machines. The two cannot share a port: `tailscale up --ssh` makes Tailscale answer every tailnet connection to
+port 22 itself. The [[tailscale#tailscale-ssh-or-openssh|Tailscale page]] compares them.
+
+## Tips
+
+- **Reuse connections.** `ControlMaster auto`, `ControlPath ~/.ssh/cm-%C` and `ControlPersist 10m` in a `Host` block
+  make every later connection to that host start almost instantly, riding the first. That belongs in `ssh_config`, not
+  on individual command lines.
+- **Copy files with the same aliases.** `scp file box-a:` and `rsync -av dir/ box-a:dir/` use the config too.
+- **Forward a port.** `ssh -L 5173:localhost:5173 box-a` makes a dev server on a remote machine open in your local
+  browser at `localhost:5173`.
+- **Debug with `-v`.** `ssh -v box-a` shows which config blocks applied and which keys were offered.
+
+## Set it up
+
+1. Make a key with `ssh-keygen -t ed25519`, and install it on each server with `ssh-copy-id`.
+2. Write one `Host` block per machine in `~/.ssh/config`, pointing at a name, with `IdentitiesOnly` and
+   `accept-new`.
+3. Put every machine on [[tailscale|Tailscale]] so the names resolve everywhere, and close public SSH on the servers.
+4. Add the tmux and shell pieces from [[dotfiles|Cole's dotfiles]] if you want new windows to follow you and dead
+   connections to clean up after themselves.

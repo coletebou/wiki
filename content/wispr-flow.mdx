@@ -1,0 +1,65 @@
+---
+title: Wispr Flow
+summary: >-
+  A dictation app: hold a key, talk, and cleaned-up text lands in whatever app has the cursor, terminals and agents
+  included. Cole's verdict: good, but thinking of making one.
+table: desk
+folio: 8
+aliases: [wispr, dictation]
+updated: 2026-10-28
+sources:
+  - title: Wispr Flow pricing and plans
+    url: https://wisprflow.ai/pricing
+  - title: Wispr Flow (Homebrew cask)
+    url: https://formulae.brew.sh/cask/wispr-flow
+  - title: Voice dictation (Claude Code docs)
+    url: https://code.claude.com/docs/en/voice-dictation
+---
+
+Wispr Flow is a dictation app. You hold a key, speak, and polished text appears wherever the cursor is: an email, a
+browser, a terminal, a prompt to an agent. It is on every one of Cole's Macs, installed from the
+[[homebrew|Brewfile]], and Cole's verdict on it is short.
+
+<ColesTake>
+
+Wispr Flow is good, but I'm thinking of making my own.
+
+</ColesTake>
+
+## What it does
+
+Wispr Flow turns speech into text "in any app", across Mac, Windows, iOS and Android, in more than 100 languages.
+Homebrew's listing sums up the difference from plain dictation: "Voice-to-text dictation with AI-powered
+auto-editing". The output is cleaned up, not a raw transcript of every "um". It also learns the names and jargon you
+use, and keeps a dictionary and snippets, shortcuts that expand into longer text you say often.
+
+The free plan includes 2,000 words a week on the desktop. Pro removes the limit (<Price id="wispr-flow-pro" />) and
+adds shared dictionaries and snippets for teams.
+
+## Why dictation fits agent work
+
+Talking to coding agents is mostly writing: what you want, what you already tried, what must not change, what done
+looks like. The better that brief, the better the agent's work, and most people talk much faster than they type. A
+long, specific prompt that would take five minutes to type takes one to say.
+
+Claude Code has voice dictation of its own: run `/voice`, then hold the space bar to talk. Its docs list the catches:
+it needs a Claude.ai sign-in, so it is unavailable when Claude Code runs on an API key or a cloud provider like Amazon
+Bedrock, and it needs a local microphone, so it does not work in SSH sessions. In Cole's setup many agents run on
+servers, reached over [[ssh|SSH]] in [[tmux]], and some run through Bedrock with the [[yu|yuma]] launcher. A
+system-wide dictation app does not care: it types into the focused window on the Mac, and the terminal sends those
+keystrokes wherever it is connected.
+
+## Tips
+
+- **Say the structure.** "First, ... Second, ... Don't touch the tests." The cleanup keeps it.
+- **Read before you send.** Dictation is fast, and fixing a misheard file name before an agent acts on it is faster
+  than undoing what it did.
+- **Teach it your words.** Add project names, tool names and teammates' names to the dictionary early; jargon is what
+  dictation gets wrong most.
+- **On the phone,** [[termius]] has voice typing built into its keyboard panel, for short commands.
+
+## Making one
+
+Cole is thinking of building a replacement. The ingredients are well understood: a global hotkey, a speech-to-text
+model, a language-model pass that cleans up the transcript, and a way to insert text into whichever app is focused,
+which on a Mac means accessibility permissions. It is the kind of small menu bar app the [[mac-apps]] page covers.

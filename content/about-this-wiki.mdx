@@ -1,0 +1,70 @@
+---
+title: About This Wiki
+summary: How this library is made, read and kept up to date by people and agents, and why it looks like a page from Leonardo's notebooks filed in the Library of Alexandria.
+table: library
+folio: 2
+aliases: [about, colophon, codex tebou]
+updated: 2026-10-28
+sources:
+  - title: Astro documentation
+    url: https://docs.astro.build/
+  - title: Pagefind
+    url: https://pagefind.app/
+  - title: The Pinakes (Wikipedia)
+    url: https://en.wikipedia.org/wiki/Pinakes
+  - title: Codex Atlanticus, Biblioteca Ambrosiana
+    url: https://www.ambrosiana.it/en/opere/codex-atlanticus/
+---
+
+This wiki is Cole Tebou's whole working setup written down in one place: the terminal, the agents, the infrastructure, the apps, the desk, and what all of it costs. It started as Cole's request for "a guide on how to be a beast", and it became a wiki because every piece connects to five others and deserves its own page.
+
+Start with [[how-to-be-a-beast|How to Be a Beast]] for the tour, or browse the [Pinakes](/pinakes/), the catalogue of every page. This page is about the book itself.
+
+## How to read it
+
+Every page is a *folio*, a leaf of the codex, with a number like **f. 11r**. The front of the leaf (the *recto*, "r") carries the text. The back (the *verso*, "v") carries what a scholar wants after reading: which other folios cite this one, which it cites, the sources it rests on, when it was last emended, and how to emend it.
+
+- **Links carry tags.** Hover over any link, or focus it with the keyboard, and a small parchment tag swings down with the page's title, its table and a one-line summary. On a phone, the first tap on a link to another folio shows the tag as a sheet at the bottom of the screen, and the second tap (or **Open folio**) follows the link. The sheet has a switch to turn previews off.
+- **Seek anything.** Press <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd> (<kbd>⌘</kbd>+<kbd>K</kbd> on a Mac) anywhere to search every word of every folio. The search runs in your browser against an index built with the site, so it is fast and sends your query nowhere.
+- **Candlelight.** The flame in the top bar switches the parchment to a dark theme for reading at night, and back. Without a choice of your own, the site follows your system setting.
+- **Studies in ink.** Some folios hold interactive drawings: the [[tmux-keymap|tmux keymap]], the [[agent-fleet|agent fleet]], [[parallel-worktrees|worktree fan-out]], the [[observability|observability path]], the [[cloudflare-front-door|Cloudflare front door]] and the [[what-it-costs|cost calculator]]. Click, tap or tab through them.
+
+## Why it looks like this
+
+Cole asked for a wiki that looks "like Leonardo da Vinci's journals and the Library of Alexandria". Those two are a good match for what this wiki is: a working notebook that is also a catalogue.
+
+**Leonardo's notebooks** are the model for the page. He filled thousands of sheets with machines, water studies, anatomy and lists, in brown iron-gall ink with red chalk (*sanguine*) for drawing, and wrote his notes right to left in mirror script. So the text here is set in iron-gall brown on parchment, the accents are red chalk, the diagrams are hatched ink sketches, and the outer margin carries lines from his notebooks in mirror writing. That marginalia is ornament only: it is hidden from screen readers and never holds anything you need to read.
+
+**The Library of Alexandria** is the model for the catalogue. Its first great librarian-cataloguer, Callimachus of Cyrene, wrote the *Pinakes* ("tables"), sorting the library's scrolls by subject and recording for each work its title, its opening words (the *incipit*) and its length in lines (*stichoi*). The [Pinakes](/pinakes/) of this wiki does the same for every folio: ten tables, each entry with its incipit and its length in stichoi, counted the Alexandrian way at about 36 letters to the line. Each scroll in Alexandria also carried a small parchment tag, a *sillybos*, naming the work so nobody had to unroll it to find out. Those are the tags that hang from every link here.
+
+Readability comes first. Body text is set in EB Garamond at a real size with more than 13:1 contrast in daylight, accents hold at least 4.5:1 in both themes, the layout falls to a single column on a phone, and nothing depends on hover alone.
+
+## How it is built
+
+The site is static: plain HTML, CSS and a little JavaScript, built ahead of time and served from a CDN.
+
+| Piece | What it does |
+|---|---|
+| [Astro](https://astro.build) with MDX | Turns each folio (one `.mdx` file in `content/`) into a page. MDX is Markdown that can hold components, which is how the diagrams and the price tags get in. |
+| Wiki links | `[[slug]]`, `[[slug\|label]]` and `[[slug#section\|label]]` link folios by name, title or alias. A link to a folio that does not exist fails the build. |
+| Backlinks | The build reads every link in every folio, so the back of each leaf can list who cites it. |
+| [Pagefind](https://pagefind.app) | Indexes every word after the build and searches it in the browser. |
+| Prices | Every price on the site comes from one data file, with the date it was read and a link to the vendor's own page. See [[what-it-costs]]. |
+| Fonts | EB Garamond for the text, Cinzel for the inscriptions, Italianno for Leonardo's hand, JetBrains Mono for code. All under the SIL Open Font License and served from this site, never a third-party font CDN. |
+
+The site is hosted on [[vercel|Vercel]], and its name, `wiki.coletebou.com`, is a DNS record at [[cloudflare|Cloudflare]] like every other domain Cole runs. It is one of the editions of coletebou.com, beside the Almanac, the Plan Set and the Terminal: the switcher at the foot of every page moves between them.
+
+## How it is kept
+
+The source lives in a public GitHub repository, [coletebou/wiki](https://github.com/coletebou/wiki). Nothing reaches the site except through a pull request, and every pull request runs the same [[github-actions|GitHub Actions]] checks:
+
+1. **build**: the whole site builds, every wiki link resolves, every page's frontmatter is valid, every price id exists.
+2. **links**: every internal link and section anchor in the built site points at something real.
+3. **gitleaks**: no credential is in the change.
+4. **public-safety**: nothing that must stay private is published. The rules are written down in [[wiki-mcp#the-public-safety-rules|the public-safety rules]].
+
+Agents edit the wiki too. Any agent with the wiki's [[mcp|MCP]] server can search and read every folio, follow backlinks, and propose an edit. A proposed edit becomes a branch, a commit and a pull request labelled `agent-edit`, opened with the agent's own GitHub credentials. When all four checks pass on an `agent-edit` pull request that Cole's own account opened from a branch of this repository, automation squash-merges it and the site redeploys. Anything else waits for a human. [[wiki-mcp|Editing the wiki with agents]] has the details and the setup for [[claude-code|Claude Code]] and [[codex|Codex]].
+
+## Licenses
+
+The words and drawings are licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): share and adapt them with credit. The code is [MIT](https://github.com/coletebou/wiki/blob/master/LICENSE). The fonts keep their own SIL Open Font License. The lines in the margins are Leonardo's, long in the public domain.

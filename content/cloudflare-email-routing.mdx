@@ -1,0 +1,125 @@
+---
+title: Cloudflare Email Routing
+summary: >-
+  Custom addresses on your own domains, forwarded for free to a real inbox or handed to a Worker: how Cole routes mail
+  for every domain with Cloudflare Email Routing, how to set it up, and where its limits are.
+table: works
+folio: 55
+aliases: [Email Routing, custom email, email forwarding]
+updated: 2026-10-28
+sources:
+  - title: Cloudflare Email Service overview (Cloudflare docs)
+    url: https://developers.cloudflare.com/email-routing/
+  - title: Route emails (Cloudflare docs)
+    url: https://developers.cloudflare.com/email-service/get-started/route-emails/
+  - title: Email routing rules and addresses (Cloudflare docs)
+    url: https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/
+  - title: Email Service limits (Cloudflare docs)
+    url: https://developers.cloudflare.com/email-routing/limits/
+---
+
+Cloudflare Email Routing receives mail sent to addresses on your own domain and forwards it to an inbox you already
+have, or hands it to a Worker to process. There is no mailbox to pay for: `hello@` your domain can land in your
+existing inbox for free. Cole runs it on every domain that receives mail, so every project gets real addresses without
+another email bill.
+
+It is now part of **Cloudflare Email Service**, alongside a separate *Email Sending* product (in beta, on the Workers
+Paid plan). Routing itself is available on every plan and needs the domain's DNS to be on [[cloudflare|Cloudflare]].
+
+## How it works
+
+Turning Email Routing on for a domain adds three kinds of DNS record to the zone: **MX** records that send the
+domain's mail to Cloudflare, an **SPF** TXT record that authorizes the routing, and a **DKIM** TXT record that signs
+what it forwards. Email Routing owns those records, and the API marks them read-only.
+
+Then three pieces decide where a message goes:
+
+- **Destination addresses** are the real inboxes mail can be forwarded to. They belong to the account, not to one
+  domain, so every domain can reuse them, and each must be verified: Cloudflare sends a link, and until it is clicked,
+  every rule that points at the address stays disabled.
+- **Routing rules** match an address (`signups@example.com`) and take one action: *send to an email* (a verified
+  destination), *send to a Worker*, or *drop*. Dropping is useful for an address that should look valid but go
+  nowhere.
+- **The catch-all** handles everything that matched no rule, including typos (`ifno@` for `info@`). It can forward,
+  hand off to a Worker, or drop.
+
+**Subaddressing** (plus addressing, RFC 5233) is a setting: with it on, `you+receipts@example.com` matches the rule for
+`you@example.com`, and the `+receipts` part is kept for filtering. A rule for the exact `you+receipts@` address still
+wins. That makes one address per purpose free: give each service you sign up for its own address, and a leak or a spam
+wave shows exactly where it came from, and that one address can be dropped without touching the others.
+
+## How Cole uses it
+
+- **Every domain gets addresses** that forward to Cole's own inbox, so a project's contact, support and vendor
+  accounts all use the project's domain without a separate mailbox.
+- **Cloud account root emails live here too.** Each AWS account needs a unique root email address, and each one is
+  a literal routing rule on one of Cole's domains. The rule has to exist *before* the account is created, or the
+  verification mail falls through to the catch-all.
+- **The catch-all goes to a Worker**, which can read the message and decide what to do with it, instead of dumping
+  every stray message into the inbox.
+- **All of it is code.** Rules, the catch-all and the settings are managed by [[opentofu|OpenTofu]], with
+  `prevent_destroy` on each, and the destination addresses are managed once at the account level.
+
+One lesson from managing it as code: in the Cloudflare provider Cole uses, *destroying* the Email Routing settings
+resource calls the API that disables routing for the whole zone. Every forward stops at once, including the
+cloud-account root emails. That resource gets `prevent_destroy`, and so does the catch-all.
+
+## Setting it up
+
+In the dashboard: **Compute**, then **Email Service**, then **Email Routing**, then **Onboard Domain**. Add a
+destination address, click the verification link, then create a rule.
+
+With Cloudflare's new CLI (see [[cloudflare-api]]), the same thing is two commands. `--dry-run` prints the API request
+without sending it:
+
+```sh
+cf email-routing addresses create --email you@example.com --dry-run
+cf email-routing rules create -z example.com --name "signups" \
+  --matchers '[{"type": "literal", "field": "to", "value": "signups@example.com"}]' \
+  --actions '[{"type": "forward", "value": ["you@example.com"]}]' --dry-run
+```
+
+Then test it from a *different* account than the destination. Some providers silently discard a message that seems to
+come from the account it is being delivered to, which looks exactly like a broken rule.
+
+## Sending is a different problem
+
+Email Routing only receives. Replying from `hello@example.com` needs something that can *send* as the domain: Cloudflare's
+Email Sending beta, or any transactional provider, with its own SPF and DKIM records added next to the routing ones.
+Sending to your own verified destination addresses from a Worker is free on every plan, which covers alerts to
+yourself.
+
+A domain that sends no mail at all should say so, or anyone can send as it:
+
+```text
+example.org.         1  IN  MX   0 .
+example.org.         1  IN  TXT  "v=spf1 -all"
+_dmarc.example.org.  1  IN  TXT  "v=DMARC1; p=reject; sp=reject"
+```
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Routing rules per domain | 200 |
+| Destination addresses per account | 200, shared across every domain |
+| Inbound message size | 25 MiB; larger messages are rejected |
+| Domains per zone (routing and sending together) | 30 |
+| Destinations per rule | One address or one Worker; to fan out, a Worker calls `forward()` once per destination |
+
+## Gotchas
+
+- **Deleting a destination address disables every rule that uses it.** Check the rules before cleaning up addresses.
+- **Two rules with the same pattern:** only the one shown first in the dashboard processes mail.
+- **Workers on the free plan have CPU limits**, and a complex email handler can exceed them and drop the message.
+  Failures show up in the Worker's logs as `EXCEEDED_CPU`.
+- **Mail a Worker sends shows as *dropped*** in the Email Routing summary even when it was delivered. Use the sending
+  metrics instead.
+- **Renaming a Worker unbinds it** from every rule that points at it. Edit the rules after a rename.
+
+<ColesTake>
+
+We use Cloudflare's custom email routing for every domain. Every project gets real addresses, and it all lands in one
+inbox without paying for a mailbox.
+
+</ColesTake>

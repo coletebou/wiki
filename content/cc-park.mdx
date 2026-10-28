@@ -1,0 +1,155 @@
+---
+title: cc-park
+summary: >-
+  Parks idle Claude Code sessions in tmux: exits them to free their memory, leaves the last screen and the exact resume
+  command in the pane so Enter brings them back, and closes the windows of sessions that had finished.
+table: automata
+folio: 35
+aliases: [autopark, parking sessions]
+updated: 2026-10-28
+sources:
+  - title: cc-park skill (dx)
+    url: https://github.com/coletebou/dx/blob/master/plugins/session/skills/cc-park/SKILL.md
+  - title: The session plugin (dx)
+    url: https://github.com/coletebou/dx/tree/master/plugins/session
+  - title: Claude Code prompt caching
+    url: https://code.claude.com/docs/en/prompt-caching
+  - title: tmux(1) manual
+    url: https://man.openbsd.org/tmux.1
+---
+
+cc-park parks idle [[claude-code|Claude Code]] sessions that sit in [[tmux]] panes. It exits each one cleanly, which
+frees its memory and stops its helper processes, then leaves the session's last screen in the pane as plain text with
+the exact resume command typed (not run) at the prompt below. Press Enter and the conversation comes back. A session
+that had clearly finished gets its window closed instead, with its resume command kept in `cc-park status`. On Cole's
+Macs a scheduled job autoparks anything idle for six hours, every thirty minutes.
+
+<Diagram name="agent-fleet" scene="parking" />
+
+The diagram shows the two outcomes. An idle session that may still be needed is parked in place: same window, same
+name, its last screen, and the resume command waiting. A session whose last reply finished the job is parked and its
+window closed, and the ledger keeps the way back.
+
+## Why parking matters
+
+An idle session is not free. Measured on a Mac in October 2026:
+
+- each Claude Code process held about 300 MB, plus about 260 MB of Playwright [[mcp|MCP]] servers from the moment it
+  started;
+- a session that had edited a TypeScript file also held a TypeScript [[lsp|language server]] (700 MB on average in a
+  large monorepo, up to 4 GB), and one that touched Python held pyright (about 200 MB);
+- none of those stop until the session exits, and 47 sessions idle for more than a day held about 40 GB.
+
+Parking keeps what is useful about leaving a session open (the window, its name, the scrollback, one keypress to
+continue) and drops the processes. It costs no extra tokens after an hour idle, because the
+[[context-and-compaction|prompt cache]] lasts at most an hour: a session idle longer than that starts cold whether you
+resume it or had left it running.
+
+<ColesTake>
+
+Dozens of idle sessions were quietly eating tens of gigabytes. Parking keeps the window, the name and the scrollback,
+drops the processes, and Enter brings the conversation back.
+
+</ColesTake>
+
+## Using it
+
+```sh
+cc-park list                 # read-only: what would be parked or closed, and why the rest are skipped
+cc-park park                 # park every session idle 6 h or more; close the finished ones' windows
+cc-park park --idle 24       # a different threshold
+cc-park park --no-close      # park finished sessions in place too
+cc-park status               # parked and closed sessions, their resume commands, which were resumed
+cc-park auto off             # pause autopark on this machine (cc-park auto on undoes it)
+tmux set -p @cc-park-keep on # keep this pane's session out of bulk parking (-w for the window)
+```
+
+Run `cc-park list` first and read the skip reasons. Parking the pane you are looking at is refused, so run it from
+another pane.
+
+## What a parked pane looks like
+
+```text
+── last screen before cc-park parked this session ──
+⏺ The rollout is still waiting on your sign-off.
+✻ Brewed for 12s · done Thursday 1:20 PM
+── parked Thu 05:09, last active Wed 18:26 · press Enter to resume ──
+
+@laptop webapp on  master
+❯ cd /home/you/code/webapp && claude --dangerously-skip-permissions --resume 3dca2a62-…
+```
+
+To get there, cc-park captures the conversation part of the screen (everything above Claude's input box), sends
+`/exit`, clears the pane, writes the captured text to the pane's terminal as output (so it never reaches the shell's
+input or history), sends <kbd>Ctrl</kbd>+<kbd>c</kbd> for a fresh prompt, and types the resume command:
+`cd <dir> && claude <original flags> --resume <session id>`. The full screen with 400 lines of history is saved
+beside a ledger of every park attempt. The original first prompt is left out of the resume command, because replaying
+it would send it again.
+
+## Closing finished sessions
+
+A session that had finished does not need its window. cc-park parks it and then closes the window, keeping the screen
+and the resume command in the ledger exactly as for a parked pane. Finished means all of the following:
+
+- it passes every parking check below;
+- its last turn ended with a reply, not an interruption, an API error or a tool call still waiting;
+- that final reply has no question mark outside code and links, and none of the waiting phrases ("waiting", "needs
+  your", "let me know", "if you want", "I'll", "next steps" and so on), and does not address the owner by name;
+- [[drover|Drover]] agrees: its `sessions.lastReply` op classifies the session as finished.
+
+Against 484 real transcripts from October 2026, 83 passed, and every one of them was a [[handoff-chains|handoff]], a
+report or an answer.
+The window must also hold nothing else: one pane only, not the last window of its tmux session, nothing else running
+on its terminal. Those checks run again right before the pane is closed, and anything unclear parks in place.
+
+## What it refuses to park
+
+| Skipped | Why |
+|---|---|
+| Busy, or active within the threshold | Still working. Activity is the newest transcript entry, never a file time, because live transcripts get touched without new entries |
+| "Waiting for N background agents" on screen | Its turn ended but an agent it started is still working |
+| A loop, cron job or pending wakeup in the last 48 hours | Those live in the Claude process and would die with it |
+| A child process that is not an MCP or language server | A background shell, a test run, a browser |
+| A dialog, a spinner, or unsent text in the prompt | Enter would answer someone else's question; unsent text would be lost |
+| The pane on screen in an attached client, or in copy mode | Do not pull a session out from under you; keys in copy mode drive copy mode |
+| `synchronize-panes` on in its window | tmux would copy every key into every pane |
+| An unknown launch flag, or a missing `--settings` file | The resume command could not reproduce the session |
+
+## Autopark
+
+A LaunchAgent on macOS (or a systemd user timer on Linux) runs `cc-park auto` every 30 minutes. It parks sessions idle
+for six hours or more that pass every check, closes the finished ones' windows, never types into a busy, dialog or
+half-typed session, and logs one line per run. Only one park run happens at a time; a manual run during an autopark
+exits instead of typing into the same panes twice. `cc-park auto off` writes a flag file, so a reinstall does not
+undo the pause.
+
+## Working with tmux
+
+cc-park leans on tmux features, and on a few tmux traps learned the hard way:
+
+- **Options as switches.** `@cc-park-keep on` (pane or window) keeps a session live through bulk parking;
+  `@cc-park-close off` parks it in place even when finished. Put `set -gw @cc-park-close off` in `tmux.conf` to keep
+  every window.
+- **`respawn-pane` re-runs the original command.** A pane created as `tmux new-window 'claude … "brief"'` would start
+  a fresh session executing the brief again. cc-park always respawns an explicit login shell instead.
+- **Wrapped launches.** A pane that runs `zsh -lic "… claude …"` dies with Claude, so it gets `remain-on-exit` first
+  and a fresh shell after.
+- **Exit text is not proof.** Claude's exit hint prints the session id, so "the id is on screen" does not mean the
+  command was typed. cc-park checks that the prompt ends with the whole command.
+
+The [[tmux]] page covers the multiplexer itself, and [[tm]] is how Cole finds a parked window again.
+
+## Limits
+
+- Only Claude Code sessions in tmux. Codex sessions are left alone (`codex resume <id>` by hand).
+- Environment prefixes on the original launch (`FOO=1 claude …`) are not replayed; flags are.
+- The waiting phrases are English, so a reply in another language could read as finished.
+- Windows close only where the `drover` command is installed; elsewhere every session parks in place.
+
+A useful side effect: after a configuration change that needs a new process (settings `env`, plugin skills, agents),
+park with `--idle 1` and press Enter in each pane. An hour idle means the cache is already cold, so the restart costs
+nothing extra.
+
+To install it, add the `session` plugin from the [dx marketplace](https://github.com/coletebou/dx) (see
+[[skills-and-plugins]]), which puts `cc-park` on the Bash tool's `PATH`; `./install.sh --with schedules` adds
+autopark. Parking is one of the five views of the [[agent-fleet]] diagram.

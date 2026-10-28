@@ -1,0 +1,262 @@
+---
+title: iOS Development
+summary: >-
+  How Cole makes iPhone apps: a Mac, Xcode and native Swift, a paid Apple developer account, TestFlight for betas and
+  the App Store for release, with agents writing most of the code. The map for the rest of the Atelier.
+table: atelier
+folio: 66
+aliases: [iOS, iPhone apps, iOS apps, Apple Developer Program, developer fee]
+updated: 2026-10-28
+sources:
+  - title: Apple Developer Program
+    url: https://developer.apple.com/programs/
+  - title: Choosing a membership (free account vs the program)
+    url: https://developer.apple.com/support/compare-memberships/
+  - title: Enrolling in the Apple Developer Program
+    url: https://developer.apple.com/programs/enroll/
+  - title: Supported capabilities (iOS)
+    url: https://developer.apple.com/help/account/reference/supported-capabilities-ios
+  - title: Xcode 27.1 release notes
+    url: https://developer.apple.com/documentation/xcode-release-notes/xcode-27_1-release-notes
+  - title: Upcoming requirements (App Store Connect)
+    url: https://developer.apple.com/news/upcoming-requirements/
+  - title: Giving external agents access to Xcode
+    url: https://developer.apple.com/documentation/xcode/giving-external-agents-access-to-xcode
+  - title: Drover's native Apple clients (Cole's public repo)
+    url: https://github.com/coletebou/drover/tree/master/native
+  - title: Tide, a native code editor for iPad and iPhone (Cole's public repo)
+    url: https://github.com/coletebou/tide
+---
+
+iOS development is making apps for the iPhone and iPad with Apple's tools: a Mac, Xcode, the Swift language, and a
+paid developer account once you want your app on anyone else's phone. Cole ships native Swift apps for the iPhone,
+the Apple Watch and the Mac, and most of that Swift is written by agents running in [[claude-code|Claude Code]] and
+[[codex|Codex]]. This page is the map: what you need, what it costs, how a build travels from a laptop to a phone,
+and where the sharp edges are. Each stop on the way has its own page.
+
+## The whole path in seven steps
+
+1. **Get a Mac and install [[xcode|Xcode]].** Nothing else builds, signs and uploads an iPhone app.
+2. **Pick an approach.** Native Swift, a web app wrapped with Capacitor, or React Native with Expo. The trade-offs are
+   in [[capacitor-expo-swift|Capacitor vs Expo vs Swift]].
+3. **Run it on your own phone, for free.** A free Apple Account is enough to install your app on your own iPhone from
+   Xcode, with weekly limits: see [[push-to-your-phone|pushing straight to your phone]].
+4. **Join the Apple Developer Program** (below) when you want other people to run it.
+5. **Create the app in [[app-store-connect|App Store Connect]]**, Apple's console for builds, testers, store pages and
+   review.
+6. **Upload builds and beta test with [[testflight|TestFlight]]**: a private group of your own team, then a public
+   link once the build passes Beta App Review.
+7. **Submit for App Review and release**, all at once or in phases.
+
+The same machinery, with small differences, ships the other things in this part of the wiki:
+[[mac-apps|Mac and menu bar apps]], [[apple-watch-apps|Apple Watch apps]] and [[safari-extensions|Safari extensions]].
+
+## What you need
+
+### A Mac
+
+Xcode runs only on macOS, so every iPhone app is built, signed and uploaded on a Mac, even when the code was written
+somewhere else. Xcode 27, the current major version, needs macOS Tahoe 26.6 or later. In Cole's setup, agents write
+code on the AWS servers and the laptop, and the builds that need Apple's toolchain run on the [[mac-mini|Mac mini]]
+on the desk. A new base Mac mini is <Price id="mac-mini" />.
+
+There are two ways around owning the Mac that does the build. GitHub's hosted macOS runners can build and sign in
+[[github-actions|GitHub Actions]] (free for public repositories, billed per minute for private ones at
+<Price id="github-actions-macos-minute" />, about ten times the Linux rate). And Expo's EAS Build compiles React
+Native apps on Expo's own Macs. You still want a Mac nearby for the simulator and for debugging.
+
+### Xcode
+
+[[xcode|Xcode]] is free. It bundles the Swift compiler, the iOS SDK, the simulators, Instruments, the code signing
+machinery and the upload tools. As of late October 2026 the current release is Xcode 27.1 (Swift 6.4, the iOS 27.1
+SDK), with 27.2 at release candidate. It debugs on devices running iOS 17 or later.
+
+### An Apple Account, and later the program
+
+A free Apple Account, signed in to Xcode, gives you a *Personal Team*: enough to run your own app on your own
+phone. Anything that reaches other people (TestFlight, the App Store, signed Mac apps) needs the paid
+[Apple Developer Program](https://developer.apple.com/programs/).
+
+### An iPhone
+
+The simulator is fast and good for most UI work, but Apple says it plainly: simulators "don't replicate the
+performance or features of a physical device." Cameras, sensors, hardware buttons, push notifications and real
+networking all need a real phone. One of Cole's apps added a camera feature driven by the volume buttons, and the
+only way to test it was a TestFlight build on a physical iPhone, because the simulator cannot press them.
+
+## The Apple Developer Program
+
+The developer fee is <Price id="apple-developer-program" />, renewed every membership year, and Apple notes the price
+may vary by region. Here is what it changes, from Apple's own comparison and capability tables:
+
+| | Free Apple Account (Personal Team) | Apple Developer Program |
+|---|---|---|
+| Xcode, simulators, beta OS releases | Yes | Yes |
+| Run your app on your own devices | Yes: up to 3 devices and 3 apps per device, and the app IDs, devices and profiles all expire after 7 days | Yes, without the weekly expiry; up to 100 registered devices per product family per membership year |
+| [[testflight\|TestFlight]] betas | No | Up to 100 internal and 10,000 external testers |
+| The App Store | No | Yes, through [[app-store-connect\|App Store Connect]] |
+| Push notifications, iCloud, Sign in with Apple, Associated Domains, Apple Pay | No | Yes |
+| App Groups, Keychain Sharing, HealthKit, background modes | Yes | Yes |
+| [[mac-apps\|Mac apps]] signed with Developer ID and notarized | No | Yes |
+| Xcode Cloud | No | 25 compute hours a month included |
+
+Two things to decide before you enroll:
+
+- **Individual or organization.** An individual enrolls with their legal name, and that name appears as the seller
+  on the App Store. An organization must be a legal entity with a D-U-N-S number and a working website, and its name
+  appears instead. Apple does not accept trade names or DBAs, so a sole developer who wants a company name on the
+  store needs an actual company first.
+- **The Apple Account you use.** It needs two-factor authentication and your real first and last name; Apple says an
+  alias or a company name in those fields delays approval.
+
+Nonprofits, accredited schools and government entities can ask for a fee waiver. Organizations that distribute apps
+only to their own employees have a separate Enterprise Program, which comes without App Store Connect or TestFlight,
+so it cannot publish to the App Store.
+
+<ColesTake>
+
+Pay for the developer program the day you want somebody else to try your app. Until then, a free account and a
+cable get your app onto your own phone, and that covers a lot of building.
+
+</ColesTake>
+
+## Choosing how to build
+
+There are three serious options, compared in depth in [[capacitor-expo-swift|Capacitor vs Expo vs Swift]]:
+
+- **Native Swift**, with SwiftUI and UIKit. Every Apple API on the day it ships, native performance, and the only
+  first-class route to widgets, Apple Watch apps and Safari extensions.
+- **Capacitor**, which wraps an existing web app in a native shell. Fastest if the website already exists, with the
+  risk that App Review sees "a repackaged website."
+- **Expo**, the framework React Native itself recommends: one TypeScript codebase for iOS and Android, rendered with
+  real native views, built and submitted from Expo's cloud.
+
+Cole's public Apple apps are all native Swift. [Drover's native folder](https://github.com/coletebou/drover/tree/master/native)
+holds an iPhone app, an Apple Watch app, a Mac app, a menu bar app, home-screen widgets and a Safari extension, all
+generated from one [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec and sharing one Swift package, DroverKit.
+[Tide](https://github.com/coletebou/tide) is a code editor for iPad and iPhone in the spirit of VS Code, written in
+Swift with no web view at all. One of Cole's apps began as a Capacitor wrapper around its website, and even that one
+is native Swift on the phone today; [[capacitor-expo-swift#what-cole-runs|what Cole runs]] has the reasoning.
+
+## How a build reaches a phone
+
+There are four ways to get an app onto an iPhone, from most hands-on to most public:
+
+| Route | Who can install | Needs | Page |
+|---|---|---|---|
+| Run from Xcode | Your own devices, connected by cable or Wi-Fi | Developer Mode on the device; a free or paid account | [[push-to-your-phone]] |
+| Ad hoc | Devices whose identifiers you registered | The paid program | [[push-to-your-phone#ad-hoc-builds\|Ad hoc builds]] |
+| TestFlight | Your team (internal) or anyone you invite or who has the public link (external) | The paid program; Beta App Review for external testers | [[testflight]] |
+| The App Store | Everyone | App Review | [[app-store-connect]] |
+
+Every upload to App Store Connect carries two numbers: the version people see (1.4) and a build number. A build
+number can be used only once, so a team with several people or several agents cutting builds needs one place that
+hands them out. Once, another of Cole's sessions had already uploaded the build number a release was about to use;
+since then the release script asks App Store Connect whether a build number is taken before it uploads.
+
+## Two release clocks
+
+The biggest change when an app gets a native client is that the code now ships on two clocks. A server fix is live
+the moment it merges and deploys. A fix in the iPhone app is live only after a build is archived, uploaded, processed,
+put in front of testers, reviewed, released, and then installed by each user, some of whom never update. In Cole's
+setup this shows up as a queue: server fixes ship on merge, while iPhone fixes collect as numbered follow-ups until
+the next TestFlight build.
+
+A few habits make the slower clock easier to live with:
+
+- **Keep the server compatible with old app builds.** Old versions stay in use for months. Add fields; don't rename
+  or remove them until the old builds are gone.
+- **Put switches on the server.** A feature the server can turn on or off, per user or for everyone, does not need a
+  new build to launch or to roll back.
+- **Cut a crash fix from the build that crashed.** If a TestFlight build crashes and `master` has moved on with
+  unproven work, base the fix on the shipped build's commit plus the fix, then merge it back, so the emergency build
+  carries nothing untested.
+- **Write release notes that claim only what you verified.** TestFlight's "What to Test" text is what testers rely on.
+
+## How agents fit in
+
+Cole's iPhone code is mostly written by agents, so the project is shaped for them:
+
+- **The project file is generated.** Both Drover and Tide keep a `project.yml` for XcodeGen as the source of truth and
+  generate the Xcode project from it. Agents edit a short YAML file instead of a machine-written `.pbxproj`, and two
+  branches that add files no longer conflict in it. The catch: a new Swift file only joins the build after
+  `xcodegen generate` runs, so "the tests pass but Xcode can't find the type" means the project was not regenerated.
+- **The logic lives in a plain Swift package.** Tide's `TideCore` and Drover's `DroverKit` have no UI dependencies,
+  so `swift test` runs in seconds on a Mac, and part of DroverKit's suite even runs on Linux in CI.
+- **Agents can drive Xcode itself.** Since Xcode 26.3, Xcode exposes its build, test and preview tools to outside
+  agents through [[mcp|MCP]]. One command connects Claude Code to the open project:
+
+  ```sh
+  claude mcp add --transport stdio xcode -- xcrun mcpbridge
+  ```
+
+  Xcode 27 lets agents boot simulators, install and launch apps, tap the screen and take screenshots, and it accepts
+  plugins that bundle [[skills-and-plugins|skills]] and MCP servers. Details are on the [[xcode]] page.
+- **Some steps stay human.** Accepting the Xcode license, unlocking the keychain that holds a signing identity, signing
+  in to App Store Connect in a browser, and pressing real buttons on a real phone all wait for Cole.
+
+## Builds in CI
+
+[[github-actions|GitHub Actions]] can build and test iPhone apps on hosted macOS runners. Two of Cole's public
+repositories show the range:
+
+- **Tide** runs its core tests, an iOS simulator build, and a full UI test suite on an iPad simulator on every push,
+  and keeps the UI tests' screenshots as an artifact.
+- **Drover** builds every scheme unsigned on pushes and pull requests, and has a separate, manual `signed` workflow
+  that signs with a certificate imported into a throwaway keychain, notarizes the Mac apps, and uploads the iPhone
+  app to TestFlight using an App Store Connect API key. That workflow never lets Xcode create certificates on its own, because a fresh
+  CI runner otherwise mints a new development certificate on every run until the account hits Apple's limit.
+
+Hosted macOS minutes are free on public repositories and expensive on private ones, so Cole keeps private macOS
+jobs lean.
+
+## Current requirements
+
+As of late October 2026:
+
+- Apps uploaded to App Store Connect must be built with Xcode 26 or later against an iOS 26 (or matching platform)
+  SDK, a rule in force since April 28, 2026.
+- iPhone and iPad apps must target iOS 13 or later (since September 9, 2026).
+- Xcode 27 and 27.1 need macOS Tahoe 26.6 or later on the Mac that builds.
+- The App Store's age ratings are 4+, 9+, 13+, 16+ and 18+, and every app had to answer Apple's updated age-rating
+  questions by January 31, 2026.
+
+Apple posts these on its [upcoming requirements](https://developer.apple.com/news/upcoming-requirements/) page; check
+it before a release, because the minimum SDK moves every spring.
+
+## Gotchas
+
+- **Beta Xcode builds don't ship.** App Store Connect refused an archive Cole's CI built with a beta Xcode
+  ("Unsupported SDK or Xcode version"); the same code built with the released Xcode uploaded fine. Build release
+  candidates with a released Xcode.
+- **Xcode might not be the Xcode you think.** If `xcode-select -p` points at the Command Line Tools, `xcodebuild`
+  fails with "requires Xcode." Point `DEVELOPER_DIR` at the full Xcode, and note that `sudo` drops that variable,
+  which matters for `sudo xcodebuild -license accept`.
+- **Archives and caches are huge.** Derived data, archives and simulator runtimes eat tens of gigabytes. Cole keeps
+  release work on an [[mac-mini#storage-on-external-drives|external volume]] because the Mac mini's internal disk
+  fills up.
+- **Simulators are memory hungry.** A booted simulator plus a large build can push a 16 GB Mac into heavy swapping
+  (see [[mac-mini#living-with-16-gb|living with 16 GB]]). Cole's release scripts wait for a free slot before they
+  start an archive.
+- **A wrapped website can fail review.** Guideline 4.2 asks for "features, content, and UI that elevate it beyond a
+  repackaged website."
+- **Capabilities belong to bundle IDs.** Every widget and extension has its own bundle ID. Automatic signing in Xcode
+  enables capabilities for you, but with manual signing in CI each bundle ID needs its capabilities (App Groups,
+  push, time-sensitive notifications) turned on in the developer portal, or the archive fails late with a
+  provisioning profile error. Drover's menu bar app hit exactly that with time-sensitive notifications.
+
+## The rest of the Atelier
+
+| Page | What it covers |
+|---|---|
+| [[capacitor-expo-swift\|Capacitor vs Expo vs Swift]] | Picking a stack |
+| [[xcode\|Xcode]] | The IDE, the command line tools, XcodeGen, agents in Xcode |
+| [[push-to-your-phone\|Pushing straight to your phone]] | Developer Mode, free provisioning, wireless installs, `devicectl` |
+| [[testflight\|TestFlight]] | Private and public betas |
+| [[app-store-connect\|App Store Connect]] | App records, roles, API keys, review and release |
+| [[apple-watch-apps\|Apple Watch apps]] | watchOS, complications, the watch's tight budgets |
+| [[mac-apps\|Mac apps and menu bar apps]] | Developer ID, notarization, `MenuBarExtra` |
+| [[safari-extensions\|Safari extensions]] and [[chrome-extensions\|Chrome extensions]] | One web extension, two browsers |
+| [[windows-apps\|Windows apps]] | The other desktop |
+
+For what all of this costs alongside the rest of the setup, see [[what-it-costs]].

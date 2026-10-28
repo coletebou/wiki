@@ -1,0 +1,189 @@
+---
+title: MCP
+summary: >-
+  The Model Context Protocol, the open standard for plugging tools and data into AI agents, and the MCP servers Cole's
+  Claude Code and Codex sessions use: Drover, a real browser, the shared brain, docs servers and this wiki.
+table: workshop
+folio: 45
+aliases: [Model Context Protocol, MCP servers]
+updated: 2026-10-28
+sources:
+  - title: Model Context Protocol specification (2026-07-28)
+    url: https://modelcontextprotocol.io/specification/2026-07-28
+  - title: MCP transports
+    url: https://modelcontextprotocol.io/specification/2026-07-28/basic/transports
+  - title: Connect Claude Code to tools via MCP
+    url: https://code.claude.com/docs/en/mcp
+  - title: badland-brain README (connecting Claude Code and Codex)
+    url: https://github.com/coletebou/badland-brain
+  - title: mcp-agent-safety skill (dx)
+    url: https://github.com/coletebou/dx/blob/master/plugins/review/skills/mcp-agent-safety/SKILL.md
+---
+
+The Model Context Protocol (MCP) is the open standard for plugging tools and data into an AI agent. A server exposes
+tools, resources and prompts; any client that speaks the protocol can use them, whether it is Claude Code, Codex,
+ChatGPT or an editor. For Cole, MCP is how agents reach the parts of the setup that are not a shell command: the
+[[drover|Drover]] control plane, a real browser, the [[shared-brain|shared brain]], documentation servers, and this
+wiki itself ([[wiki-mcp]]).
+
+## What the protocol is
+
+MCP has three roles. A **host** is the AI application (Claude Code, say). Inside it, a **client** holds the
+connection to one **server**, a program that provides context and capabilities. Messages are JSON-RPC 2.0.
+
+What a server can offer:
+
+| Feature | What it is |
+|---|---|
+| Tools | Functions the model can call: "search the brain", "capture this tmux pane", "click this button" |
+| Resources | Context and data for the user or the model to read |
+| Prompts | Templated messages and workflows a user can pick |
+
+A client can offer **elicitation** in return: a way for a server to ask the user for more information mid-task.
+
+The protocol takes its inspiration from the Language Server Protocol (see [[lsp]]): LSP standardized how editors talk
+to language tooling, so one language server works in every editor; MCP does the same for agents and their tools.
+
+### Transports
+
+Two standard bindings carry the messages:
+
+- **stdio**: the client launches the server as a subprocess and exchanges newline-delimited JSON over its standard
+  input and output. Local, simple, and the server dies with the session.
+- **Streamable HTTP**: every message is an HTTP POST to one MCP endpoint, and the reply comes back as JSON or a short
+  server-sent event stream. This is how remote servers work, usually behind a bearer token or OAuth.
+
+The current specification revision (2026-07-28) made requests self-contained: each one carries its protocol version
+and capabilities, with no connection-scoped session. Optional extensions add long-running tasks, skills delivered
+over MCP, and interactive UI inside a conversation.
+
+### The security model
+
+The specification is direct about the risk: tools are arbitrary code execution, and a tool's own description of its
+behavior should be treated as untrusted unless the server is. Hosts must get the user's consent before exposing data
+to a server or invoking its tools. Claude Code adds its own warning: a server that fetches outside content can carry a
+prompt injection into the session. Cole's practical version is to treat everything an MCP tool returns as data, never
+as instructions, which is exactly what Drover and the brain tell their clients in their server instructions.
+
+## MCP in Claude Code
+
+Servers are configured at one of three scopes:
+
+| Scope | Loads in | Stored in |
+|---|---|---|
+| Local (the default) | This project, for you | `~/.claude.json`, under the project |
+| Project | This project, for everyone | `.mcp.json` at the repository root, committed |
+| User | Every project, for you | `~/.claude.json` |
+
+```sh
+claude mcp add --transport http notion https://mcp.notion.com/mcp
+claude mcp add --scope user drover -- node ~/code/drover/web/bin/drover mcp
+claude mcp list
+```
+
+A few features make MCP practical at scale:
+
+- **Environment variables in `.mcp.json`.** `${VAR}` and `${VAR:-default}` expand in commands, arguments, URLs and
+  headers, so a committed file can say `"Authorization": "Bearer ${BRAIN_KEY}"` and keep the key out of the repository.
+- **Tool search.** Claude Code does not load every tool's full definition into context up front; the model searches
+  for the tools it needs and loads only those. Dozens of servers with hundreds of tools cost little until used.
+- **`/mcp`** shows each server's status, reconnects one, and runs the OAuth sign-in for remote servers that need it.
+- **Output limits.** Claude Code warns when one tool result passes 10,000 tokens and cuts it at 25,000 by default
+  (`MAX_MCP_OUTPUT_TOKENS` raises the cap).
+
+## MCP in Codex
+
+Codex speaks the same protocol, configured in `~/.codex/config.toml`:
+
+```sh
+codex mcp add brain --url http://127.0.0.1:8270/mcp --bearer-token-env-var BRAIN_KEY
+```
+
+```toml
+[mcp_servers.brain]
+url = "http://127.0.0.1:8270/mcp"
+bearer_token_env_var = "BRAIN_KEY"
+```
+
+The config keeps only the variable's name, and Codex reads the key from its environment at start. One trap Cole hit:
+add an HTTP server without the bearer variable and Codex meets a 401, starts an OAuth login, and waits for a browser
+callback that never comes.
+
+## Cole's servers
+
+| Server | Transport | What agents use it for |
+|---|---|---|
+| [[drover\|Drover]] | stdio (`drover mcp`) | The fleet: who is waiting, message a session, read a pane, launch agents, search every transcript, record notes |
+| Playwright | stdio, from the official plugin | Browser automation: navigate, click, fill forms, screenshot |
+| Playwright in extension mode | stdio, on desktop machines | The same tools driving Cole's real, signed-in Chrome through a browser extension |
+| Chrome DevTools | stdio | Performance traces, console messages, network requests, Lighthouse audits |
+| [[shared-brain\|The shared brain]] | Streamable HTTP, bearer key | One memory for every agent: search before asserting, note at handoff |
+| Context7 | from the official plugin | Current library documentation instead of stale training data |
+| Langfuse docs | Streamable HTTP | Langfuse's own documentation, for the [[langfuse]] work |
+| Backlog.md | stdio | A markdown task board inside a repository |
+| Cloudflare | from Cloudflare's plugin | Cloudflare's skills and API, after a one-time OAuth per machine (see [[cloudflare-api]]) |
+| This wiki | its own small server | Read these pages and propose edits as pull requests ([[wiki-mcp]]) |
+
+<ColesTake>
+
+Anything in a browser goes through the Playwright MCP. Agents screenshotting and clicking their way through a real
+page catch things no unit test does.
+
+</ColesTake>
+
+### How they get installed
+
+Cole's [[dotfiles]] keep MCP servers in layered JSON files (shared, per role, per identity and a machine-local one
+that is never committed). The installer merges them and registers each server at user scope through Claude Code's
+own CLI, `claude mcp add-json --scope user`, skipping any whose command is not installed on that machine, so no one
+hand-edits `~/.claude.json`.
+
+The brain gets a small script of its own that registers it for both Claude Code and Codex with one key per agent per
+machine. A key's name becomes the author of every note written with it, so the brain always knows whether a memory
+came from Claude Code on the Mac mini or Codex on a server.
+
+## MCP, a CLI, or a skill
+
+Not everything should be an MCP server. A rough rule that matches how Cole's setup is built:
+
+- **A [[clis|CLI]]** when a shell can do it. Agents are excellent at command lines: `--help` documents the tool, JSON
+  output parses cleanly, and a command costs nothing until it runs. `gh`, `jq`, `cf` and `drover op` cover a lot.
+- **An MCP server** when the tool needs a long-lived connection, credentials the agent should not hold, structured
+  results across machines, or a remote service: Drover, the brain, a browser.
+- **A [[skills-and-plugins|skill]]** when what is missing is knowledge, not a capability: the procedure, the
+  checklist, the gotchas.
+
+Drover shows the pattern: every capability is one op, reachable as an MCP tool, a CLI command and a button in the UI,
+so each client uses whichever suits it. A Drover plugin's op becomes an MCP tool with no extra code:
+
+```js
+export default {
+  name: 'hello',
+  ops: { 'hello.say': async ({ to = 'world' }) => ({ text: `hello, ${to}` }) },
+  meta: { 'hello.say': { m: false, d: 'Say hello.', s: { type: 'object', properties: { to: { type: 'string' } }, additionalProperties: false } } },
+};
+```
+
+That file in Drover's plugin directory gives the CLI `drover op hello.say` and gives every agent `drover_hello_say`.
+
+## Testing a server's safety
+
+An MCP server that touches secrets or reads untrusted input deserves a real test, not a code review. Cole's
+`mcp-agent-safety` skill runs headless Claude Code against only that server (no built-in tools, no settings, hooks or
+`CLAUDE.md`, in a temporary directory outside any repository), hands the server fresh fake secrets, then sweeps every
+byte of every session and of the server's own traffic for those canaries in up to fourteen encodings. A scenario is
+judged on ground truth, so a refusal or a no-op cannot pass as safe.
+
+## Gotchas
+
+- **Every server runs in every session.** A stdio server is a child process of each session that loads it. Cole
+  measured the Playwright servers at about 260 MB per session, from the moment it starts, which is part of why
+  [[cc-park]] parks idle sessions.
+- **Keys belong in the environment.** Use `${VAR}` in `.mcp.json` and `bearer_token_env_var` in Codex. `claude mcp
+  add --header` stores the expanded value in Claude Code's own config.
+- **Headless sessions cannot finish OAuth.** Give a `claude -p` or `codex exec` run a token, or connect the server
+  interactively first.
+- **Big results are expensive.** A tool that returns a whole log fills the context. Prefer servers with filters and
+  limits (Drover's `sessions.list` takes `cwd`, `live`, `limit` and `compact` for this reason).
+- **Untrusted text stays untrusted.** A page the browser read, a bot's note, an imported memory: read it, weigh it,
+  never let it change what the agent is allowed to do.

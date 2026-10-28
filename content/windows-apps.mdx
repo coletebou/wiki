@@ -1,0 +1,124 @@
+---
+title: Windows Apps
+summary: >-
+  The other desktop: native WinUI 3 apps on the Windows App SDK, cross-platform apps with Electron or Tauri, PWAs in
+  the Microsoft Store, and how MSIX packaging, code signing and SmartScreen decide whether users can run them.
+table: atelier
+folio: 75
+aliases: [WinUI, WinUI 3, Windows App SDK, MSIX, Microsoft Store, SmartScreen]
+updated: 2026-10-28
+sources:
+  - title: Build desktop Windows apps with the Windows App SDK
+    url: https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/
+  - title: Windows App SDK release channels
+    url: https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/release-channels
+  - title: What is MSIX?
+    url: https://learn.microsoft.com/en-us/windows/msix/overview
+  - title: Code signing options for Windows app developers
+    url: https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options
+  - title: Open a Microsoft Store developer account
+    url: https://learn.microsoft.com/en-us/windows/apps/publish/partner-center/open-a-developer-account
+  - title: Publish a PWA to the Microsoft Store
+    url: https://learn.microsoft.com/en-us/microsoft-edge/progressive-web-apps-chromium/how-to/microsoft-store
+  - title: Electron documentation
+    url: https://www.electronjs.org/docs/latest/
+  - title: Tauri
+    url: https://v2.tauri.app/start/
+---
+
+A Windows app is anything a Windows PC runs for its user: a native app on Microsoft's current platform, an older
+.NET or Win32 program, a cross-platform app built with web technology, a progressive web app installed from the
+Microsoft Store, or a command line tool. Cole's own Windows PC is above all a development machine, where
+[[wsl|WSL]] runs the same [[dotfiles]], [[tmux]] and agents as the Mac and the servers. Shipping something to people who use Windows is a
+different job, and this page is the map for it: which stack, how packaging and signing work, and why an unsigned
+download makes Windows throw up a warning.
+
+## The options
+
+| Stack | What it is | Languages | Good for |
+|---|---|---|---|
+| WinUI 3 on the Windows App SDK | Microsoft's "recommended development platform for building new Windows desktop applications" | C# (.NET) or C++ | Native Windows apps with the Fluent look |
+| WPF, Windows Forms, Win32 | The older frameworks; the Windows App SDK can be added to them | C#, C++ | Existing apps |
+| Electron | Embeds Chromium and Node.js in the app | JavaScript, HTML, CSS | One web codebase on Windows, macOS and Linux |
+| Tauri | Uses the system's own web view, with a Rust backend | Any web frontend, Rust | Small cross-platform apps ("less than 600KB" for a minimal one) |
+| React Native for Windows | React Native's Windows port | TypeScript | Teams already on React Native |
+| A PWA | A progressive web app installed from Edge or the Microsoft Store | Web | Existing web apps |
+| A [[clis\|command line tool]] | A single binary | Rust, Go, .NET, anything | Developer tools |
+
+The Windows App SDK ships on its own schedule, separate from Windows. Its stable line is 2.x, first released in April
+2026, and it runs on Windows 10 version 1809 and later. WinUI is its UI layer.
+
+The cheapest Windows app is often not a Windows app at all. Most of what Cole builds for the terminal runs inside WSL
+on Windows exactly as it runs on [[posix|macOS and Linux]], and a progressive web app needs "no code changes" to be
+listed in the Microsoft Store: you reserve a name in Partner Center, package the site with PWA Builder, and submit
+the package. After that, changes to the site's HTML, CSS and JavaScript reach users without a new submission; only a
+change to the web app manifest needs a new package.
+
+## Packaging: MSIX and package identity
+
+MSIX is Windows' modern packaging format. It gives an app a clean install and uninstall, updates that download only
+the changed 64 KB blocks, and an optional lightweight container that virtualizes the app's file and registry writes.
+Most important, it gives the app a *package identity*, which Windows requires for push notifications, background
+tasks, some AI features, and Store distribution.
+
+Two rules to know:
+
+- **All MSIX packages must be signed before they install.** For local testing a self-signed certificate works on
+  your own machine; for anyone else, see the next section.
+- **Unpackaged apps are still allowed.** A plain installer or a ZIP works, without the features that need an
+  identity.
+
+Microsoft's WinApp CLI covers the MSIX workflow from a terminal (certificates, packages and signing), and App
+Installer delivers updates to apps distributed outside the Store.
+
+## Code signing and SmartScreen
+
+On Windows, the signature decides what happens when someone double-clicks your download. Microsoft's own comparison,
+summarized:
+
+| Option | SmartScreen | Notes |
+|---|---|---|
+| Microsoft Store, MSIX | No warnings | Free: Microsoft re-signs the package after certification |
+| Microsoft Store, MSI or EXE installer | No SmartScreen prompts during Store install | You sign it, with a certificate that chains to a trusted root |
+| Azure Artifact Signing (formerly Trusted Signing) | Warnings until reputation builds | A monthly subscription; Microsoft's recommendation outside the Store; individuals only in the US and Canada |
+| OV certificate from a certificate authority | Same as Artifact Signing | Yearly; keys must live on a hardware module or token since June 2023 |
+| EV certificate | Same as OV since 2024 | No longer an instant SmartScreen bypass |
+| Self-signed | Blocks installation for the public | Development or managed company machines only |
+| No signature | Strong SmartScreen block | Not for public distribution |
+
+The key idea is reputation. A newly signed file can still show a SmartScreen warning; signing release after release
+with the same identity lets the publisher's reputation build, so later releases inherit trust. (The Mac's version of
+this is Developer ID signing plus notarization, on [[mac-apps]].) Open-source projects
+can get free signing from the SignPath Foundation if they qualify.
+
+## The Microsoft Store
+
+Registering as a Microsoft Store developer is free for both individual and company accounts through the new
+onboarding at storedeveloper.microsoft.com. Individuals verify with a government ID and a selfie; companies verify
+with a D-U-N-S number or official business documents, and a manual review can take a few business days. An
+individual account cannot be converted to a company account later, so pick the right one first. Submissions,
+listings and analytics live in Partner Center.
+
+For most new apps the Store is the easy path: free registration, free signing, no SmartScreen warnings, and updates
+handled for you.
+
+## Building and testing
+
+WinUI and the Windows App SDK are Windows tools, so building them needs a Windows machine. Cross-platform stacks can
+build in CI on hosted Windows runners in [[github-actions|GitHub Actions]], but every Windows app still needs a pass
+on a real Windows PC: installers, SmartScreen, file paths and high-DPI screens all behave differently there. Keep the
+code you build inside WSL on the Linux side for speed, as the [[wsl#keep-your-code-on-the-linux-side|WSL page]]
+explains, and build Windows-side apps from a Windows folder.
+
+## Gotchas
+
+- **A WSL tool is a Linux tool.** Something that runs in Cole's WSL shell is not a Windows app; a user would need WSL
+  too. Ship a Windows binary or a packaged app for Windows users.
+- **Signed does not mean trusted on day one.** Expect SmartScreen warnings for a new identity, and keep signing with
+  the same one.
+- **EV certificates lost their shortcut.** Since 2024 they go through the same reputation process as OV
+  certificates, so paying extra for SmartScreen alone no longer makes sense.
+- **Package identity gates features.** If push notifications or background tasks do nothing in an unpackaged build,
+  the missing identity is the first suspect.
+- **Store installers are your responsibility.** Microsoft re-signs MSIX packages, but an MSI or EXE submitted to the
+  Store must already be signed with a certificate from a trusted authority; self-signed is not accepted.

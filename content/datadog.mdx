@@ -1,0 +1,121 @@
+---
+title: Datadog
+summary: >-
+  The infrastructure layer of the observability path: what Datadog's agent collects from a server, how logs and
+  OpenTelemetry data get in, what the free tier covers, and how per-host and per-gigabyte pricing adds up.
+table: observatory
+folio: 63
+aliases: [Datadog Agent, infrastructure monitoring, log management]
+updated: 2026-10-28
+sources:
+  - title: Datadog pricing
+    url: https://www.datadoghq.com/pricing/
+  - title: Getting started with the Agent (Datadog docs)
+    url: https://docs.datadoghq.com/getting_started/agent/
+  - title: OpenTelemetry in Datadog (Datadog docs)
+    url: https://docs.datadoghq.com/opentelemetry/
+  - title: Journald integration (Datadog docs)
+    url: https://docs.datadoghq.com/integrations/journald/
+---
+
+Datadog is a hosted monitoring service for infrastructure: host metrics, logs, application traces and dashboards in
+one place, with alerts on any of them. In Cole's [[observability|observability path]] it is the layer for the machines
+themselves, the place to ask what a server was doing when something went wrong. [[sentry|Sentry]] covers errors in the
+code and [[langfuse|Langfuse]] covers model calls; Datadog covers the boxes they run on.
+
+## What it collects
+
+Everything starts with the **Datadog Agent**, a small program that runs on each host and ships data to Datadog. Out of
+the box its core checks collect CPU, memory, disk, network, IO, uptime and clock (NTP) metrics: 75 to 100 system-level
+metrics every 15 to 20 seconds. On top of that:
+
+- **Integrations**, more than a thousand of them, read the services on the host: nginx, PostgreSQL, Redis, Docker,
+  systemd and so on. Most are a short YAML file in the Agent's `conf.d/` folder.
+- **Logs** are off by default. Turning them on is one line in the Agent's main config, then a config per source.
+- **Traces** come from instrumented applications, through Datadog's own tracing libraries or OpenTelemetry.
+
+The Agent's main config. The API key goes here too (or in the `DD_API_KEY` environment variable), so this file never
+belongs in a repository:
+
+```yaml
+# /etc/datadog-agent/datadog.yaml
+site: datadoghq.com
+logs_enabled: true
+```
+
+On a server where every service is a systemd unit (see [[servers]]), the journal is the natural log source. The Agent's
+user needs to be in the `systemd-journal` group (`sudo usermod -a -G systemd-journal dd-agent`), and one file picks the
+units to ship:
+
+```yaml
+# /etc/datadog-agent/conf.d/journald.d/conf.yaml
+logs:
+  - type: journald
+    path: /var/log/journal/
+    include_units:
+      - app.service
+      - nginx.service
+```
+
+## OpenTelemetry
+
+Datadog takes OpenTelemetry data four ways: through the Datadog Agent with its embedded OpenTelemetry Collector (the
+route Datadog recommends), through your own OpenTelemetry Collector exporting to Datadog, through OTLP ingestion in the
+Agent, or directly over OTLP with no agent at all. That keeps instrumentation portable: an app instrumented with
+OpenTelemetry can send the same spans to Datadog or anywhere else, and a collector can fan one stream out to several
+backends.
+
+## Where it fits
+
+Each tool in the path answers a different question, and Datadog's is about the host:
+
+| Question | Where |
+|---|---|
+| What broke in the code, in which release? | [[sentry\|Sentry]] |
+| What did the model see, say and cost? | [[langfuse\|Langfuse]] |
+| Was the server out of memory, out of disk, or pegged? What did the logs say just before? | Datadog |
+| Did a service die or a timer stop? | systemd's `OnFailure=` alerts, and Sentry's cron monitors |
+
+The value Datadog adds over a server's own tools is history and correlation: a memory graph across a week, every box's
+logs searchable in one place, and an alert when disk usage passes a threshold instead of when it hits 100%.
+
+## Pricing and the free tier
+
+| Product | Price |
+|---|---|
+| Free tier | <Price id="datadog-free" format="bare" /> |
+| Infrastructure Monitoring Pro | <Price id="datadog-infra-pro" format="bare" /> |
+| Log Management | <Price id="datadog-logs" format="bare" /> |
+
+(As of October 28, 2026, from datadoghq.com.) The free tier is what an account drops to when its trial ends: up to five
+hosts with one day of metric retention, which is enough to watch the present and useless for trends. Paid
+infrastructure monitoring is priced per host per month, cheaper on an annual commitment. Logs have two separate meters:
+every gigabyte *ingested*, and every million events *indexed* (kept searchable, for 15 days on the standard plan).
+
+## Keeping the bill small
+
+- **Index less than you ingest.** Exclusion filters can drop debug noise before indexing, and archives can send
+  everything to your own S3 bucket instead (see [[s3-and-glacier]]), from which Datadog can rehydrate a window later.
+- **Count hosts carefully.** Every host running the Agent is a billable host, so decide deliberately which machines
+  get it, especially short-lived ones.
+- **Watch tag cardinality.** Custom metrics are counted per unique combination of tags, so a tag holding a user id or
+  a request id multiplies them.
+- **Set usage alerts.** Datadog publishes its own estimated-usage metrics, and a monitor on them warns before the bill
+  does.
+
+## Gotchas
+
+- **The site matters.** Datadog runs several regional sites (`datadoghq.com`, `datadoghq.eu` and others). An Agent
+  pointed at the wrong one sends nothing anyone can see.
+- **API keys and application keys are different.** The Agent needs only an API key; scripts that read data need an
+  application key, which should be scoped and kept out of the Agent's config.
+- **Logs cost more than hosts, fast.** Turning on every log source on every host is the quickest way to an unexpected
+  bill. Start with the units you would actually search.
+- **One day of free retention.** Do not plan an investigation around free-tier data from last week: it is already gone.
+
+<ColesTake>
+
+We send things to Datadog and Sentry. Sentry is for what broke in the code; Datadog is for the boxes themselves, the
+memory, the disks and the logs.
+
+</ColesTake>

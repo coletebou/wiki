@@ -1,0 +1,117 @@
+---
+title: CLIs
+summary: >-
+  Why command-line tools are the cheapest way to give an agent a capability, the third-party CLIs Cole's agents use all
+  day, the ones Cole wrote, and the design habits that make a CLI safe and pleasant for agents to drive.
+table: workshop
+folio: 47
+aliases: [command-line tools, CLI]
+updated: 2026-10-28
+sources:
+  - title: GitHub CLI manual
+    url: https://cli.github.com/manual/
+  - title: jq manual
+    url: https://jqlang.org/manual/
+  - title: ripgrep
+    url: https://github.com/BurntSushi/ripgrep
+  - title: Handoff chains, exit codes (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/handoff.md
+  - title: Claude Code plugin components (bin/ on PATH)
+    url: https://code.claude.com/docs/en/plugins/components
+---
+
+A command-line tool is the cheapest way to give an agent a new capability. It documents itself (`--help`), it can
+print JSON for the next tool in the pipe, it reports success or failure with an exit code, and it costs nothing at
+all until it runs, unlike an MCP server whose tools are listed in every session. Models have read an enormous amount
+of shell, so they are good at it. Most of Cole's setup is CLIs, and the agents drive them all day, the same way a
+person would.
+
+## Why agents like CLIs
+
+- **Self-documenting.** An agent that meets an unfamiliar tool runs `tool --help` and carries on.
+- **Composable.** `gh api … | jq …` answers questions no single tool was built for.
+- **Testable.** A CLI has inputs, outputs and an exit code, so it gets real tests (see [[testing]]).
+- **Shared with the human.** The command an agent ran is one Cole can run, read in a transcript, or put in a script.
+- **Cheap in context.** Nothing loads until a command is used, and output can be filtered before it reaches the model.
+
+The tradeoff is structure and authority. A long-lived connection, credentials the agent should not hold, or results
+gathered across machines fit better behind an [[mcp|MCP server]]. Cole's [[drover|Drover]] offers both: every
+capability is one op, available as `drover op <op>`, as an MCP tool and as a button.
+
+## The everyday toolbox
+
+| Tool | What the agents use it for |
+|---|---|
+| `git` | Everything; see [[git]] and [[git-worktrees]] |
+| `gh` | Pull requests, issues, CI runs and raw API calls to GitHub |
+| `jq` | Reading and reshaping JSON: hook payloads, API answers, transcripts |
+| `rg`, `fd` | Fast text search and file finding (see [[grep-ripgrep-ugrep]]) |
+| `tmux` | Windows for every session; capture, send keys (see [[tmux]]) |
+| `cf` | Cloudflare's own CLI, for DNS, tunnels and the rest (see [[cloudflare-api]]) |
+| `aws` | The AWS servers and storage (see [[servers]] and [[s3-and-glacier]]) |
+| `docker` | Compose stacks per worktree |
+| `dotenvx` | Encrypted env files (see [[env-files]]) |
+| `gitleaks` | Secret scanning on every commit and push |
+| `claude`, `codex` | Starting more agents, headless (`claude -p`, `codex exec`) or in tmux |
+
+Inside Claude Code there is one twist: Cole's rules tell agents to prefer Claude Code's built-in Read, Grep and Glob
+tools over `cat`, `rg` and `find` within a session. The shell versions are for pipelines, scripts and machines without
+the agent.
+
+Tools arrive on each machine through the [[bootstrap-script]], [[homebrew|Homebrew's Brewfile]] on macOS and pinned
+Node tool versions everywhere, so every machine has the same versions. Plugins can ship their own CLIs too: Claude
+Code puts a plugin's `bin/` directory on the Bash tool's `PATH` while the plugin is enabled (see
+[[skills-and-plugins]]).
+
+## Cole's own CLIs
+
+| CLI | What it does | Page |
+|---|---|---|
+| `wt` | Create or attach a git worktree and `cd` into it | [[git-worktrees]] |
+| `pw` | Launch, watch, broadcast to and tear down parallel worktree sessions | [[parallel-worktrees]] |
+| `cc-park` | Park idle Claude Code sessions and bring them back | [[cc-park]] |
+| `cc-handoff` | Hand a session to a fresh successor through a brief | [[handoff-chains]] |
+| `reflections` | Add, search and close items in the reflection store | [[reflection-store]] |
+| `drover` | The control plane: `drover op`, `drover search`, `drover grep`, `drover stacks` | [[drover]] |
+| `dotsync` | Commit, pull, push and apply the dotfiles on every machine | [[dotfiles]] |
+| `autoreview-pair` | Two independent reviews of one frozen scope, in parallel, one exit code | [[git]] |
+| `badland-brain` | Mint keys, import memory, reindex the shared brain | [[shared-brain]] |
+
+Several are public on their own: [porchlight](https://github.com/coletebou/porchlight), a fleet-aware login dashboard
+for the terminal; [ai-keys](https://github.com/coletebou/ai-keys), one CLI to create, list, revoke and distribute API
+keys across AI providers; and Cole's forks of [imsg](https://github.com/coletebou/imsg) (Messages from the command
+line, for agents), [acpx](https://github.com/coletebou/acpx) (a headless client for Agent Client Protocol sessions)
+and [clawpatch](https://github.com/coletebou/clawpatch) (review code, patch bugs, land pull requests).
+
+## How Cole designs a CLI for agents
+
+Patterns that recur across Cole's tools:
+
+- **Results on stdout, conversation elsewhere.** `wt-helper` writes its prompts and status lines to the terminal and
+  prints only the final path on standard output, so a shell function can capture it.
+- **Exit codes that mean something.** `cc-handoff launch` documents eight: 0 started and replied, 2 bad arguments or an
+  unready brief (nothing started), 3 a required tool is missing, 4 a successor already exists (never relaunch), 5 tmux
+  failed (a window that opened is left running), 7 started but not replied yet, 8 no launcher reproduces the
+  session's route, 9 the remote preflight failed. An agent can branch on the number instead of parsing prose.
+- **A dry run for anything that changes things.** The installer's `--dry-run`, `cc-park list`, `pw validate`, and
+  `--print` on the handoff launcher all show the plan and touch nothing.
+- **Refuse rather than guess.** A brief with a placeholder left, an unknown launch flag, a volume that is not mounted:
+  the tool stops and says why.
+- **Never print a secret, never take one in argv.** Values come from standard input or a hidden prompt, because other
+  users can read a process's arguments, and status commands print names, never values.
+- **Gates fail closed, helpers fail open.** A secret scan that cannot run blocks the push; a helper hook that breaks
+  just steps aside.
+- **Idempotent.** Running it twice changes nothing the second time; the installer moves anything it replaces into a
+  dated backup with a log.
+- **Portable.** Most of Cole's scripts run on macOS's stock bash 3.2 as well as on Linux, so they avoid tools that
+  differ between BSD and GNU (`sed -i`, `readlink -f`, `date -d`, `stat`). See [[posix]].
+
+## Gotchas
+
+- **Interactive prompts hang agents.** Anything that waits for a password, a passphrase or a browser callback stalls a
+  headless session. Give automation `--batch`, `BatchMode=yes` for SSH, and tokens instead of logins.
+- **Pipes hide exit codes.** Without `set -o pipefail`, `gate | tail` exits with `tail`'s status. Wrap a gate so the
+  wrapper exits with the gate's own code.
+- **Huge output is expensive.** Filter before printing: `rg` with a glob, `jq` with a selection, `tail -n 50`.
+- **`pgrep -f` matches more than you think.** It also matches every other session's polling loop that mentions the
+  same pattern; match by exact process name with `pgrep -x`.

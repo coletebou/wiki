@@ -1,0 +1,106 @@
+---
+title: npm, bun and pnpm
+summary: >-
+  Three ways to install JavaScript dependencies from the same registry, with different tradeoffs in speed, disk,
+  strictness and safety, and where Cole uses each: Bun for the main app, pnpm and npm elsewhere, npm to pin every CLI.
+table: workshop
+folio: 50
+aliases: [npm, bun, pnpm]
+updated: 2026-10-28
+sources:
+  - title: npm ci
+    url: https://docs.npmjs.com/cli/v11/commands/npm-ci
+  - title: pnpm, motivation
+    url: https://pnpm.io/motivation
+  - title: pnpm build settings (allowBuilds, strictDepBuilds)
+    url: https://pnpm.io/settings/build
+  - title: bun install
+    url: https://bun.com/docs/pm/cli/install
+  - title: parallel-worktrees skill, bootstrap gotchas (dx)
+    url: https://github.com/coletebou/dx/blob/master/plugins/worktrees/skills/parallel-worktrees/SKILL.md
+---
+
+npm, pnpm and Bun all install JavaScript packages from the same registry, and all three read the same
+`package.json`. They differ in how fast they install, how much disk they use, how strict they are about what code can
+import, and whether a dependency's install scripts run on your machine without asking. Cole uses all three, each where
+it fits: Bun in the main app's monorepo, pnpm in another app, and npm for small tools, libraries meant to install
+anywhere, and pinning the command-line tools on every machine.
+
+## At a glance
+
+| | npm | pnpm | Bun |
+|---|---|---|---|
+| What it is | The package manager that ships with Node | A package manager | A runtime with a package manager, test runner and bundler built in |
+| Lockfile | `package-lock.json` | `pnpm-lock.yaml` | `bun.lock` (text since Bun 1.2) |
+| `node_modules` | Flat, hoisted | Symlinked; only direct dependencies at the top | Isolated for new workspaces, hoisted for single packages |
+| Disk | A full copy per project | One content-addressable store, hard-linked into each project | A global cache |
+| Dependency install scripts | Run by default | Blocked until you allow each package | Not run, except for packages you list as trusted |
+| Clean CI install | `npm ci` | `pnpm install --frozen-lockfile` | `bun install --frozen-lockfile` or `bun ci` |
+| Workspaces | `workspaces` in `package.json` | `pnpm-workspace.yaml` | `workspaces` in `package.json` |
+
+## npm
+
+npm comes with Node, so it is always there. `npm ci` is its install for automation: it requires a lockfile, fails if
+the lockfile and `package.json` disagree, and starts from an empty `node_modules`. Its flat `node_modules` is the most
+compatible layout, and also the loosest: code can import packages it never declared, because they happen to be
+hoisted next to it.
+
+Cole uses npm where reach matters more than speed: small tools, the [[shared-brain|brain]] server (whose instructions
+are `npm ci && npm run build`), and the fleet's own command-line tools. Every machine installs the same set of Node
+CLIs (dotenvx, the Codex CLI, the Playwright MCP server, Cloudflare's `cf`, pnpm itself, the Pyright and TypeScript
+language servers, and a few more) from one committed lockfile with `npm ci --omit=dev`, on one pinned Node version, so
+every machine runs exactly the same versions (see [[bootstrap-script]]). [[drover|Drover]] goes further and has no
+npm dependencies at all.
+
+## pnpm
+
+pnpm keeps every package version once, in a content-addressable store, and hard-links (or clones) the files into each
+project. Ten projects that use the same version of a library use the disk once. Its `node_modules` holds only your
+direct dependencies at the top level, as symlinks into a `.pnpm` directory, so code cannot import a package it did not
+declare. That strictness catches "phantom dependencies" that work on your machine and break somewhere else; for the
+rare tool that cannot handle symlinks, `nodeLinker: hoisted` gives an npm-style layout.
+
+pnpm is also strict about install scripts: a dependency's build or `postinstall` script does not run until you allow
+that package, and by default an install with unreviewed build scripts fails instead of quietly running them.
+
+## Bun
+
+Bun is a JavaScript runtime that also installs packages, runs tests (`bun test`), bundles and runs scripts (`bunx` is
+its `npx`). Its installer is very fast (its own docs claim 25 times faster than `npm install`), it does not run
+dependencies' lifecycle scripts unless the package is listed in `trustedDependencies`, and new workspaces get an
+isolated layout that prevents phantom dependencies too.
+
+Cole's main app is a Bun workspace monorepo: `bun install` at the root, apps and shared packages as workspaces, scripts
+that run inside one workspace with `bun run --cwd <app>`, `bun test` for scripts and infrastructure, and Vitest for the
+app workspaces (see [[testing]] and [[oxlint]]).
+
+<ColesTake>
+
+Pick one package manager per repository and never mix them. Two lockfiles in one repo means two different dependency
+trees.
+
+</ColesTake>
+
+## In worktrees and fan-outs
+
+Package managers are where a [[parallel-worktrees|worktree fan-out]] spends most of its time and disk:
+
+- **Every worktree needs its own install.** `node_modules` is not tracked, so a fresh [[git-worktrees|worktree]] has
+  none. Cole's launcher runs `npm install` in each new worktree by default.
+- **Use the repository's own manager.** In a Bun repository, that default `npm install` would build a second,
+  divergent tree. Launch with `PW_NPM_INSTALL=0 PW_BOOTSTRAP_HOOK='bun install --frozen-lockfile'` instead.
+- **Budget the disk.** A Bun-installed worktree of a mid-size monorepo is about 1.9 GB, so five lanes need about 10 GB.
+  pnpm's shared store helps here, since identical files are linked rather than copied. Skip the install entirely for
+  lanes that only write docs.
+- **Install with the lockfile frozen.** An agent that runs a plain install can quietly rewrite the lockfile; in
+  automation, use the frozen form and treat a lockfile change as a real change to review.
+
+## Choosing
+
+- **A new app or monorepo, and you like one tool for everything:** Bun.
+- **A monorepo where correctness of imports and disk use matter most:** pnpm.
+- **A library or tool that should install anywhere with nothing extra:** npm.
+- **Whatever you pick,** commit the lockfile, use the frozen install in CI ([[github-actions]]), and do not run
+  dependencies' install scripts you have not looked at.
+
+Homebrew handles everything that is not a JavaScript package (see [[homebrew]]).

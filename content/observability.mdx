@@ -1,0 +1,180 @@
+---
+title: The Observability Path
+summary: >-
+  Where every signal in Cole's setup goes: model calls and agent sessions to Langfuse, code errors and uptime to
+  Sentry, host metrics and logs to Datadog, archives to S3 and Glacier, and the few alerts that reach a human.
+table: observatory
+folio: 61
+aliases: [observability, monitoring, telemetry, OpenTelemetry, OTel]
+updated: 2026-10-28
+sources:
+  - title: OpenTelemetry documentation
+    url: https://opentelemetry.io/docs/
+  - title: OpenTelemetry semantic conventions for generative AI
+    url: https://opentelemetry.io/docs/specs/semconv/gen-ai/
+  - title: Monitoring, metrics, events and traces (Claude Code docs)
+    url: https://code.claude.com/docs/en/monitoring-usage
+  - title: OpenTelemetry endpoint (Langfuse docs)
+    url: https://langfuse.com/integrations/native/opentelemetry
+  - title: Uptime monitoring (Sentry docs)
+    url: https://docs.sentry.io/product/uptime-monitoring/
+  - title: OpenTelemetry in Datadog (Datadog docs)
+    url: https://docs.datadoghq.com/opentelemetry/
+---
+
+Observability is knowing what your systems and your agents did without having to ask them. In Cole's setup every kind
+of signal has exactly one home. Model calls and their cost, from the production apps and from Claude Code itself, go to
+[[langfuse|Langfuse]]. Errors in the code and the uptime of public endpoints go to [[sentry|Sentry]]. Host metrics and
+logs go to [[datadog|Datadog]]. Anything worth keeping for years ends up in [[s3-and-glacier|S3 and Glacier]].
+OpenTelemetry is the common wire between most of them.
+
+<Diagram name="observability" />
+
+The diagram reads from left to right. On the left are the sources: agent sessions on the [[mac-mini|Mac mini]] and on
+the [[servers]], the production apps and bots, the frontends on [[vercel|Vercel]], and the servers themselves. In the
+middle are the pipes: OpenTelemetry over OTLP, the vendors' SDKs, and integrations such as Sentry's for Vercel. On the
+right are the stores, and from them the few alerts that go to a person. Follow any one signal and it ends in one place,
+never two.
+
+## Four questions, four places
+
+| Question | Where it is answered | Kept for |
+|---|---|---|
+| What did the model see and say, how long did it take, and what did it cost? | [[langfuse\|Langfuse]] | As long as the self-hosted disk allows |
+| What broke in the code, for whom, and in which release? | [[sentry\|Sentry]] | 30 to 90 days, by plan |
+| Is the server healthy? What did its logs say before it went wrong? | [[datadog\|Datadog]] | One day of metrics on the free tier, longer on paid plans |
+| Where is the record a year from now? | [[s3-and-glacier\|S3 and Glacier]] | Years, for about a dollar per terabyte per month |
+
+Keeping one home per signal is what keeps the path cheap and searchable. A model call recorded in Langfuse is not also
+logged in full to Datadog; an exception is not also written into a trace's metadata. When something goes wrong, the
+question tells you where to look.
+
+## OpenTelemetry, the common wire
+
+OpenTelemetry (OTel) is the open standard, run by the Cloud Native Computing Foundation, for three kinds of telemetry:
+**traces** (a request broken into timed spans), **metrics** (numbers over time) and **logs** (events). It defines the
+data model, the wire protocol (OTLP, over gRPC or HTTP), SDKs for most languages, and *semantic conventions*: agreed
+attribute names, including a family for generative AI (`gen_ai.request.model`, `gen_ai.usage.input_tokens` and so on).
+
+The piece that makes it practical is the **OpenTelemetry Collector**, a small service that receives telemetry, changes
+it and sends it on. Cole runs one in front of Langfuse. It renames the token counts Claude Code reports into the GenAI
+names Langfuse prices from, passes each client's credentials through so traces land in the right project, and applies a
+stricter allowlist to traffic from production. A collector is also where you redact, sample, drop noise or send one
+stream to two backends, without touching the applications.
+
+Every store in the path speaks it. Langfuse accepts OTLP over HTTP, Datadog accepts it four different ways, and Claude
+Code emits it natively.
+
+## Agent sessions: the part most setups miss
+
+Most observability setups watch the product. Cole's also watches the agents that build it, because a fleet of
+[[claude-code|Claude Code]] sessions is a real cost center and a real source of mistakes.
+
+Claude Code exports OpenTelemetry on its own: metrics, events, and (in beta) traces. Each prompt becomes a trace with
+a span for every model call, tool call and hook, and a subagent's calls nest under the Agent call that started it.
+Cole turns tracing on per machine and sends it to the Claude Code project in Langfuse, next to the production projects.
+The content switches stay off, so the spans carry structure, timing, models and token counts, not the conversation.
+The full setup, including the header helper and the collector, is on [[langfuse]].
+
+Telemetry is one view of the agents; it is not the only one. The rest of the picture comes from elsewhere in the
+setup:
+
+- **What a session learned and left open** goes to the [[reflection-store|reflection store]] through [[hooks]] that
+  run before compaction and at the end of a session.
+- **Which sessions are working, waiting or stuck, on every machine,** is [[drover|Drover]]'s board, which also samples
+  each machine's memory, swap, disk and CPU and alerts on sustained pressure.
+- **What a session actually typed and ran** is in its transcript, which every tool can read back later.
+
+## Production apps and bots
+
+- **Model calls** go to each app's own Langfuse project, through the SDK, OpenTelemetry, or an ingestion job that reads
+  a bot's session logs, with the session and user set so cost can be split per conversation and per customer.
+- **Errors** go to Sentry from each app's SDK, with releases and source maps. Frontends get this through Sentry's
+  Vercel integration, which also uploads the source maps at build time.
+- **Uptime** is checked from outside by Sentry's uptime monitors (the public site, the chat app, the API's health
+  endpoint), and scheduled jobs check in with Sentry's cron monitors.
+- **The servers** report host metrics and logs to Datadog, and production systemd services carry an `OnFailure=` hook
+  that tells a human when one dies.
+
+## Alerts that reach a human
+
+An alert is a promise that someone will act on it, so Cole keeps the list short and sends everything else to a
+dashboard:
+
+| Alert | From | Fires when |
+|---|---|---|
+| New or escalating high-priority issue | Sentry | An error is new, or is getting worse |
+| Error spike, slow pages | Sentry metric monitors | Errors jump, or p95 page time crosses its threshold |
+| Endpoint down | Sentry uptime monitors | Three failed checks in a row, each from a different region |
+| Job missed or failed | Sentry cron monitors | A scheduled job does not check in, fails or runs too long |
+| Service died | systemd `OnFailure=` | A unit gives up restarting |
+| Backup silent | A daily check | The last good backup is more than about a day old |
+| Spending | AWS Budgets, cost anomaly detection, the GitHub Actions budget | 85% and 100% of the month's budget, a forecast over it, or an unusual jump |
+| An agent needs Cole | [[drover\|Drover]] | A session is waiting on a question or a permission |
+
+The backup check is the one people forget: `OnFailure=` only fires when a job runs and fails, never when the timer that
+should start it has stopped. Alerting on the *absence* of a success catches both.
+
+## Following one problem through the path
+
+Say a user reports that the chat in one of Cole's apps "got slow". Each store answers one part of it:
+
+1. **Sentry first.** Is there a new issue or an error spike in the API's project, and did the p95 duration of the chat
+   route move? If an issue opened right after a release, the release and the suspect commit are on the issue.
+2. **Langfuse next.** In the app's project, filter the chat traces to the last day and sort by latency. Are the model
+   calls themselves slower (time to first token up, a bigger model, more input tokens because the context grew), or is
+   the time spent around them, in tool calls and retrieval?
+3. **Datadog last.** If neither the code nor the model explains it, look at the host: memory pressure, a full disk, a
+   noisy neighbor process, and the service's logs from the same minutes.
+
+The order is cheapest first: Sentry tells you whether something broke, Langfuse whether the AI part changed, Datadog
+whether the machine did. Because each signal has one home, nobody has to guess which dashboard holds the answer.
+
+## Building your own
+
+A sensible path for one person, in the order that pays off soonest:
+
+1. **Sentry on every app** before anything else. The wizard takes minutes, the Developer plan is free, and an email
+   about a new error beats a user telling you.
+2. **Uptime and cron monitors** on the endpoints and jobs that matter, so silence becomes an alert.
+3. **Langfuse as soon as an app calls a model.** Start on Langfuse Cloud's free Hobby plan, send the provider's token
+   counts, and set the session and user on every trace.
+4. **Claude Code's own traces** into a separate Langfuse project once agents do real work, so their cost is visible
+   next to the product's.
+5. **Datadog's free tier** when there is a server to watch, with logs from the units you would actually search.
+6. **A collector** when two backends need the same data, or when something has to be renamed, filtered or redacted on
+   the way.
+
+## Privacy and retention
+
+Telemetry from AI systems carries the most sensitive data in the whole setup: prompts, code, file contents, tool
+output. Treat the stores like the source code:
+
+- **Keep content out unless you need it.** Claude Code redacts prompts and tool content in its spans by default, and
+  Cole leaves it that way for the native traces.
+- **Self-host the store that holds content.** Langfuse runs on Cole's own server for that reason.
+- **Redact at the collector**, not in each app, so one rule covers every source.
+- **Never send secrets.** API keys in a prompt end up in a trace. The [[env-files|env files]] page covers how Cole
+  keeps them out of prompts and commits in the first place.
+- **Decide retention per store.** Hot stores (Langfuse's ClickHouse, Sentry, Datadog's indexes) keep weeks or months;
+  anything needed for years goes to [[s3-and-glacier|Glacier]].
+
+## Gotchas
+
+- **A telemetry change needs a restart.** Claude Code reads its telemetry settings when a session starts; sessions that
+  were already running keep the old endpoint.
+- **Count a cost once.** If two paths report the same model calls (native spans and a transcript replay, or a gateway
+  and an SDK), price one of them and keep the other's usage as metadata.
+- **Exporters should never block the work.** Send to a collector on the same machine, which can retry and buffer, so a
+  slow network never stalls a tool on exit.
+- **Check the plan's retention before you need it.** Free tiers keep a day (Datadog) or a month (Sentry Developer,
+  Langfuse Hobby). Last week's incident may already be gone.
+
+The monthly cost of all of this is on [[what-it-costs]].
+
+<ColesTake>
+
+We have S3 and Glacier, we send things to Datadog and Sentry, and then we use Langfuse for all our traces and cost
+analysis. Every signal has one home.
+
+</ColesTake>

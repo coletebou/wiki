@@ -1,0 +1,136 @@
+---
+title: Sentry
+summary: >-
+  Where Cole's apps report what broke: one Sentry project per app, errors with source maps and releases, monitors on
+  error spikes and slow pages, uptime and cron checks, and the Vercel and GitHub integrations that wire it all up.
+table: observatory
+folio: 64
+aliases: [error monitoring, crash reporting, uptime monitoring, cron monitoring]
+updated: 2026-10-28
+sources:
+  - title: Sentry pricing
+    url: https://sentry.io/pricing/
+  - title: Sentry for Next.js (Sentry docs)
+    url: https://docs.sentry.io/platforms/javascript/guides/nextjs/
+  - title: Vercel integration (Sentry docs)
+    url: https://docs.sentry.io/organization/integrations/deployment/vercel/
+  - title: Uptime monitoring (Sentry docs)
+    url: https://docs.sentry.io/product/uptime-monitoring/
+  - title: Crons with the Sentry CLI (Sentry docs)
+    url: https://docs.sentry.io/cli/crons/
+---
+
+Sentry catches what breaks in the code of Cole's apps: an exception in an API handler, a crash in a frontend, a
+scheduled job that never ran. Each failure becomes an *issue* with its stack trace, the release that shipped it, the
+browser or device it hit, and the breadcrumbs that led up to it. Every app has its own project, and anything new or
+getting worse lands in Cole's email.
+
+## What Sentry does
+
+- **Error monitoring.** An SDK in the app captures unhandled exceptions (and handled ones you send yourself), groups
+  repeats into one issue by fingerprint, and attaches the stack trace, tags, the environment and the user. With source
+  maps, a minified frontend stack trace points back at the original line.
+- **Releases.** Each deploy is a release, so an issue says which release introduced it and whether the next one fixed
+  it. With the GitHub integration, Sentry can name the suspect commit.
+- **Tracing.** Spans from requests and page loads give durations per route, so a slow page shows up as a number, not a
+  feeling.
+- **Uptime and cron monitors.** Sentry checks public URLs from outside and expects scheduled jobs to check in.
+- **Seer**, Sentry's AI debugging agent, proposes a root cause and a fix for an issue, and can open the pull request.
+  It needs a paid plan and its own subscription.
+
+Sentry also offers an MCP server, so an agent working on a fix can read the issue it is fixing.
+
+## How Cole uses it
+
+- **One organization, one project per app**: the APIs, the web frontends, the bots, a command-line tool, grouped into
+  teams by product. An app's errors never mix with another's.
+- **Frontends on [[vercel|Vercel]] use Sentry's Vercel integration.** It links each Vercel project to its Sentry
+  project and writes the variables the SDK and the build need into Vercel: `SENTRY_ORG`, `SENTRY_PROJECT`,
+  `SENTRY_AUTH_TOKEN` and `NEXT_PUBLIC_SENTRY_DSN`. Source maps upload during each build, and every deploy becomes a
+  release.
+- **The GitHub integration** links commits to releases, which is what turns "something broke" into "this commit broke
+  it". An alert also tells Cole when Seer has a fix pull request ready for review.
+- **Monitors and alerts.** Sentry's current model separates *monitors* (what to watch) from *alerts* (who to tell).
+  Cole's set:
+  - metric monitors on error spikes for the busiest projects, and on the main frontend's p95 page duration;
+  - uptime monitors on the public site, the chat app and the API's health endpoint;
+  - cron monitors for scheduled sync jobs;
+  - a default alert per project that emails Cole about new and escalating high-priority issues.
+- **Managed as code.** Projects, teams, monitors and alerts are in [[opentofu|OpenTofu]]. The client keys (DSNs) stay
+  out, because their only job is to hold a key, and so do the variables the Vercel integration owns.
+
+The rest of the [[observability|observability path]] sits beside it: [[langfuse|Langfuse]] for model calls and their
+cost, [[datadog|Datadog]] for the servers themselves.
+
+## Setting it up
+
+For a Next.js app, Sentry's wizard does most of the work:
+
+```sh
+npx @sentry/wizard@latest -i nextjs
+```
+
+It installs the SDK, writes one initialization file per runtime (the browser in `instrumentation-client.ts`, the server
+and the edge through `instrumentation.ts`, which also captures errors from server components and route handlers), and
+offers to route the browser's reports through your own server so ad blockers do not drop them. The browser side ends
+up looking like this:
+
+```ts
+import * as Sentry from "@sentry/nextjs";
+
+Sentry.init({
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  environment: process.env.VERCEL_ENV, // production, preview or development
+  tracesSampleRate: 0.1,               // trace one request in ten
+});
+```
+
+Setting the environment from `VERCEL_ENV` keeps errors from preview deployments out of production's numbers. Keep the
+sample rate low in production: a rate of 1.0 traces every request and spends the quota fast.
+
+## Uptime and cron monitors
+
+An **uptime monitor** requests a URL on a schedule (every minute up to every hour) and expects a 2xx status within the
+timeout, following up to nine redirects. To avoid false alarms, checks rotate between regions, and an issue opens only
+after three consecutive failures by default, each from a different place. One success closes it again. Uptime checks do
+not count against the tracing quota.
+
+A **cron monitor** expects a job to check in. The Sentry CLI wraps any command and reports when it starts, when it
+finishes and whether it failed, using the project's DSN:
+
+```sh
+export SENTRY_DSN="<the project's DSN>"
+sentry-cli monitors run --schedule "0 3 * * *" nightly-sync -- ./scripts/nightly-sync.sh
+```
+
+A missed check-in, a failure or a timeout opens an issue, and the same alerts as any other issue fire. For jobs that
+run on a server, this is the "alert on silence" that `OnFailure=` in systemd cannot give: it notices a timer that
+stopped running at all.
+
+## Plans
+
+| Plan | Price | Included |
+|---|---|---|
+| Developer | <Price id="sentry-developer" format="bare" /> | One user, 5k errors a month, 30-day lookback, email alerts |
+| Team | <Price id="sentry-team" format="bare" /> | Unlimited users, 50k errors a month, up to 90-day lookback, third-party integrations |
+
+(Prices as of October 28, 2026, from sentry.io.) Business and Enterprise add more on top. Sentry lists third-party
+integrations, such as the Vercel and GitHub ones Cole relies on, as a Team feature, which is why [[what-it-costs]] counts
+Team in Cole's setup. Usage beyond a plan's quota is billed per event.
+
+## Gotchas
+
+- **One error loop can spend the month's quota.** A bug that throws on every request sends thousands of identical
+  events. Keep spike protection on, and filter what you know is noise: browser extensions, `localhost`, known bots.
+- **No source maps, no line numbers.** Upload them during the build, and keep them out of the public build output.
+- **Personal data stays off by default.** `sendDefaultPii` is off unless you turn it on; think before you do.
+- **Ad blockers block Sentry's ingest.** Route browser reports through your own server (the wizard's tunnel option).
+- **Some tools lag the new alert model.** Sentry's monitors-and-alerts model is newer than parts of its API and the
+  OpenTofu provider, so a few alerts still have to be managed by hand.
+
+<ColesTake>
+
+We send things to Sentry. Every app gets its own project, and anything high priority lands in my email with the release
+and the commit that caused it.
+
+</ColesTake>

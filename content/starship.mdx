@@ -1,0 +1,149 @@
+---
+title: Starship
+summary: >-
+  The prompt in every one of Cole's shells: machine label, directory, git branch and status, jobs, AWS profile and
+  command time, configured in one TOML file and tuned so drawing it never slows the shell down.
+table: shell
+folio: 16
+aliases: [starship prompt, starship.toml]
+updated: 2026-10-28
+sources:
+  - title: Starship configuration docs
+    url: https://starship.rs/config/
+  - title: Starship installation guide
+    url: https://starship.rs/guide/
+  - title: Starship on GitHub
+    url: https://github.com/starship/starship
+  - title: Cole's starship.toml (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/starship.toml
+  - title: Cole's base/zshrc (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/zshrc
+---
+
+Starship draws Cole's shell prompt, the line in front of the cursor, on every machine. It shows the machine's short
+label, the directory, the git branch and its status, background jobs, the AWS profile when one is active and how long
+the last command took, then a `❯` that turns red when the last command failed. The configuration is one small file, and
+most of its comments are about keeping the prompt fast.
+
+## What Starship is
+
+[Starship](https://starship.rs/) is a prompt for any shell, written in Rust and configured with a single TOML file,
+`~/.config/starship.toml`. A prompt is built from modules (directory, git status, language versions, cloud profiles and
+dozens more), and the `format` string decides which ones appear and in what order. Hooking it into zsh is one line at
+the end of the shell config:
+
+```zsh
+eval "$(starship init zsh)"
+```
+
+Its icons need a Nerd Font, a font patched with extra glyphs. Cole's [[homebrew|Brewfile]] installs MesloLGS Nerd
+Font for that.
+
+## Cole's prompt
+
+A rendered example, inside a repository with changes:
+
+```text
+@desk site on login-fix [!2?1⇡1] took 1.3s
+❯
+```
+
+The format string from
+[base/starship.toml](https://github.com/coletebou/dx/blob/master/base/starship.toml):
+
+```toml
+format = """
+${env_var.DF_PROMPT_BADGE}\
+${env_var.DF_PROMPT_HOST}\
+$directory\
+$git_branch\
+$git_status\
+$jobs\
+$aws\
+$cmd_duration\
+$line_break\
+$character"""
+```
+
+Piece by piece:
+
+| Module | Shows | Cole's settings |
+|---|---|---|
+| Identity badge | An orange `[work]` tag, only on a work identity | Invisible everywhere else |
+| Host label | `@desk`, the machine's short name | Replaces the built-in hostname module |
+| Directory | The current folder | At most three parent folders, cut back to the repository root inside a repo |
+| Git branch | `on login-fix` | Starship's default, with its branch icon |
+| Git status | `[!2?1⇡1]` | Counts, not just symbols: `+` staged, `!` modified, `?` untracked, `✘` deleted, `»` renamed, `$` stashed, `=` conflicted, `⇡` ahead, `⇣` behind |
+| Jobs | `✦ 1` | Shown from one background job (Starship's default threshold for the number is two) |
+| AWS | `on ☁ profile (region)` | Only when an AWS profile is active |
+| Command duration | `took 1.3s` | From 250 milliseconds; the default is 2 seconds |
+| Character | `❯` | Green after success, red after a failure |
+
+Two choices stand out. The git status shows counts, so `!2` means two modified files rather than "something is
+modified". And the duration threshold is low, set to 250 milliseconds with the comment "catch 'huh that was slow' more
+often", so slow commands get noticed early.
+
+The line break puts the cursor on a fresh line every time. A long path, a branch name and a git status never push the
+command you type off to the right, which matters in a narrow [[tmux]] pane or on a phone in [[termius]].
+
+## Built to stay fast
+
+A prompt runs before every command, so a slow one taxes everything. The config and the zsh setup around it make three
+deliberate choices.
+
+**Environment variables instead of custom modules.** The host label and the identity badge used to be custom
+modules, small shell commands Starship runs. Each one forked a bash process on every prompt and made Starship scan the
+directory first. Now [base/zshrc](https://github.com/coletebou/dx/blob/master/base/zshrc) computes the host label
+once per shell, with zsh builtins only, and exports it; the badge is set by a tiny hook before each prompt, so
+switching identity with `df-switch` shows at once. Starship's `env_var` module just prints them:
+
+```toml
+[env_var.DF_PROMPT_HOST]
+style = "bold dimmed white"
+format = "[@$env_value]($style) "
+```
+
+**No following symlinks.** On the [[mac-mini|Mac mini]], `~/code` links into external USB drives. Modules that detect
+files make Starship scan the working directory, and following symlinks means statting their targets, which on a cold
+external drive blew Starship's 30 millisecond scan budget. The config sets `follow_symlinks = false`. Nothing in the
+current format scans, so this guards against a module added later.
+
+**No right prompt.** Starship's zsh setup runs a second Starship process for the right-hand prompt before every
+command. Cole's config has no right side, so `base/zshrc` unsets `RPROMPT` right after the init and saves those few
+milliseconds per prompt.
+
+The commands Starship runs get a one-second timeout (`command_timeout = 1000`, double the default), so a slow `git`
+on a huge repository cannot hang the prompt for long.
+
+<ColesTake>
+
+The prompt should never be the slow part.
+
+</ColesTake>
+
+## A log of slow prompts
+
+`base/zshrc` also watches the prompt. It times each one from the first pre-prompt hook to the moment the line editor
+starts, two clock reads and no extra process, and appends a line to `~/.local/state/logs/prompt-latency.log` whenever
+a prompt takes 100 milliseconds or more, or a new shell takes a second or more to reach its first prompt. Both
+thresholds are environment variables (`DF_PROMPT_LOG_MS`, `DF_SHELL_LOG_MS`). When the log shows a slow directory,
+running `starship timings` there names the module responsible.
+
+## One name for each machine
+
+The host label is the same one the [[tmux-status-line|tmux status bar]], the terminal tab title and the
+[[claude-code-status-line|Claude Code status line]] show. All four read the same hosts file, which maps hostname
+patterns to short labels, so a machine reads the same everywhere you look. A label is a name only, never an address.
+
+## Set it up
+
+1. Install Starship with `brew install starship`, or with the install script from the
+   [Starship guide](https://starship.rs/guide/).
+2. Install a Nerd Font and select it in your terminal ([[ghostty|Ghostty]] bundles its own glyph fallback, but other
+   terminals need the font).
+3. Add `eval "$(starship init zsh)"` to the end of `~/.zshrc`.
+4. Start from Cole's [starship.toml](https://github.com/coletebou/dx/blob/master/base/starship.toml), or from Starship's
+   presets, and change one module at a time.
+
+The [[dotfiles]] page covers how the file is linked into place on every machine, and [[posix]] covers why the same
+prompt works the same on macOS and Linux.

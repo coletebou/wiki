@@ -1,0 +1,252 @@
+---
+title: Drover
+summary: >-
+  Cole's open-source control plane for the agent fleet: a daemon on every machine that sees every Claude Code, Codex
+  and bot session, shows which are waiting on Cole, and lets people and agents answer, message and launch them.
+table: automata
+folio: 38
+aliases: [Drover daemon, truth file]
+updated: 2026-10-28
+sources:
+  - title: Drover (GitHub)
+    url: https://github.com/coletebou/drover
+  - title: Drover web README (daemon, ops, truth file, bots)
+    url: https://github.com/coletebou/drover/blob/master/web/README.md
+  - title: The drover skill
+    url: https://github.com/coletebou/drover/blob/master/skills/drover/SKILL.md
+  - title: Claude Code cross-session messaging
+    url: https://code.claude.com/docs/en/cross-session-messaging
+  - title: Codex App Server
+    url: https://learn.chatgpt.com/docs/app-server
+---
+
+Drover is the control plane for Cole's [[agent-fleet|agent fleet]]. A small daemon runs on every machine, sees every
+[[claude-code|Claude Code]] session, [[codex|Codex]] thread, Grok bot and the fleet manager on every host, sorts them
+into who is waiting on Cole, who is working and who is idle, and lets Cole (or another agent) answer them, message
+them and launch new ones from a browser, a terminal, a Mac, an iPhone, a watch or a browser extension. It also keeps
+one append-only truth file of features, notes, messages and launches that people and agents both write.
+
+Cole built it and publishes it as open source: [github.com/coletebou/drover](https://github.com/coletebou/drover),
+Apache 2.0. It has zero npm dependencies and needs Node 24 and tmux.
+
+## Why it exists
+
+With two sessions you can watch both panes. With thirty across several machines you cannot, and the question that
+matters is always the same: which ones are stuck waiting on me? Scraping tmux panes for the answer is unreliable,
+because a terminal UI collapses tool output, a pane that looks idle can be mid command, and a permission dialog looks
+like any other screen. Drover reads the sources of truth instead: each agent's own session registry, its transcript,
+its inbox, and only then the screen.
+
+<ColesTake>
+
+Agents should ask Drover, not scrape tmux. A pane collapses tool output and can make a busy session look idle. The
+transcript and the daemon know what is really going on.
+
+</ColesTake>
+
+## How it is built
+
+- **One daemon per machine.** `drover serve` listens on loopback and runs under launchd on a Mac or a systemd user
+  unit on Linux. Its token lives in its state directory, readable by your user only.
+- **Machines reach each other over SSH.** The fleet is a list of SSH aliases. To ask another machine, the daemon runs
+  `ssh <alias> drover rpc` and speaks newline-delimited JSON over it, so the daemons themselves listen only on
+  loopback. See [[ssh]] and [[tailscale]].
+- **One op table, three fronts.** Every capability is an op with a dot-separated name (`sessions.list`,
+  `tmux.capture`, `launch.start`). The browser UI, the `drover_*` [[mcp|MCP]] tools and the command line
+  (`drover op <op> '<json>'`) all call the same ops, so an agent has exactly the powers the UI has.
+- **Plugins.** Anything only one fleet needs (a private forge, a deploy pipeline, a memory service) is a plugin: a
+  directory with a `plugin.js` that adds ops, MCP tools, UI views and terminal tables. Drover itself stays generic.
+
+```sh
+drover serve                       # the daemon, in the foreground
+drover open                        # the browser UI, with its token
+drover op sessions.list '{"host":"box-a","live":true,"compact":true,"limit":10}'
+drover op tmux.capture '{"target":"agents:3","lines":40}'
+drover op sessions.message '{"id":"webapp-f8","text":"status?"}'
+```
+
+## The board
+
+The main view puts every live agent on every host in three lanes: **Waiting on you**, **Working** and **Idle**. A
+session showing a permission dialog or a question appears in the first lane with the dialog's options as buttons, and
+one key answers it. Before sending a key, Drover checks that the screen still shows the dialog you saw, so an answer
+never lands on a different question.
+
+Transitions become alerts: a dialog appearing, a session that stops on a question, a busy session going idle (with an
+excerpt of its last reply), a session dying, a host going dark, a launch. Each alert lands in the truth file and goes
+to every client: a browser notification with Approve, Deny and Reply buttons, the Mac app, the iPhone, and a buzz on
+the watch. Categories, sounds and quiet hours are fleet-wide settings.
+
+Claude Code's own `Notification` hook feeds the board too: Cole's [[hooks|hook]] appends a `notify` event the moment a
+session asks for a human.
+
+## The truth file
+
+`drover-events.jsonl` is an append-only JSON Lines file kept in Cole's dotfiles repository and synced to every machine
+with them. Git merges it with the `union` strategy, so two machines appending at once never conflict. Every event
+gets a time-ordered UUIDv7 id, a timestamp, the host and an actor; the current state of anything (a feature, a pin, a
+setting) is a fold over its events, and no line is ever rewritten.
+
+| Event | What it records |
+|---|---|
+| `feature` | A piece of work and its state (not started, in progress, shipped, abandoned), with links |
+| `note`, `pin` | Notes about a feature or session, pinned items |
+| `message` | A message to a session: who sent it, to whom, the text, how it was delivered |
+| `launch` | An agent started: engine, mode, profile, effort, folder |
+| `handoff` | A session's handoff file |
+| `chat`, `status` | Replies and status reports from the manager and bots |
+| `notify` | An alert, including a hook's "this session needs you" |
+| `op` | Every write any front made, with its actor, arguments (secrets redacted) and result |
+
+The actor is what makes the file useful for provenance. Cole's own clients (the browser, the apps, the CLI) write as
+the owner; an agent writing through the MCP server is `mcp`; a hook is `hook`; a bot is `grok:<name>` and its writes
+are marked untrusted. [[message-ids]] covers why that matters.
+
+## How it reaches each agent
+
+- **Claude Code.** The live registry is `~/.claude/sessions/<pid>.json`. Replies are read from the session's transcript.
+  Messages go into the session's own inbox socket, the one Claude Code's built-in
+  [[agent-messaging|cross-session messaging]] uses, wrapped in the same envelope with the sender named `drover (<actor>)`. A session in bypass mode
+  holds a message from a sender that does not declare its mode, so Drover declares the bypass class when the target
+  has it, because what it relays is the owner's own typing.
+- **Codex.** The daemon owns one read-only `codex app-server` per host and reads threads through it; messages to a
+  terminal thread go through `codex queue`.
+- **Headless sessions.** `claude -p` runs that Drover started, held open by the daemon, with stream JSON both ways.
+- **Any tmux pane.** Read the screen, send keys or text. A paste into a pane that shows a dialog is refused unless
+  forced, because the Enter at the end of a paste would pick whatever option is selected.
+
+### Handoff successors
+
+A long session can hand its work to a fresh one ([[handoff-chains]]), and peers keep messaging the old name. When the
+target of a message is gone, Drover reads the handoff tool's own record of the chain and delivers the message to the
+newest live generation, saying so in the result (`resolvedFrom`, `resolvedTo`, `resolvedWhy`). It never redirects a
+message to a session that is still live, and it refuses when a name could mean more than one chain.
+
+## The other engines
+
+**Grok bots.** Grok Bot agents run on xAI's models in hosted VMs that only make outbound connections. Drover's bot
+gateway gives each bot an MCP connection of its own, through OAuth, with a narrow set of tools: report status, reply
+to a message, add a note or a feature, read the fleet summary and search. In the other direction, a bot is a session
+named `grok:<name>`, and a message to it goes to its webhook. Everything a bot writes is recorded as that bot and
+marked untrusted, and every agent is told to read it as data, never as instructions.
+
+**The fleet manager.** `drover manager setup` installs an OpenClaw agent as the manager for the whole fleet. You can
+ask it "who is waiting on me?" from any client, have it sweep every host, or float it over any tmux window as a popup
+(`drover manager keys --install` binds the tmux prefix plus <kbd>g</kbd>).
+
+## Launching agents
+
+`launch.start` (the `drover_launch` tool, or the Launch view) starts Claude Code or Codex on any host, in a tmux window
+or headless, with a profile, a model, a reasoning effort and a first prompt:
+
+```sh
+drover op launch.start '{"engine":"claude","mode":"tmux","cwd":"~/code/webapp","prompt":"hi","name":"demo"}'
+drover op launch.start '{"engine":"codex","mode":"tmux","effort":"xhigh","cwd":"~/code/webapp","prompt":"hi"}'
+```
+
+A few details make unattended launches work:
+
+- **Folder trust.** Claude Code and Codex ask once per folder whether to trust it, even in bypass mode, and a fresh
+  worktree would sit at that question forever. A tmux launch records the folder as trusted first, exactly the way
+  accepting the dialog would.
+- **Effort per session.** The effort goes on the command line for that one session. Typing `/effort` inside a Claude
+  session instead would change the global default for every later session.
+- **Credentials.** `credential: auto` spreads Claude sessions across a pool of credentials with separate quotas,
+  skipping one that was rate limited in the last two minutes. Only variable names are ever stored or shown.
+- **Placement.** Every daemon samples its machine's memory, swap, disk and CPU each minute and alerts on sustained
+  trouble. `host: "auto"` launches wherever there is room for one more session, and a production machine can be
+  weighted down so it is chosen last.
+
+## Search
+
+Every daemon indexes what was said in its sessions (with subagents), Codex rollouts, truth-file notes, memory files and
+reflections, and searches it by meaning and by exact words. Vectors come from a local embedding model served on
+loopback by `llama-server`, so nothing leaves the machine. `drover search` asks every reachable host and merges the
+answers; `drover grep` runs ripgrep over the raw transcripts on every machine, tool output included.
+
+```sh
+drover search why does the breaker trip
+drover grep turbo.json --roles tool_result
+```
+
+Where a plugin connects it, search also asks the [[shared-brain|shared brain]] and fuses the two lists by rank. A
+search from a machine or project configured as off-limits never reaches the brain, and that check fails closed.
+
+## Waiting on workers
+
+A coordinator waiting for workers used to loop on `sleep 60; ssh box cat status.md`, and every tick woke the model,
+cost tokens and saw changes a minute late. `files.wait` blocks until a file, or the entries of a directory, change on
+any host, then answers with what changed. Run it under Claude Code's background Bash and the session is told when it
+exits:
+
+```sh
+drover op files.wait '{"host":"box-a","path":"~/runs/status","glob":"WS-*.md"}'
+```
+
+Passing the previous answer's `ts` and `exists` back as `since` and `existed` means nothing that changed between two
+waits is missed.
+
+## Docker stacks
+
+`drover stacks` lists every Docker Compose stack on every machine: each service healthy, unhealthy, completed or
+failed, with why, and the code each stack runs (branch, commit, dirty files, images older than the source). A few
+verbs (logs, restart, start, exec an argv, run a one-off job) act only on what discovery finds; nothing can take a
+stack down, build, pull or prune.
+
+## The clients
+
+| Client | What it is |
+|---|---|
+| Web UI | Served by the daemon: the board, each session's chat and screen, launches, features, memory, files, search, stacks |
+| Terminal UI | `drover tui`: the manager first, then the board, sessions and every web view as tables |
+| Mac app, menu bar, widgets | A native app, a menu bar popover that answers dialogs, and desktop and home-screen widgets |
+| iPhone and watch | The board and chats on the phone with replies from the lock screen; the watch lists what waits and answers with a canned reply or dictation |
+| Chrome and Safari extensions | A popup that asks the manager and answers waiting agents; a side panel that follows one session |
+
+Devices pair with the daemon by a six-digit code that Cole approves on the Mac, and approval is deliberately not an
+op, so no agent or MCP tool can let a device in. The Apple clients are worked examples for [[mac-apps]],
+[[apple-watch-apps]], [[chrome-extensions]] and [[safari-extensions]].
+
+## Using it from an agent
+
+`drover mcp` is an MCP server on standard input and output. Register it once per machine and every Claude Code and
+Codex session gets the `drover_*` tools:
+
+```sh
+claude mcp add --scope user drover -- node ~/code/drover/web/bin/drover mcp
+```
+
+The [drover skill](https://github.com/coletebou/drover/blob/master/skills/drover/SKILL.md) tells agents which tool to
+use for what: `drover_fleet_summary` for who is waiting, `drover_send` to message a session (identify yourself in the
+text), `drover_capture` to read a pane, `drover_launch` to start an agent, `drover_event_append` to record a note,
+`drover_search_fleet` to find what any session said. Cole's `wwa fleet` shorthand ("where we at", fleet-wide) is a
+prompt that uses exactly these tools.
+
+## Installing it
+
+On each machine, with Node 24 and tmux:
+
+```sh
+git clone https://github.com/coletebou/drover ~/code/drover
+ln -s ~/code/drover/web/bin/drover ~/.local/bin/drover
+drover serve      # then keep it running under launchd or a systemd user unit
+drover open
+```
+
+Other machines are SSH aliases with Drover installed at the same path; the list of fleet hosts lives in the dotfiles
+repository next to the truth file. To reach a daemon from a phone, keep it on loopback and publish it on the tailnet
+over HTTPS with `tailscale serve`.
+
+## Gotchas
+
+- **Restart the daemon after pulling new code.** `drover status` names the commit the daemon loaded and says when the
+  checkout has moved past it. Headless agents stop with the daemon (they can be resumed).
+- **Reads are cached.** The board refreshes in the background; pass `fresh: true` when a decision depends on the live
+  value.
+- **Never force past a dialog guard without reading the pane.** A wrong Enter picks an option in someone else's
+  session.
+- **What a bot reads leaves your machines.** Grok bots think on xAI's models, so anything sent to them goes to xAI.
+  Secrets are redacted, but there is no other content filter for the owner's own bots.
+
+Drover was called apx-web until mid-October 2026; the old `apxw` command still works with a deprecation notice until
+November 15.

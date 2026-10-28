@@ -1,0 +1,289 @@
+---
+title: The tmux Keymap
+summary: >-
+  Every key binding in Cole's tmux config: stock prefix keys, one-chord Alt keys for windows and sessions, Alt-a for an
+  instant agent window, SSH-aware splits, phone-friendly control keys and the mouse.
+table: shell
+folio: 12
+aliases: [tmux key bindings, tmux bindings]
+updated: 2026-10-28
+sources:
+  - title: tmux(1) manual
+    url: https://man.openbsd.org/tmux.1
+  - title: Cole's tmux.conf (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/tmux.conf
+  - title: tmux-sensible
+    url: https://github.com/tmux-plugins/tmux-sensible
+  - title: Tmux Plugin Manager (TPM)
+    url: https://github.com/tmux-plugins/tpm
+  - title: tmux-resurrect
+    url: https://github.com/tmux-plugins/tmux-resurrect
+  - title: Ghostty config reference
+    url: https://ghostty.org/docs/config/reference
+---
+
+Cole's tmux keymap keeps the stock bindings worth keeping, adds one-chord Alt keys for moving between windows and
+sessions, and gives agents keys of their own: <kbd>Alt</kbd>+<kbd>a</kbd> opens a Claude Code window on the spot, and
+a new window opened from an SSH pane lands on the same server. This page is the full reference for every binding in
+[[tmux]]'s config file, with the reason each one exists.
+
+<Diagram name="tmux-keymap" />
+
+The keyboard above is drawn from the same file the tables below come from,
+[base/tmux.conf](https://github.com/coletebou/dx/blob/master/base/tmux.conf). Pick a key to see what it does on its own
+and after the prefix.
+
+## How to read the bindings
+
+tmux has two kinds of keys. **Prefix keys** take two steps: press the prefix, <kbd>Ctrl</kbd>+<kbd>b</kbd> by default,
+let go, then press the key. **Root keys** fire on their own, with no prefix, and tmux catches them before the program
+in the pane ever sees them. The config writes root keys as `bind -n`.
+
+tmux's own notation shows up in the config: `C-b` is <kbd>Ctrl</kbd>+<kbd>b</kbd>, and `M-h` is
+<kbd>Alt</kbd>+<kbd>h</kbd> (M for Meta, the old name for Alt). An uppercase letter means Shift, so `M-S` is
+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>s</kbd>.
+
+Cole keeps the stock prefix. Windows and panes are numbered from 1, not 0, so the first window sits under the 1 key,
+and `renumber-windows` closes the gaps when a window goes away.
+
+## No-prefix Alt bindings
+
+These are the everyday movement keys. Each one is a single chord, which matters on a phone keyboard in [[termius]],
+where every extra keystroke is a tap.
+
+| Keys | What it does | Why |
+|---|---|---|
+| <kbd>Alt</kbd>+<kbd>h</kbd> | Previous window | One chord, phone-friendly, h is left in vim |
+| <kbd>Alt</kbd>+<kbd>l</kbd> | Next window | One chord, l is right in vim |
+| <kbd>Alt</kbd>+<kbd>s</kbd> | Next session, wrapping around | Hop between projects without a picker |
+| <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>s</kbd> | Previous session | The reverse of Alt-s |
+| <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>9</kbd> | Jump to window 1 to 9 | Direct jumps; windows start at 1 |
+| <kbd>Alt</kbd>+<kbd>a</kbd> | New window named `yolo` running Claude Code with permission prompts off | An agent, right now, in this directory |
+| <kbd>Alt</kbd>+<kbd>y</kbd> | Kill the current window, no confirmation | Faster than the stock `&`, which asks first |
+| <kbd>Alt</kbd>+<kbd>c</kbd> | Capture the whole pane's scrollback into tmux's paste buffer | Paste it into any pane with prefix `]` |
+| <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>c</kbd> | Copy the whole scrollback to the system clipboard | Works on macOS, WSL, Wayland, X11, and over SSH |
+| <kbd>Ctrl</kbd>+<kbd>k</kbd> | Clear the pane's scrollback history | A clean slate before a noisy command |
+
+The config block for the movement keys, exactly as written:
+
+```tmux
+# Quick window switching with Alt+number
+bind -n M-h previous-window    # Alt+h = previous window (mobile-friendly)
+bind -n M-l next-window        # Alt+l = next window (mobile-friendly)
+bind -n M-s switch-client -n   # Alt+s = next session (cycles, wraps)
+bind -n M-S switch-client -p   # Alt+Shift+s = previous session
+```
+
+The two copy keys differ in where the text goes. <kbd>Alt</kbd>+<kbd>c</kbd> runs `capture-pane -S - -E -`, which
+grabs everything from the top of the history to the bottom, and keeps it inside tmux. The shifted version runs a small
+helper,
+[tmux-copy-buffer.sh](https://github.com/coletebou/dx/blob/master/base/tmux-copy-buffer.sh), that picks whichever
+clipboard tool exists (`pbcopy` on a Mac, `clip.exe` in [[wsl|WSL]], `wl-copy`, `xclip` or `xsel` on Linux desktops)
+and, inside an SSH session with none of those, hands the text to tmux, which sends it to your local terminal as an
+OSC 52 escape sequence. That last path is how a whole agent transcript on a server ends up on the laptop's clipboard.
+
+## Prefix bindings
+
+### Windows and splits
+
+| Keys | What it does |
+|---|---|
+| prefix <kbd>c</kbd> | New window right after the current one, in the current directory. If the pane is running `ssh`, the new window is already connected to the same host |
+| prefix <kbd>Ctrl</kbd>+<kbd>c</kbd> | New window, always local, even from an SSH pane |
+| prefix <kbd>&#124;</kbd> | Split side by side (SSH-aware, like prefix c) |
+| prefix <kbd>-</kbd> | Split top and bottom (SSH-aware) |
+
+The stock prefix <kbd>c</kbd> opens a window at the next free number, usually the end of the list, in the session's
+working directory. Cole's version inserts it right after the current window (`-a`), in the directory you are in, which
+keeps related windows next to each other.
+
+The SSH part is the clever bit. When the pane is running `ssh`, the binding calls
+[tmux-ssh-inherit.sh](https://github.com/coletebou/dx/blob/master/base/tmux-ssh-inherit.sh), which reads the `ssh`
+command line back from the process table, keeps the connection options, drops any remote command, and opens the new
+window already logged in to the same host. If the remote shell reports its working directory (Cole's zsh does, with an
+OSC 7 escape sequence on every prompt), the new window even lands in the same remote directory. The window is named for
+the host and pinned, so it does not get renamed to a useless `ssh`. Before this, every new window from a server pane
+meant retyping the `ssh` and the `cd`. For non-SSH panes the helper does exactly what the plain binding would. The
+[[ssh]] page covers the details, including why it only looks at direct children of the pane's shell (a jump host
+starts a second `ssh` that must not be replayed).
+
+Prefix <kbd>Ctrl</kbd>+<kbd>c</kbd> is the escape hatch, in the config's own words:
+
+```tmux
+# Escape hatch: always a LOCAL window, even from an ssh'd pane. Same key as the
+# stock new-window, plus Ctrl — mnemonically "c, but don't be clever".
+bind C-c new-window -a -c "#{pane_current_path}"
+```
+
+Cole's description of the keymap puts it this way: "custom tmux bindings like Alt-H and Alt-L, in addition to the
+standard ones like Ctrl-B and Ctrl-C to start new windows or Alt-A to start an agentic window off the bat".
+
+### Agent windows
+
+| Keys | What it does |
+|---|---|
+| prefix <kbd>a</kbd> | New window named `yolo` running `claude --dangerously-skip-permissions` in the current directory |
+| <kbd>Alt</kbd>+<kbd>a</kbd> | The same, without the prefix |
+| prefix <kbd>Shift</kbd>+<kbd>a</kbd> | New window named `claude` running Claude Code with a first message of "hi", permission prompts on |
+
+"Yolo" is the nickname for running [[claude-code|Claude Code]] with its permission prompts switched off, the same mode
+the [[yu]] launcher uses. Here is the binding:
+
+```tmux
+bind a new-window -a -n yolo -c "#{pane_current_path}" 'exec zsh -lic "claude --dangerously-skip-permissions"' \; setw automatic-rename off
+```
+
+Two details make it work. First, `setw automatic-rename off` keeps the name `yolo`, so the window stands out in the
+[[tmux-status-line|status line]] instead of turning into `claude` or a directory name. Second, the command runs inside
+`zsh -lic`, a login, interactive zsh. The comment in the config explains why: without it, tmux runs the command through
+a bare `sh -c` that inherits the tmux *server's* environment, frozen at whatever moment the server started. An API key
+or cloud token that rotated since then is stale in that snapshot, and the agent fails with an authentication error. The
+`zsh -lic` wrapper reads the shell startup files, which load the current credentials from `~/.env_secrets`. That is
+also why typing `claude` by hand in a fresh window always worked while a raw command binding did not.
+
+Since agent windows open in the current directory, the natural move is to `cd` into a repository or a
+[[git-worktrees|worktree]] and hit <kbd>Alt</kbd>+<kbd>a</kbd>. For many agents at once, the
+[[parallel-worktrees]] launcher creates the windows and types the launch commands itself.
+
+### Mobile-friendly control keys
+
+| Keys | Sends | Normally means |
+|---|---|---|
+| prefix <kbd>k</kbd> | <kbd>Ctrl</kbd>+<kbd>c</kbd> | Interrupt the running program |
+| prefix <kbd>q</kbd> | <kbd>Ctrl</kbd>+<kbd>d</kbd> | End of input, exits a shell |
+| prefix <kbd>z</kbd> | <kbd>Ctrl</kbd>+<kbd>z</kbd> | Suspend the program |
+| prefix <kbd>l</kbd> | <kbd>Ctrl</kbd>+<kbd>l</kbd> | Clear the screen |
+
+```tmux
+# Mobile-friendly bindings (after Ctrl+B prefix)
+bind k send-keys C-c          # Ctrl+B then k = Ctrl+C (kill/interrupt)
+bind q send-keys C-d          # Ctrl+B then q = Ctrl+D (exit/EOF)
+bind z send-keys C-z          # Ctrl+B then z = Ctrl+Z (suspend)
+bind l send-keys C-l          # Ctrl+B then l = Ctrl+L (clear)
+```
+
+On a phone, the control keys live in an extra row above the on-screen keyboard. Once the prefix is a key you can reach,
+every other control character becomes the prefix plus a plain letter, typed on the normal keyboard.
+
+### The bar, the mouse and the config
+
+| Keys | What it does |
+|---|---|
+| prefix <kbd>s</kbd> | Session chooser, colored like the status bar |
+| prefix <kbd>w</kbd> | Window chooser, colored like the status bar |
+| prefix <kbd>b</kbd> | Hide the status bar, or bring it back (with its second row on tmux 3.7 and newer) |
+| prefix <kbd>Shift</kbd>+<kbd>b</kbd> | Switch between a one-row and a two-row bar (tmux 3.7 and newer) |
+| prefix <kbd>Shift</kbd>+<kbd>m</kbd> | Turn mouse mode on or off |
+| prefix <kbd>r</kbd> | Reload the config and say "Config reloaded" |
+
+The choosers are tmux's stock `choose-tree` with a color wrapper: the current session in bold gold, every window in its
+activity color, a handoff badge on windows whose agent handed off. The [[tmux-status-line]] page explains the colors.
+
+## Keys from the plugins
+
+The config loads three plugins through the Tmux Plugin Manager, and they bring keys of their own.
+
+| Keys | From | What it does |
+|---|---|---|
+| prefix <kbd>Shift</kbd>+<kbd>i</kbd> | TPM | Install the plugins listed in the config |
+| prefix <kbd>Shift</kbd>+<kbd>u</kbd> | TPM | Update plugins |
+| prefix <kbd>Alt</kbd>+<kbd>u</kbd> | TPM | Remove plugins no longer listed |
+| prefix <kbd>Ctrl</kbd>+<kbd>s</kbd> | tmux-resurrect | Save every session, window and pane layout |
+| prefix <kbd>Ctrl</kbd>+<kbd>r</kbd> | tmux-resurrect | Restore the saved layout |
+| prefix <kbd>Ctrl</kbd>+<kbd>p</kbd> / <kbd>Ctrl</kbd>+<kbd>n</kbd> | tmux-sensible | Previous and next window, holding Ctrl |
+| prefix <kbd>Shift</kbd>+<kbd>r</kbd> | tmux-sensible | Reload the config (a second way) |
+
+tmux-sensible only binds a key that is still free, so Cole's own bindings win. That matters for prefix <kbd>b</kbd>,
+which sensible would otherwise turn into "last window".
+
+Restore is manual on purpose (`@continuum-restore 'off'`). After a restore, two hooks Cole added put every agent back:
+the save hook records which Claude Code or [[codex|Codex]] conversation ran in which pane, and the restore hook types
+`claude --resume <id>` or `codex resume <id>` into each one. The [[tmux#saving-and-restoring-sessions|tmux page]]
+covers how that works and the gap it closes.
+
+## Stock keys that still matter
+
+Everything not overridden keeps its default. The ones worth knowing:
+
+| Keys | What it does |
+|---|---|
+| prefix <kbd>d</kbd> | Detach: tmux and everything in it keeps running |
+| prefix <kbd>[</kbd> | Copy mode, to scroll and select with the keyboard |
+| prefix <kbd>]</kbd> | Paste the most recent tmux buffer |
+| prefix <kbd>,</kbd> | Rename the window |
+| prefix <kbd>$</kbd> | Rename the session |
+| prefix <kbd>n</kbd> / <kbd>p</kbd> | Next and previous window |
+| prefix <kbd>(</kbd> / <kbd>)</kbd> | Previous and next session |
+| prefix <kbd>1</kbd> to <kbd>9</kbd> | Jump to a window |
+| prefix arrow keys | Move between panes |
+| prefix <kbd>o</kbd> | Next pane |
+| prefix <kbd>x</kbd> | Kill the pane, after a yes or no |
+| prefix <kbd>&amp;</kbd> | Kill the window, after a yes or no |
+| prefix <kbd>"</kbd> / <kbd>%</kbd> | Stock splits, top and bottom or side by side, without the SSH inheritance |
+| prefix <kbd>?</kbd> | List every binding, the quickest way to check this page against a live server |
+| prefix <kbd>:</kbd> | The tmux command prompt |
+
+## Keys Cole gave up
+
+Rebinding a stock key means losing what it did. The trades in this config:
+
+| Key | Stock meaning | Now |
+|---|---|---|
+| prefix <kbd>z</kbd> | Zoom the pane to full window | Sends Ctrl-Z |
+| prefix <kbd>q</kbd> | Show pane numbers | Sends Ctrl-D |
+| prefix <kbd>l</kbd> | Last window | Sends Ctrl-L |
+| prefix <kbd>-</kbd> | Delete the newest paste buffer | Split top and bottom |
+| prefix <kbd>Shift</kbd>+<kbd>m</kbd> | Clear the marked pane | Toggle the mouse |
+| prefix <kbd>r</kbd> | Redraw the client | Reload the config |
+
+Zoom is the one people miss. It is still a command away: prefix <kbd>:</kbd> then `resize-pane -Z`, or bind it to a
+free key of your own.
+
+## The mouse
+
+Mouse mode is on. Clicking a pane focuses it, dragging selects text, and clicking a window name on the first status
+row, or a session name on the second, switches to it. Prefix <kbd>Shift</kbd>+<kbd>m</kbd> turns the mouse off when you
+would rather the outer terminal own selection.
+
+Two mouse behaviors are deliberate changes:
+
+- **Selecting does not throw you back to the bottom.** Stock tmux copies a selection when you release the button and
+  then leaves copy mode, which snaps the view to the live end of the output and loses your place. Cole's config copies
+  and stays put, at the same scroll position, until you press <kbd>q</kbd> or <kbd>Esc</kbd> or scroll back down.
+- **The scroll wheel is inverted on purpose.** A [[termius]] update flipped which wheel events a finger swipe on the
+  phone sends. Rather than relearn, Cole re-inverted tmux so a finger-up swipe again reveals older output, and flipped
+  the desktop to match so both feel the same. Each wheel tick moves five lines, and scrolling past the bottom leaves
+  copy mode. Programs that capture the mouse themselves, like vim with `mouse=a`, get the raw events and are not
+  inverted.
+
+## Two sharp keys
+
+**<kbd>Ctrl</kbd>+<kbd>k</kbd> never reaches your programs.** It is a root binding, so tmux eats it in every pane. That
+includes the shell, where <kbd>Ctrl</kbd>+<kbd>k</kbd> normally deletes from the cursor to the end of the line. If you
+copy this config and miss that shortcut, drop the `bind -n C-k clear-history` line.
+
+**<kbd>Alt</kbd>+<kbd>y</kbd> does not ask.** It kills the window and every pane in it at once. An agent's conversation
+survives on disk, so `cr` or `yur` from the [[yu]] page can resume it, but whatever a shell was running is gone.
+
+## Making Alt keys work
+
+Alt bindings only work if the terminal sends Alt as a modifier. Two settings make that true:
+
+- **On a Mac,** the Option key types accented characters by default (Option-h is ˙), and tmux never sees an Alt key.
+  Cole's [[ghostty]] config sets `macos-option-as-alt = left`, so the left Option key acts as Alt and the right one
+  still types accents.
+- **Inside tmux,** the config turns on extended keys in the CSI u format (`extended-keys on`,
+  `extended-keys-format csi-u`). Without it, Ghostty's encodings for Alt and Ctrl combinations leak into panes as
+  literal escape characters instead of reaching the program.
+
+On the phone, [[termius]] has Alt in its extra key row. On a board like Cole's
+[[mechanical-keyboard|mechanical keyboard]], the Mac and Windows switch remaps the modifier row: Option and Command for
+the Mac, Alt and the Windows key for a PC.
+
+## Copy the keymap
+
+The whole file is public: take the parts you like from
+[base/tmux.conf](https://github.com/coletebou/dx/blob/master/base/tmux.conf). The SSH-aware keys need
+`tmux-ssh-inherit.sh` next to it, and the bindings check for that script and fall back to plain splits when it is
+missing. After an edit, prefix <kbd>r</kbd> reloads. The rest of the setup is on the [[tmux]] page, the session picker
+that sits in front of it is [[tm]], and the [[dotfiles]] page explains how the file gets onto every machine.

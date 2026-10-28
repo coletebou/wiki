@@ -1,0 +1,140 @@
+---
+title: Homebrew and the Brewfile
+summary: >-
+  Homebrew installs command-line tools and Mac apps; a Brewfile lists them all in one file. Cole's covers the CLI kit,
+  dev tools, GNU utilities, GUI apps, a Nerd Font and editor extensions, installed with one brew bundle.
+table: shell
+folio: 20
+aliases: [brew, brewfile, brew bundle]
+updated: 2026-10-28
+sources:
+  - title: Homebrew
+    url: https://brew.sh/
+  - title: Homebrew Bundle and the Brewfile (Homebrew docs)
+    url: https://docs.brew.sh/Brew-Bundle-and-Brewfile
+  - title: Homebrew formulae and casks
+    url: https://formulae.brew.sh/
+  - title: Cole's zshenv (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/zshenv
+---
+
+Homebrew is the package manager most Mac developers use: one command installs a command-line tool, an app or a font,
+and keeps it updated. A Brewfile lists everything a machine should have in a single file, and one `brew bundle` makes
+the machine match it. Cole's Brewfile is the package half of the [[bootstrap-script|bootstrap script]] on every Mac,
+including the [[mac-mini|Mac mini]].
+
+## How Homebrew works
+
+[Homebrew](https://brew.sh/) installs software into its own prefix, `/opt/homebrew` on Apple silicon Macs and
+`/usr/local` on Intel ones, so it never fights with the files macOS itself ships. It knows three kinds of things:
+
+- **Formulae** are command-line tools and libraries: `brew install ripgrep`.
+- **Casks** are Mac apps, fonts and other bundles: `brew install --cask ghostty`.
+- **Taps** are extra repositories of formulae and casks, like `oven-sh/bun` for the bun JavaScript runtime.
+
+The installer is a single command from the Homebrew home page:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Homebrew also runs on Linux, in a prefix of its own. Cole's Linux machines use apt for their packages instead, but the
+shell setup puts a Linux Homebrew prefix on the path if one exists.
+
+## The Brewfile
+
+A Brewfile is a Ruby file with one line per thing to install. Homebrew Bundle reads it. The top of Cole's says how to
+use it:
+
+```ruby
+# Install: brew bundle --file=~/.dotfiles/Brewfile
+# Check:   brew bundle check --file=~/.dotfiles/Brewfile
+# Cleanup: brew bundle cleanup --file=~/.dotfiles/Brewfile
+```
+
+- `brew bundle` installs whatever is missing, and by default also upgrades anything outdated. Pass `--no-upgrade`, or
+  set `HOMEBREW_BUNDLE_NO_UPGRADE=1`, to skip upgrades.
+- `brew bundle check` changes nothing and says whether everything in the file is installed. With `--verbose` it names
+  what is not.
+- `brew bundle cleanup` lists what is installed but not in the file; with `--force` it removes it.
+- `brew bundle dump` goes the other way: it writes a Brewfile from what a machine already has, which is the easiest
+  way to start one.
+
+Because a Brewfile is Ruby, it can hold logic. Homebrew's docs show lines like `brew "gnupg" if OS.mac?`.
+
+## What is in Cole's
+
+| Group | Entries |
+|---|---|
+| Core command-line tools | bat, fd, fzf, htop, jq, mas, GNU nano, ncdu, ripgrep, tmux, tree |
+| Developer tools | cmake, fnm, node, bun, go, pipx, gh, git, git-delta, starship |
+| Networking | cloudflared, mtr |
+| Media and documents | ffmpeg, poppler |
+| Shell plugins | zsh-autosuggestions, zsh-syntax-highlighting |
+| Modern replacements | eza for `ls`, lazygit, zoxide for `cd` |
+| Cloud | awscli, and the Google Cloud CLI as a cask |
+| Containers | colima, docker, lima, for local Docker without Docker Desktop |
+| Git and security | git-filter-repo, gitleaks, age, chafa |
+| GNU utilities | coreutils, gnu-sed, findutils, gawk |
+| Fun | figlet, fortune, ttyd |
+| Apps | Brave, Chrome, Ghostty, mitmproxy, VS Code, Bitwarden, Claude, Linear, Maccy, Mos, Wispr Flow, Tailscale, Google Antigravity |
+| Fonts | MesloLGS Nerd Font |
+| VS Code extensions | Claude Code, Remote SSH and Dev Containers, Python, YAML, Tailwind, GitHub Actions and more |
+
+A few entries are worth calling out:
+
+- **[[ghostty|Ghostty]]** is the desktop terminal, and **[[wispr-flow|Wispr Flow]]** the dictation app.
+- **Tailscale** is listed as `tailscale-app`, the cask's name since the upstream rename, which puts the
+  [[tailscale|Tailscale]] client on every Mac.
+- **Mos** smooths a mouse wheel's scrolling on macOS and lets you set the mouse's scroll direction separately from the
+  trackpad's, which matters with a wheel mouse like the one on the [[mice]] page.
+- **ripgrep, fd and fzf** are the search trio: ripgrep for file contents ([[grep-ripgrep-ugrep]]), fd for file names,
+  and fzf for picking from any list, as in [[tm]].
+- **htop and ncdu** answer "what is eating the CPU" and "what is eating the disk" ([[system-utilities]]).
+- **The Nerd Font** is for the icons in the [[starship|Starship]] prompt and `eza --icons`. Ghostty draws those glyphs
+  even without it, but a browser-based terminal can only use fonts installed on the system.
+- **GNU nano**, because the `nano` that ships with macOS is a link to pico, without syntax highlighting.
+
+## Tricks in the file
+
+**GNU tools under a `g` prefix.** macOS ships the BSD versions of `sed`, `find`, `date` and friends, and they differ
+from the GNU versions on Linux in ways that break scripts (see [[posix]]). The Brewfile installs the GNU versions as
+`gsed`, `gfind`, `gdate` and so on, rather than replacing the BSD ones that macOS itself depends on:
+
+```ruby
+brew "coreutils"   # gtac, gdate, gls, gtimeout, gcp, gmv, ~100 more
+brew "gnu-sed"     # gsed (handles -i without empty-string arg quirk)
+```
+
+**A conditional cask.** An App Store copy of Bitwarden updates through the App Store, and the cask cannot install or
+upgrade over it, so the line skips the cask on a Mac that has the App Store version:
+
+```ruby
+cask "bitwarden" unless File.exist?("/Applications/Bitwarden.app/Contents/_MASReceipt")
+```
+
+**What is deliberately not here.** The Codex CLI is installed as an npm global by the installer instead, so every
+machine, Mac or Linux, Intel or ARM, gets the same binary and version; a Homebrew `codex` would fight it for the
+command name. macOS preferences, like tap to click, cannot live in a Brewfile at all; a separate script that the
+installer runs sets them with `defaults write`.
+
+**Check after a failure.** One broken cask makes `brew bundle` report every entry as failed. Cole's installer runs
+`brew bundle check --verbose` afterward and reports only the entries that are really missing, and it uninstalls
+retired formulae that would otherwise block others from linking.
+
+## Homebrew first on the path
+
+Cole's `zshenv` puts Homebrew's directories ahead of the system ones in every zsh, login or not, including the shells
+that SSH commands and agents' tools start. The comment explains the failure it prevents: a launcher can hand a shell a
+`PATH` in system order, and then `bash` means macOS's `/bin/bash`, version 3.2. A background service once started
+every agent that way, and the scripts that need a modern bash refused to run. With Homebrew's directories first, any
+tool Homebrew installed, a current bash included, wins over the old system copy in every shell.
+
+## Set it up
+
+1. Install Homebrew with the command above, and follow its note about adding `brew shellenv` to your shell.
+2. Start a Brewfile with `brew bundle dump`, or write one by hand, and keep it in your [[dotfiles]].
+3. Run `brew bundle --file=path/to/Brewfile` on each Mac, and `brew bundle check` whenever you wonder whether a
+   machine is complete.
+
+The [[package-managers]] page covers npm, bun and pnpm, the package managers for JavaScript projects themselves.

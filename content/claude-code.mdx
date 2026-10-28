@@ -1,0 +1,207 @@
+---
+title: Claude Code
+summary: >-
+  Anthropic's agentic coding tool for the terminal, and the engine of Cole's setup: almost all work is a Claude Code
+  session in a tmux window, started with yu, wrapped in hooks and steered through Drover.
+table: automata
+folio: 27
+aliases: [Claude Code CLI]
+updated: 2026-10-28
+sources:
+  - title: Claude Code documentation
+    url: https://code.claude.com/docs/en/setup
+  - title: Claude Code permission modes
+    url: https://code.claude.com/docs/en/permission-modes
+  - title: Claude Code sessions
+    url: https://code.claude.com/docs/en/sessions
+  - title: Claude Code context window and compaction
+    url: https://code.claude.com/docs/en/context-window
+  - title: Cole's universal agent rules (CLAUDE.base.md in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/claude/CLAUDE.base.md
+  - title: Cole's Claude Code settings (settings.base.json in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/claude/settings.base.json
+---
+
+Claude Code is Anthropic's agentic coding tool: a model in your terminal that reads files, runs commands, edits code
+and keeps going until the job is done. It is the engine of Cole's whole setup. On any given day nearly all the work,
+on the Mac mini and on the AWS servers alike, is a Claude Code session running in its own [[tmux]] window, started
+with [[yu]], wrapped in [[hooks]], and visible to every other session through [[drover|Drover]].
+
+This page covers how Cole configures and runs it. The pieces that grew around it have pages of their own: the
+[[agent-fleet|agent fleet]] (how many sessions work together), [[skills-and-plugins|skills and plugins]],
+[[mcp|MCP servers]], [[lsp|language servers]], and the session lifecycle tools ([[handoff-chains]], [[cc-park]],
+[[context-and-compaction]]).
+
+## What it is
+
+A Claude Code session is a conversation with tools. You type a request; the model decides to read a file, run a
+shell command, search, edit, or start a subagent; Claude Code runs the tool (asking first, unless a permission mode
+says otherwise) and feeds the result back. Everything is written to a transcript, a JSON Lines file under
+`~/.claude/projects/<project>/<session id>.jsonl`, one record per message or tool call, each with its own id. That
+transcript is what makes the rest of Cole's tooling possible: [[message-ids|message ids]], handoffs, Langfuse traces
+and fleet-wide search all read it.
+
+The parts that matter most here:
+
+| Part | What it does | In Cole's setup |
+|---|---|---|
+| Tools | Read, Edit, Bash, Grep, web fetch, subagents, MCP tools | Bash and the file tools do most of the work |
+| Permission modes | How much runs without asking | `auto` by default, bypass through `yu` |
+| `CLAUDE.md` | Instructions loaded into every session | One universal rules file plus per-repo files |
+| Auto memory | Notes Claude keeps per repository | Curated nightly by Cole's memory tooling (see [[reflection-store]]) |
+| [[hooks\|Hooks]] | Commands that run at lifecycle events | Close to twenty scripts, on every machine |
+| [[skills-and-plugins\|Skills and plugins]] | Packaged instructions and tools | A public marketplace, [dx](https://github.com/coletebou/dx) |
+| [[mcp\|MCP]] | External tool servers | Drover, Playwright, the [[shared-brain]], docs servers |
+| Subagents | Child agents with their own context | Capped at about three per coordinator |
+
+## Installing it
+
+The official installer is one line on macOS, Linux and WSL:
+
+```sh
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+Homebrew (`brew install --cask claude-code`) and WinGet work too, but those do not auto-update by default. Then run
+`claude` in a repository, sign in, and accept the folder trust dialog. On a new machine Cole does not configure
+anything by hand: the [[bootstrap-script]] and [[dotfiles]] generate the settings, link the skills and register the
+MCP servers.
+
+## How Cole launches it
+
+Plain `claude` works, but Cole almost never types it. The shell function `yu` (from Cole's
+[[dotfiles]], covered on [[yu]]) starts Claude Code with `--dangerously-skip-permissions`, and adds `--effort=max`
+when the session will start on Opus 5.5, because no settings file can keep `max` as a saved default. Its siblings
+resume (`yur`), continue (`yuc`) or route the session through Amazon Bedrock (`yuma`), so a big fan-out can run on AWS
+capacity instead of one subscription's limits.
+
+Every session gets its own tmux window. <kbd>Alt</kbd>+<kbd>a</kbd> opens a fresh agent window (see
+[[tmux-keymap]]), [[tm]] finds a session again later, and a hook renames the window to the session's `/rename`
+title so the tab bar reads like a task list. The [[claude-code-status-line]] shows the model, context use, cost,
+git state and handoff state on one line.
+
+### Permission modes
+
+Claude Code's documented modes run from `default` (reads only) through `acceptEdits`, `plan` and `auto` to
+`bypassPermissions`. Cole's settings make `auto` the default for any session started without a flag: a separate
+classifier model reviews each action and blocks what goes beyond the request, so routine work needs no prompts.
+`yu` goes further, to bypass, which skips the checks entirely.
+
+The docs are blunt that bypass belongs in isolated environments, and that is a real tradeoff. Cole accepts it for
+interactive work in a terminal, with the guard rails living in rules, hooks and git instead: the password vault is
+never unlocked inside an agent's environment and secrets are tested for, never printed (see [[env-files]]), a
+pre-push secret scan blocks leaks, a merge gate blocks `gh pr merge` while review findings are unanswered, and a
+standing rule forbids destructive git commands.
+
+<ColesTake>
+
+`yu` is how I start almost every session. Approving a prompt every thirty seconds defeats the point of running a
+dozen agents at once. Auto mode is the safer default, and that is what a session gets when I do not ask for more.
+
+</ColesTake>
+
+## The settings
+
+Claude Code reads `~/.claude/settings.json`, but on Cole's machines nobody edits that file. The installer generates
+it by merging layers: the shared base, the identity's settings, the machine's role and a machine-local file that is
+never committed. A later layer's hooks add to the earlier ones instead of replacing them. Change a source file, run
+`dotsync`, and every machine regenerates its settings.
+
+A few choices in the base layer, each with a reason in the file itself:
+
+| Setting | Value | Why |
+|---|---|---|
+| `permissions.defaultMode` | `auto` | Few prompts, with background safety checks |
+| `effortLevel` | `xhigh` | The highest level a settings file keeps; `yu` adds `max` on Opus |
+| `idleCompaction` | `false` | Sessions sit idle for hours at a 1M context and should come back whole |
+| `autoDreamEnabled` | `false` | Cole runs a separate nightly memory pass, with a single writer |
+| `cleanupPeriodDays` | `3650000` | Transcripts are never deleted; search, traces and reflections read them |
+| `attribution` | empty | No co-author trailer on commits and pull requests |
+| `env.BW_SESSION` | empty | An unlocked password-manager session never reaches an agent |
+| `statusLine` | `statusline.sh` | The custom status line, with its own test suite |
+
+There is also a playful one: `spinnerVerbs` appends a list of liturgical verbs ("Genuflecting", "Swinging the
+censer", "Illuminating") to the spinner, which suits a wiki styled after a Renaissance notebook.
+
+The plugins it enables include the official TypeScript, Pyright and Swift language servers, Playwright, Context7,
+`code-simplifier`, `commit-commands`, `feature-dev` and Cloudflare's skills. One popular plugin is deliberately off:
+its startup hook tells every session to invoke a skill before any reply, which fought Cole's own routing.
+
+## The rules every session gets
+
+Cole keeps one universal rules file, `CLAUDE.base.md`, that loads into every session on every machine, with
+identity-specific additions layered on top. The [public copy](https://github.com/coletebou/dx/blob/master/base/claude/CLAUDE.base.md)
+is worth reading in full; the short version:
+
+- **Communication.** Keep answers tight. Quote exact errors. When naming code as a cause, say whether you read it or
+  ran it. `wwa` ("where we at") means re-check everything still running and answer in a few lines.
+- **Todo list.** Build one from the prompt and any handoff brief, keep it current, and carry unfinished items to the
+  next session.
+- **Definition of done.** Never edit, skip or delete a test to make it pass. Done means the real flow ran end to end;
+  the final report says what was verified, how, and what was not. More on this in [[testing]].
+- **Safety.** Fix root causes. No destructive git commands unless asked. Formatting tools stay off unless requested.
+- **Architecture.** Humans own the big picture: new locks, polling, or a new persistence layer need a stated failure
+  mode and a human design review first.
+- **Parallelism.** Use subagents for independent side work, at most about three at a time; move to
+  [[parallel-worktrees|worktrees]] when writers would touch the same files or build state.
+- **Git.** `git switch` and `git restore`, never `git checkout`; Conventional Commits; small commits. See [[git]].
+- **Verification.** A negative result ("403", "doesn't work") counts only with controls: the same input succeeds on a
+  known-good path, and a known-bad input fails the same way.
+
+<ColesTake>
+
+When in doubt, ship first and ask questions later. If I tell an agent to do something and come back an hour later to
+find it blocked on a question it hit five minutes in, that is fifty-five minutes wasted. I can always correct it or
+restart it.
+
+</ColesTake>
+
+## Sessions and their lifecycle
+
+A session lives longer than one conversation. Claude Code can resume one by id or name (`claude --resume`,
+`/resume`), fork it (`/branch`), rename it (`/rename`) and keep it working toward a condition (`/goal`). Cole's hooks
+build on each of those:
+
+- After `/branch`, a hook reopens the original conversation in a new tmux window, so both stay at hand.
+- When a session fills its context, the [[context-and-compaction|context advisor]] suggests a fresh one, and the
+  [[handoff-chains|handoff tooling]] moves the work to a successor with a written brief.
+- Idle sessions get parked by [[cc-park]], which frees their memory and leaves the resume command typed in the pane.
+- Background reflections file what each session learned and left open in the [[reflection-store]].
+- When a session ends, its transcript goes to [[langfuse|Langfuse]] as one trace, for cost and behavior analysis
+  (see [[observability]]).
+
+Sessions also talk to each other. Claude Code has built-in cross-session messaging on one machine, and
+[[drover|Drover]] extends it across machines; see [[agent-messaging]].
+
+## Subagents
+
+A subagent is a child agent with its own context window, started with the Agent tool. It is the cheapest way to read
+twenty files without filling the main conversation. Cole's `SubagentStart` hook hands every subagent the same
+contract: do the assignment directly, return file paths, commands and evidence, say what was and was not verified,
+and start further subagents only when its own instructions call for it. Coordinators often forget to restate those
+rules, so the hook does it for them.
+
+## Models and plans
+
+Cole runs the main sessions on Opus at the highest effort, and the background passes on cheaper models: a Haiku pass for
+the first reflection checkpoint, Sonnet for later ones. Claude Code also runs on Amazon Bedrock, and Cole uses that
+route for overflow so a large fan-out is not capped by one plan.
+
+On the subscription side, Cole pays for Claude Max 20x (<Price id="claude-max-20x" />), because a fleet of parallel
+sessions burns through the lower tiers' limits. Most people should start lower: Claude Pro (<Price id="claude-pro" />)
+is the entry plan, and Max 5x (<Price id="claude-max-5x" />) is the step up when you hit its limits. The
+[[what-it-costs|cost page]] puts these next to the rest of the bill.
+
+## Gotchas
+
+- **`~/.claude/settings.json` is generated.** On Cole's machines a direct edit is overwritten on the next install.
+  Edit the source layer instead.
+- **`/effort` and `/model` save a new default.** Typed inside a session, they overwrite the global setting for every
+  later session. Launch-time flags affect one session only, which is why Drover and the launchers pass them.
+- **Project settings cannot set `auto` or bypass.** Claude Code ignores those two values in a repository's
+  `.claude/settings.json`; only user or managed settings can choose them.
+- **Workspace trust comes first.** Even in bypass mode, a new folder shows the trust dialog. Drover's launcher records
+  the folder as trusted before starting an agent, and the handoff tool refuses a target folder Claude Code does not
+  trust, so unattended sessions never sit at that prompt.
+- **A session is not free while idle.** Each one holds hundreds of megabytes, plus its MCP servers and language
+  servers. That is what [[cc-park]] is for.

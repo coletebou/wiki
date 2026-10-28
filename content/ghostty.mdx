@@ -1,0 +1,163 @@
+---
+title: Ghostty
+summary: >-
+  The terminal on Cole's desktop: a fast, native, GPU-accelerated terminal for macOS and Linux, free and open source.
+  Cole's config line by line, and how it fits with tmux, SSH and the Alt-key bindings.
+table: desk
+folio: 9
+aliases: [ghostty terminal]
+updated: 2026-10-28
+sources:
+  - title: About Ghostty
+    url: https://ghostty.org/docs/about
+  - title: Ghostty config reference
+    url: https://ghostty.org/docs/config/reference
+  - title: Ghostty keybind action reference
+    url: https://ghostty.org/docs/config/keybind/reference
+  - title: Ghostty terminfo help
+    url: https://ghostty.org/docs/help/terminfo
+  - title: Ghostty on GitHub
+    url: https://github.com/ghostty-org/ghostty
+---
+
+Ghostty is the terminal on Cole's desktop, the way [[termius]] is the terminal on the phone. It is a fast, native
+terminal emulator for macOS and Linux, free and open source (<Price id="ghostty" />), and it is where
+[[tmux]], every agent and every SSH session are drawn. Its config is a short plain-text file, and Cole's is tuned so
+the terminal stays out of tmux's way.
+
+## What Ghostty is
+
+Ghostty's own description is "fast, feature-rich, and native": its GitHub page calls it "a fast, feature-rich, and
+cross-platform terminal emulator that uses platform-native UI and GPU acceleration". It is a passion project started by
+Mitchell Hashimoto. On macOS its interface is written in Swift with AppKit and SwiftUI; on Linux, in Zig with GTK4.
+Both sit on a shared core library that does the terminal emulation, font handling and rendering. In practice that
+means native tabs and splits, smooth scrolling through very long output, and a terminal that feels like a Mac app on a
+Mac.
+
+Install it with `brew install --cask ghostty` (it is in Cole's [[homebrew|Brewfile]]) or from ghostty.org. The config
+lives at `~/.config/ghostty/config`; Cole's is kept in the [[dotfiles]] and linked there by the installer.
+
+## Cole's config, line by line
+
+### Alt for tmux
+
+```text
+macos-option-as-alt = left
+```
+
+The most important line. On a Mac, the Option key normally types special characters (Option-h is ˙), so terminal
+programs never see an Alt key, and the Alt bindings in Cole's [[tmux-keymap|tmux keymap]] (Alt-h, Alt-l, Alt-a,
+Alt-s) would never fire. This makes the left Option key act as Alt, and leaves the right one for typing accented
+letters, so normal macOS text entry still works.
+
+### Scrolling and selecting
+
+```text
+mouse-scroll-multiplier = 0.3
+selection-word-chars = "-_./:@~?&=%+#"
+```
+
+The first line slows scrolling with a notched mouse wheel, from Ghostty's default of 3 down to 0.3.
+
+The second is a lesson in reading an option's definition. Its comment in Cole's config says the goal is for a
+double-click to grab a whole `feat/my-branch-name`, file path or URL. But Ghostty's reference defines this option as
+the characters where a selection *stops*: "similar to the `WORDCHARS` environment variable in zsh, except this
+specifies the boundary characters rather than the word characters". So this value turns `-`, `/` and `.` into stop
+points, the opposite of the intent, and drops the space from the boundaries. Ghostty's default boundaries (space, tab,
+quotes, brackets, `|`, `:`, `;`, `,` and `$`) already keep paths and branch names whole. To have a double-click grab a
+whole URL as well, take the colon out of the default set:
+
+```text
+selection-word-chars = " \t'\"│`|;,()[]{}<>$"
+```
+
+### New tabs and splits stay where you are
+
+```text
+window-inherit-working-directory = true
+tab-inherit-working-directory = true
+split-inherit-working-directory = true
+split-preserve-zoom = navigation
+```
+
+New windows, tabs and splits open in the directory you were in, the "continue where I was" model, instead of the home
+folder. And a zoomed split stays zoomed when you move focus to another split, rather than silently un-zooming.
+
+### Notifications for long commands
+
+```text
+notify-on-command-finish = unfocused
+notify-on-command-finish-action = bell,notify
+notify-on-command-finish-after = 30s
+```
+
+When a command that ran for more than 30 seconds finishes in a window you are not looking at, Ghostty rings the bell
+and posts a macOS notification. Ghostty's own default is five seconds; 30 keeps quick commands from producing noise.
+Long test runs, builds and installs announce themselves.
+
+### SSH that renders properly
+
+```text
+shell-integration-features = ssh-env,ssh-terminfo
+```
+
+Ghostty identifies itself as `xterm-ghostty`, and a server that has never heard of that terminal shows errors like
+"missing or unsuitable terminal: xterm-ghostty", with broken backspace, arrow keys and colors. These two shell
+integration features fix it automatically: Ghostty installs its terminal description on the remote machine the first
+time you connect (with `infocmp` and `tic`), and falls back to a widely known terminal type when it cannot. Cole's
+[[bootstrap-script|bootstrap script]] also installs that description locally on every Mac, since macOS does not ship
+one.
+
+### Keys
+
+```text
+keybind = cmd+shift+m=toggle_mouse_reporting
+keybind = cmd+opt+w=close_tab:right
+keybind = ctrl+slash=text:\x1f
+```
+
+- **<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>m</kbd>** toggles mouse reporting. Full-screen programs like lazygit or btop
+  capture the mouse, which blocks selecting text with it; one tap gives the mouse back to the terminal, another
+  returns it.
+- **<kbd>Cmd</kbd>+<kbd>Opt</kbd>+<kbd>w</kbd>** closes every tab to the right of the current one, the way browsers
+  do.
+- **<kbd>Ctrl</kbd>+<kbd>/</kbd>** sends the single byte `0x1f`. Ghostty's modern keyboard protocol encodes Ctrl-/ as
+  an escape sequence that fzf does not understand, so the bytes leaked into fzf's search box. `0x1f` is the byte
+  Ctrl-_ sent on old serial terminals, and fzf has always read it as `ctrl-/`.
+
+## How it fits with tmux and the shell
+
+Ghostty and tmux both want to own parts of the terminal, so a few settings on the tmux side meet it halfway:
+
+- **True color.** Cole's `tmux.conf` tells tmux that `xterm-ghostty` accepts 24-bit RGB color.
+- **Keys.** tmux runs with extended keys in the CSI u format, so Ghostty's encodings for Alt and Ctrl combinations
+  reach programs inside tmux instead of leaking in as escape characters.
+- **The right `TERM`.** A tmux hook copies the attaching client's terminal type into the server's environment on
+  every attach, so a tmux server first started over a plain SSH session still gives new windows Ghostty's full
+  terminal type later.
+- **Shell integration, guaranteed.** Ghostty normally injects its zsh integration on its own. When zsh starts in a way
+  that skips that, the integration's `ssh` wrapper never loads, so Cole's `zshrc` sources it explicitly. Cole's own
+  `ssh` wrapper, which cleans up terminal modes after a dropped connection, then chains to Ghostty's (see
+  [[ssh#a-dead-connection-cannot-wreck-your-terminal|SSH]]).
+- **Tab titles.** tmux sets the tab title to the machine's short label plus the current window name, so a Ghostty tab
+  attached to a server says which server.
+
+## Ghostty and Termius
+
+Ghostty runs on macOS and Linux, on the desk. On the phone, [[termius]] plays the same role, and the tmux config is
+written so both feel alike, down to the scroll direction. Over [[tailscale|Tailscale]], either one reaches any machine
+by name.
+
+## Gotchas
+
+- **Option is not Alt by default.** Without `macos-option-as-alt`, Alt-key bindings in tmux and other programs do
+  nothing on a Mac.
+- **Remote servers need the terminfo entry.** Turn on `ssh-terminfo`, or copy it once by hand with
+  `infocmp -x xterm-ghostty | ssh YOUR-SERVER -- tic -x -`, as Ghostty's docs show.
+- **Programs that grab the mouse.** If you cannot select text, the program has taken the mouse;
+  <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>m</kbd> takes it back.
+- **Check what a value means.** Option names can mislead, as `selection-word-chars` shows. The reference says, for
+  each option, exactly what its value controls and what the default is.
+
+The full option list is in the [Ghostty config reference](https://ghostty.org/docs/config/reference), and the
+[[tmux]] page covers the multiplexer that runs inside it.

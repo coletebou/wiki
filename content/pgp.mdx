@@ -1,0 +1,97 @@
+---
+title: PGP
+summary: >-
+  OpenPGP and GnuPG, the public-key tools for signing and encrypting files: where they fit in Cole's setup (verifying
+  what gets installed, optional commit signing) and why program secrets use dotenvx instead.
+table: workshop
+folio: 44
+aliases: [GnuPG, GPG, OpenPGP]
+updated: 2026-10-28
+sources:
+  - title: The GNU Privacy Guard manual
+    url: https://www.gnupg.org/documentation/manuals/gnupg/
+  - title: AWS CLI install guide (verifying the installer's signature)
+    url: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+  - title: git-config(1), gpg.format
+    url: https://git-scm.com/docs/git-config
+  - title: GitHub, about commit signature verification
+    url: https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification
+---
+
+PGP (Pretty Good Privacy) is public-key cryptography for files and messages. Its open standard is OpenPGP, and the
+tool most people run is GnuPG, the `gpg` command. You keep a private key and publish a public one; anything you sign
+can be checked by anyone with your public key, and anything encrypted to someone's public key can be read only with
+their private key. In Cole's setup PGP shows up where trust in a file has to be proven, mostly in what gets
+installed, while the secrets programs need are handled by [[env-files|dotenvx]].
+
+## What it does
+
+- **Sign.** A signature proves who made a file and that it has not changed since. Release artifacts ship with a
+  detached `.sig` (or `.asc`) file beside them.
+- **Encrypt.** A message or file encrypted to a public key can be read only by the matching private key.
+- **Keyrings.** `gpg` keeps the public keys you have imported in a keyring, by default under `~/.gnupg`. A key is known
+  by its fingerprint; a good signature from the wrong key is still the wrong key.
+
+```sh
+gpg --import release-key.asc            # add a publisher's public key
+gpg --verify tool.tar.gz.sig tool.tar.gz
+gpg --list-keys
+```
+
+## Verifying what gets installed
+
+The use that matters most in an agent fleet is boring: proving that the binary a script is about to install is the one
+the vendor published. AWS, for example, signs the AWS CLI installer for Linux and documents how to check it with `gpg`
+before running it.
+
+One of Cole's machine-setup scripts does exactly that when it installs the AWS CLI, in a way an unattended script can
+trust:
+
+- **The publisher's public key is pinned in the script**, not fetched from the same server as the download, so a
+  compromised download server cannot supply both a bad file and a matching key.
+- **It is imported into a throwaway keyring**: a fresh temporary directory passed with `--homedir`, so nothing in the
+  user's own keyring can make a bad signature look trusted, and nothing is left behind.
+- **The script reads `gpg`'s machine-readable status output** (`--status-fd`) rather than the human message, and stops
+  unless the signature is good and made by the pinned key.
+
+```sh
+tmp=$(mktemp -d); mkdir -m 0700 "$tmp/gnupg"
+gpg --homedir "$tmp/gnupg" --batch --import pinned-key.asc
+gpg --homedir "$tmp/gnupg" --batch --status-fd 1 --verify awscliv2.sig awscliv2.zip
+```
+
+This is the same idea as the checksum pins in Cole's CI workflows, which verify each downloaded tool against a known
+SHA-256 before using it (see [[github-actions]]): trust a value you pinned, never the thing being checked.
+
+## Signing commits
+
+Git can sign commits and tags with an OpenPGP key, an X.509 certificate or an SSH key (`gpg.format` is `openpgp`,
+`x509` or `ssh`), and GitHub marks signed commits as verified. SSH signing is the easy path today, since you already
+have an SSH key and a place to publish it (see [[ssh]]).
+
+Signing is optional in Cole's base git config. What the setup does insist on is that signing can never block automation:
+the tools that commit unattended (snapshots, sync commits) pass `--no-gpg-sign`, so a signing setup on one machine,
+with a passphrase prompt nobody is there to answer, cannot stall a background job. The same goes for agents: a
+headless session that triggers a pinentry prompt simply hangs.
+
+## PGP, dotenvx and SSH keys
+
+| Tool | For | Typical use in Cole's setup |
+|---|---|---|
+| PGP (GnuPG) | Signing and encrypting files and messages between people | Verifying signed installers; optional commit signing |
+| [[env-files\|dotenvx]] | Encrypting individual values inside an env file, for programs | The encrypted secrets vault; committed `.env` files |
+| [[ssh\|SSH keys]] | Logging in to machines; optionally signing commits | Every machine-to-machine hop in the fleet |
+
+They share the idea of a public and a private key and nothing else: different formats, different tools, different
+jobs. A PGP key does not decrypt a dotenvx file, and a dotenvx key does not sign a release.
+
+## Key files are secrets
+
+Private keys never belong in a repository or in an agent's reach. The tool that writes Cole's sync commit messages
+with a model lists files ending in `.gpg`, `.asc`, `.pem`, `.key` or `.p12` by name only, so their content never
+reaches the model, and the [[git]] hooks run a secret scanner that catches private key blocks on every commit and
+push. Public keys are the opposite: publish them where people can find them, and give their fingerprints through a
+second channel when it matters.
+
+The scripts that install and verify tools live with the rest of Cole's [[dotfiles]], next to the
+[[bootstrap-script]] that sets up a new machine; [[clis]] covers the habits those scripts follow.

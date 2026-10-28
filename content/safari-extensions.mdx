@@ -1,0 +1,125 @@
+---
+title: Safari Extensions
+summary: >-
+  Web extensions for Safari on the Mac, iPhone and iPad: the same JavaScript as a Chrome extension, shipped inside an
+  app. How Cole's Drover extension runs in Safari from the Chrome source, and the packager that no longer needs a Mac.
+table: atelier
+folio: 73
+aliases: [Safari web extension, safari-web-extension-packager, safari-web-extension-converter]
+updated: 2026-10-28
+sources:
+  - title: Safari web extensions (Apple Developer)
+    url: https://developer.apple.com/documentation/safariservices/safari-web-extensions
+  - title: Packaging a web extension for Safari
+    url: https://developer.apple.com/documentation/safariservices/packaging-a-web-extension-for-safari
+  - title: Packaging and distributing Safari Web Extensions with App Store Connect
+    url: https://developer.apple.com/documentation/safariservices/packaging-and-distributing-safari-web-extensions-with-app-store-connect
+  - title: Running your Safari web extension
+    url: https://developer.apple.com/documentation/safariservices/running-your-safari-web-extension
+  - title: Drover's Safari extension (Cole's public repo)
+    url: https://github.com/coletebou/drover/tree/master/native/Extensions/safari
+  - title: Drover's Safari extension design notes
+    url: https://github.com/coletebou/drover/blob/master/native/Extensions/safari/DESIGN.md
+---
+
+A Safari web extension is a browser extension for Safari on the Mac, iPhone, iPad and Vision Pro, written with the
+same HTML, CSS, JavaScript and `manifest.json` as a [[chrome-extensions|Chrome extension]]. The difference is
+packaging: Safari extensions ship inside an app, signed by Apple's rules and distributed through the App Store or
+[[testflight|TestFlight]]. Cole's Drover extension runs in both browsers from one source folder, and this page shows
+how, along with the two ways Apple offers to package an extension today.
+
+## What is different about Safari
+
+- **The extension lives in an app.** On the Mac and on iOS, the extension is an app extension embedded in a
+  *containing app*. Installing the app installs the extension; the user then turns it on in Safari.
+- **Distribution is Apple's.** The containing app goes through [[app-store-connect|App Store Connect]], so shipping a
+  Safari extension needs the Apple Developer Program (<Price id="apple-developer-program" />). Apple also notes that
+  testing a Safari extension on an iOS device requires membership, though the simulator works before you join.
+- **Not every Chrome API exists.** Safari has no side panel and no omnibox, among others. The packager lists the
+  manifest keys the current Safari does not support, and the extension has to work around them.
+
+## Packaging an existing extension
+
+Apple's packager turns a Chrome or Firefox extension into a Safari one. It creates an Xcode project with a Mac or
+iOS app that installs the extension and points at your extension files:
+
+```sh
+xcrun safari-web-extension-packager /path/to/extension
+xcrun safari-web-extension-packager --copy-resources /path/to/extension   # copy the files instead of referencing them
+```
+
+The tool used to be called `safari-web-extension-converter`. By default the project references your original files,
+so edits to the Chrome extension show up in Safari too, which is exactly what you want when one source serves both.
+To add iOS to a project first made for the Mac, run the packager again with `--rebuild-project`.
+
+There is now a second way that needs no Mac at all. In App Store Connect, after creating an app record, open Users
+and Access, choose the Xcode Cloud tab, then Safari Web Extension Packager, and upload the extension's files. Apple
+assembles the app, and you test it through TestFlight and submit it like any other app. The packaging time comes out
+of the 25 hours a month of Xcode Cloud included with membership.
+
+## Trying it in Safari
+
+For a quick look on the Mac, Safari can load an extension folder or ZIP without any Xcode project:
+
+1. Safari, Settings, Developer tab (turn on "Show features for web developers" under Advanced if it is missing).
+2. Choose "Add Temporary Extension…" and pick the folder or ZIP.
+3. The extension appears under Temporary in the Extensions tab, with buttons to reload it.
+
+Safari removes temporary extensions after 24 hours or when you quit it. For an Xcode-built extension that is not
+signed with a development certificate, check "Allow unsigned extensions" in the Developer tab; that setting also
+resets every time Safari quits.
+
+On iOS, run the containing app from [[xcode|Xcode]] on a device or simulator, then turn the extension on in Safari's
+Extensions menu or in Settings, Safari, Extensions (under Apps on iOS 18 and later), and grant the site access it
+needs.
+
+## The worked example: one extension, two browsers
+
+[Drover's Safari extension](https://github.com/coletebou/drover/tree/master/native/Extensions/safari) is not a fork.
+The Chrome extension is "the single source of the UI and logic," and Safari gets a copy made at build time:
+
+- **A build phase copies Chrome's folder.** A small Node script (no dependencies) copies `Extensions/chrome` into the
+  Safari target's resources, adds a shim script to every page and to the background worker, and rewrites the manifest
+  with a small transform. Xcode runs it on every build of both extension targets.
+- **The shim smooths over the differences.** `chrome` is aliased to `browser` when only `browser` exists. Where Safari
+  has no side panel, the Chrome code notices the missing API and opens the chat in a popup window or tab instead; the
+  omnibox and offscreen document are stubbed so nothing throws.
+- **There is no separate Safari app.** The extension is embedded in Drover's own Mac and iPhone apps, which Apple
+  requires to exist anyway, and the Mac app's settings show whether Safari has it turned on.
+- **The app holds the credentials.** Pair the Drover app once, and the extension reads the same server address and
+  token through the native handler, from the shared Keychain group and App Group. Nothing has to be typed into the
+  extension.
+- **Native code does what Safari can't.** Notifications go through the native handler and appear as the containing
+  app's notifications, with its Reply and Open actions. Calls to the daemon's ops are proxied through native code, so
+  they need no host permission, and a request that times out is reported as an error and never retried, so a reply is
+  never sent twice.
+
+The extension's README also keeps an honest verification log: which builds and tests actually ran (an unsigned
+`xcodebuild` of both apps with the extension embedded, 42 native XCTest cases, 50 Node tests) and what had not yet run
+(a signed build, the extension inside Safari from the merged app). That habit is worth copying for any piece you
+cannot test end to end yet.
+
+<ColesTake>
+
+Write it once for Chrome and copy it into Safari at build time. Two extensions to maintain is one too many.
+
+</ColesTake>
+
+## Gotchas
+
+- **Main-actor closures and XPC callbacks don't mix.** Drover's first, standalone Safari container app crashed on every
+  launch because a SwiftUI view, which runs on the main actor, passed a completion handler to SafariServices. SafariServices calls it on an XPC queue, and
+  the Swift 6 runtime traps on the isolation mismatch (`EXC_BREAKPOINT` in `_swift_task_checkIsolatedSwift`). Marking
+  the closure `@Sendable` does not help. Call the `nonisolated` async versions instead and hand only a value back to
+  the view.
+- **The extension's origin changes per install.** A Safari extension's origin is `safari-web-extension://` plus a UUID
+  that differs on every install, so a server cannot allowlist it once the way it can a pinned Chrome extension ID.
+  Drover proxies its op calls through native code, which needs no allowlist at all; only its live event stream still
+  needs the origin added by hand.
+- **App Transport Security applies.** Native networking allows plain HTTP only to local addresses and the exceptions
+  listed in the app's `Info.plist`; anything else needs HTTPS. Drover adds exceptions for loopback, `.local` names and
+  its [[tailscale|tailnet]].
+- **Settings reset on quit.** "Allow unsigned extensions" and temporary extensions both disappear when Safari quits,
+  which looks like a broken build the next morning.
+- **Notification actions differ.** Notifications from a Safari extension belong to the containing app, so they carry
+  the app's actions. Drover's Approve and Deny buttons exist on Chrome only.

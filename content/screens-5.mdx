@@ -1,0 +1,77 @@
+---
+title: Screens 5
+summary: >-
+  Edovia's remote desktop app for iPhone, iPad, Mac and Vision Pro: see and control another computer's screen from
+  anywhere. Cole uses it to reach the Mac mini and calls it super super sick.
+table: desk
+folio: 7
+aliases: [screens, edovia screens]
+updated: 2026-10-28
+sources:
+  - title: Screens (Edovia)
+    url: https://edovia.com/en/screens/
+  - title: Screens 5 pricing (Edovia support)
+    url: https://support.edovia.com/en/screens-5/faq/s5-pricing
+  - title: Screens 5 on the App Store
+    url: https://apps.apple.com/us/app/screens-5-vnc-remote-desktop/id1663047912
+---
+
+Screens 5 is a remote desktop app from Edovia: from an iPhone, an iPad, a Mac or an Apple Vision Pro, you see another
+computer's screen and control it as if you were sitting in front of it. Cole uses it to reach the
+[[mac-mini|Mac mini]] from anywhere, for everything a terminal cannot do.
+
+<ColesTake>
+
+Screens 5 is super super sick.
+
+</ColesTake>
+
+## What it does
+
+Edovia's own description is short: "Control your Mac, Windows PC, Linux PC, or Raspberry Pi from your iPhone, iPad,
+Mac, or Apple Vision Pro". On a Mac it connects to the built-in Screen Sharing service; Windows PCs, Linux PCs and a
+Raspberry Pi need a VNC server installed, since Screens speaks the VNC protocol (also called RFB).
+
+The features that make it better than a basic VNC viewer:
+
+- **Touch Mode and Trackpad Mode.** On a phone or tablet, tap where you want to click, or drive a pointer the way you
+  would on a laptop's trackpad. A hardware keyboard, mouse or trackpad works too.
+- **Curtain mode.** It blacks out the remote Mac's own display while you work, so nobody at the desk sees what you are
+  doing.
+- **Multiple displays.** Pick one display of the remote machine, or see them all at once; it remembers your choice.
+- **File transfer.** Move files between your device and a remote Mac.
+- **Adaptive quality.** The picture adjusts to the connection, so it stays usable on a weak signal.
+- **Screens Connect.** A small helper on the Mac makes it reachable remotely "without complicated network setup".
+
+## Where it fits
+
+The Mac mini spends much of its life without anyone in front of it, running agents in [[tmux]]. Most of the time a
+terminal over [[ssh|SSH]] is all it needs, from a laptop or from [[termius|Termius]] on the phone. Screens covers the
+moments that need a real screen, such as:
+
+- clicking through a macOS permission dialog an agent's tool triggered;
+- watching an iOS simulator or an app build in [[xcode|Xcode]];
+- logging in at the console, which some tasks need (Xcode's UI tests, for one, can hang at the login window);
+- anything in a browser that wants a real login.
+
+With the Mac on Cole's [[tailscale|tailnet]], the phone can reach it by name from anywhere, with no ports opened on
+the home network. Screens Connect is the alternative for a Mac that is not on a private network like that.
+
+## Set it up
+
+1. On the Mac, turn on Screen Sharing in System Settings, under General, then Sharing.
+2. Install Screens 5 on the device you will connect from. It is sold on the App Store only, and one purchase covers
+   iPhone, iPad, Mac and Vision Pro. There is a seven-day free trial; after that it is a subscription or a one-time
+   lifetime purchase (<Price id="screens-5" />).
+3. Add the Mac by its name on your network or tailnet (or set up Screens Connect), and connect.
+
+Edovia lists the requirements as iOS 17.6, iPadOS 17.6, macOS 14.6 or visionOS 26 on the device running Screens, and
+it can connect to Macs as old as OS X 10.4 Tiger.
+
+## Tips
+
+- **Use curtain mode** whenever the Mac's own screen is visible to others.
+- **Prefer the terminal when you can.** SSH and tmux use a sliver of the bandwidth a screen does and keep running if
+  the connection drops. Screens is for the parts that need pixels.
+- **Keep the Mac awake.** A sleeping Mac answers neither Screens nor SSH; Cole's `caf` helper keeps it up for a set
+  number of hours ([[system-utilities]]).

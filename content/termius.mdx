@@ -1,0 +1,94 @@
+---
+title: Termius
+summary: >-
+  The SSH client on Cole's phone. Over Tailscale it reaches the Mac mini and every server by name, and Cole's tmux
+  config has bindings designed for its touch keyboard. What it does, and how to make a phone a real terminal.
+table: desk
+folio: 10
+aliases: [termius ssh client]
+updated: 2026-10-28
+sources:
+  - title: Termius pricing and plans
+    url: https://termius.com/pricing
+  - title: Connecting to a server (Termius docs)
+    url: https://docs.termius.com/organize-and-connect-to-hosts/connecting-to-a-server
+  - title: Mobile terminal (Termius docs)
+    url: https://docs.termius.com/terminal/mobile-terminal
+  - title: Cole's tmux.conf, mobile bindings (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/tmux.conf
+---
+
+Termius is the SSH client on Cole's phone, the counterpart of [[ghostty|Ghostty]] on the desk. With
+[[tailscale|Tailscale]] running on the phone, it reaches the [[mac-mini|Mac mini]] and every server by name, attaches
+to the [[tmux]] session where an agent is working, and lets you answer its question from wherever you are. Several of
+Cole's tmux bindings exist mainly so that this is pleasant on a touch keyboard.
+
+## What Termius is
+
+Termius is a cross-platform SSH client for iOS, Android, macOS, Windows and Linux. Beyond SSH it connects with Mosh,
+Telnet and serial, browses files over SFTP, forwards ports, and keeps saved hosts, keys and snippets in a vault. For
+reaching machines it has the features you would expect from a desktop client: keys imported into its keychain, agent
+forwarding through its own built-in agent, and "host chains" that hop through one or more jump hosts in one tap.
+
+The free Starter plan covers the core, with a local vault, SSH, SFTP and port forwarding. Pro (<Price id="termius-pro" />)
+adds a personal cloud vault that syncs hosts and keys across your phone and computers, session logs and snippet
+automation. Team and Business plans add shared vaults.
+
+## A real terminal on a phone
+
+The mobile app is built around the fact that a phone has no Ctrl key:
+
+- **An extra key row.** A keyboard add-on above the system keyboard holds Ctrl, Esc, Tab, arrow keys, function keys
+  and symbols, in groups of four that you can reorder and customize. The first three groups ride along above the
+  keyboard; the rest live in a side panel.
+- **Gestures.** Long-press and drag to send arrow keys (the farther you drag, the faster), double-tap for Tab, pinch
+  to resize the text.
+- **Volume buttons.** Each one can be assigned an action, such as a key you press often.
+- **Snippets and history.** Saved commands and earlier ones, a tap away in the side panel.
+- **Voice typing.** Dictate a command or a prompt in the keyboard's AI panel.
+
+## How Cole's setup meets the phone halfway
+
+A phone keyboard makes chords expensive: every modifier is an extra tap, often on another row. Cole's
+[[tmux-keymap|tmux keymap]] takes that seriously.
+
+- **One-chord movement.** <kbd>Alt</kbd>+<kbd>h</kbd> and <kbd>Alt</kbd>+<kbd>l</kbd> move between windows,
+  <kbd>Alt</kbd>+<kbd>s</kbd> cycles sessions, <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>9</kbd> jump
+  straight to a window. The config marks the first two "mobile-friendly".
+- **Control keys as plain letters.** Once the prefix is reachable, prefix <kbd>k</kbd> sends Ctrl-C, prefix
+  <kbd>q</kbd> sends Ctrl-D, prefix <kbd>z</kbd> sends Ctrl-Z and prefix <kbd>l</kbd> sends Ctrl-L, so interrupting an
+  agent or clearing the screen needs no more modifiers.
+- **The scroll direction.** When a Termius update flipped which wheel events a finger swipe sends, tmux started
+  scrolling the wrong way. Rather than relearn, Cole re-inverted tmux's wheel bindings so a finger-up swipe again
+  reveals older output.
+- **A picker that fits.** After connecting, `tm` lists every tmux session in an fzf menu sized to the screen, most
+  recent first ([[tm]]).
+- **A dashboard that fits.** A login dashboard like Cole's [porchlight](https://github.com/coletebou/porchlight) has a
+  compact layout at phone width and renders from cache in milliseconds, so the first screen after logging in already
+  says which agents are waiting.
+
+## A typical check-in
+
+1. Open Termius and tap the Mac mini (or a server). Tailscale makes the name resolve from anywhere, with no port open
+   on the internet.
+2. Type `tm` and pick the session, or `tl` for the last one.
+3. <kbd>Alt</kbd>+<kbd>l</kbd> through the windows. The [[tmux-status-line|status line]] colors show which agents are
+   working (green) and which went quiet.
+4. Answer the agent's question, or dictate a longer instruction, then put the phone away. Everything keeps running
+   in tmux.
+
+## Gotchas
+
+- **Phones drop connections.** Switching apps, losing signal or locking the screen can end the SSH session. With
+  everything inside tmux nothing is lost: reconnect and `tl`. Mosh, which Termius supports, survives network changes
+  better than SSH, at the cost of needing a server-side install.
+- **Keys, not passwords.** Generate or import a key in Termius's keychain and add its public half to each machine's
+  `authorized_keys`. Cole's servers accept keys only (see [[ssh]]).
+- **Mind the clipboard.** Copying a long agent transcript on a phone is awkward. Cole's tmux binding
+  <kbd>Alt</kbd>+<kbd>c</kbd> captures a pane's whole history into a tmux buffer, which is easier to paste somewhere
+  else from inside tmux.
+- **Small screens, long lines.** A narrow terminal wraps everything. Cole's [[starship|prompt]] puts the cursor on its
+  own line so a long path does not squeeze the command you type.
+
+The desktop half of the pair is [[ghostty]], and the [[tailscale]] page covers the network that makes the phone a peer
+of every other machine.

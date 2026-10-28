@@ -1,0 +1,125 @@
+---
+title: oxlint
+summary: >-
+  The Rust-based JavaScript and TypeScript linter from the Oxc project, 50 to 100 times faster than ESLint by its
+  authors' benchmarks, and the repo-wide lint in Cole's main app that agents run after every change.
+table: workshop
+folio: 49
+aliases: [Oxlint, oxc]
+updated: 2026-10-28
+sources:
+  - title: Oxlint guide (oxc.rs)
+    url: https://oxc.rs/docs/guide/usage/linter.html
+  - title: Oxlint configuration
+    url: https://oxc.rs/docs/guide/usage/linter/config.html
+  - title: Oxc on GitHub
+    url: https://github.com/oxc-project/oxc
+  - title: eslint-plugin-oxlint
+    url: https://github.com/oxc-project/eslint-plugin-oxlint
+---
+
+Oxlint is a linter for JavaScript and TypeScript, written in Rust on top of the Oxc compiler stack. Its authors'
+benchmarks put it at 50 to 100 times faster than ESLint, and it ships more than 870 rules covering ESLint's core rules,
+TypeScript, React, Jest, Vitest, imports, Unicorn and accessibility. In Cole's main app it is the lint for the whole
+repository, fast enough that agents run it after every batch of edits instead of leaving it for CI.
+
+## Why speed matters with agents
+
+A lint only helps if it runs. A person might lint before a commit; an agent in Cole's [[agent-fleet|fleet]] edits
+dozens of files an hour, and every check it skips is a mistake a reviewer has to catch later. Claude Code's
+[[lsp|language servers]] already report type errors after each edit; the linter catches the rest: unused code,
+suspicious patterns, the rules of React hooks.
+
+Cole's rules ask for the cheap deterministic checks (the linter, the type checker, the tests you touched) before any
+reviewer, human or model, looks at a change (see [[testing]]). When the lint takes a moment instead of a minute, that
+rule costs nothing to follow, and the same linter can run in a pre-commit hook and in CI ([[github-actions]]) without
+anyone resenting it.
+
+<ColesTake>
+
+A lint that finishes before you notice it started is a lint agents actually run.
+
+</ColesTake>
+
+## Rules and categories
+
+Rules are grouped by intent, and only `correctness` is on by default:
+
+| Category | What it catches |
+|---|---|
+| `correctness` | Code that is definitely wrong or useless (on by default) |
+| `suspicious` | Code that is likely wrong |
+| `pedantic` | Extra strict checks that may have false positives |
+| `perf` | Patterns that hurt runtime performance |
+| `style` | Idiomatic and consistent style |
+| `restriction` | Bans on specific patterns or features |
+| `nursery` | Rules still under development |
+
+Type-aware rules (floating promises and the like) run on the native Go port of the TypeScript compiler, and an alpha
+JS plugin system loads existing ESLint plugins.
+
+## Cole's setup
+
+The app's config is a `.oxlintrc.json` at the repository root. The top of the file:
+
+```json
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "unicorn", "oxc", "import"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "no-var": "error",
+    "prefer-const": "error",
+    "no-unused-expressions": "warn",
+```
+
+The rest follows a pattern worth copying:
+
+- **Correctness as errors, taste as warnings.** Unused variables and `any` are warnings; unused names that start with
+  an underscore are ignored, so intentional placeholders do not nag.
+- **Type-only imports enforced.** `typescript/consistent-type-imports` and `typescript/no-import-type-side-effects`
+  keep runtime imports honest.
+- **Overrides per area.** React apps get the rules of hooks as errors; server code gets strict equality; test files
+  relax unused-variable and import-order rules.
+- **Generated code ignored.** Build output, coverage, declaration files, minified bundles, config files and the native
+  iOS and Android folders are in `ignorePatterns`.
+
+Running it is one command over the code folders, and `--fix` applies the fixes Oxlint can make safely:
+
+```sh
+oxlint apps packages
+oxlint apps packages --fix
+```
+
+Three places run it:
+
+- **Agents, before they report.** A combined `check` script runs the lint and the TypeScript type check side by side.
+- **A pre-commit [[git|hook]].** It copies the staged versions of the files (and of `.oxlintrc.json`) into an isolated tree and
+  lints those, so a partly staged file is checked exactly as it will be committed, not as it sits in the working tree.
+- **CI**, which runs the same combined check, plus a separate job for the few ESLint rules a couple of app workspaces
+  still keep because Oxlint does not cover them.
+
+Formatting is a separate question, and Cole's answer is unusual: Prettier is switched off across Cole's workspaces, and
+agents are told not to run it or turn on editor formatting with it unless asked, and to preserve the existing
+formatting instead. Lint findings are about correctness, not whitespace.
+
+## Moving from ESLint
+
+- `oxlint --init` writes a starter config; `@oxlint/migrate` converts an existing ESLint config.
+- To run both during a migration, add `eslint-plugin-oxlint` to the ESLint config. It switches off the ESLint rules
+  Oxlint already covers, so each rule runs once, in the fast tool.
+- Move rule by rule. Turning on every category at once buries the real findings in style noise.
+
+## Gotchas
+
+- **`plugins` replaces the defaults.** Listing plugins overwrites the default set, so list every plugin you want.
+- **Config file names.** Oxlint looks for `.oxlintrc.json`, `.oxlintrc.jsonc`, `oxlint.config.ts` or
+  `oxlint.config.mts`.
+- **Only `correctness` is on.** If you expected a `suspicious` or `perf` rule to fire, turn the category or the rule on.
+- **Nursery rules change.** Pin the version (a lockfile does it) so a release does not change your lint overnight.
+- **Lint the source, not the output.** Without ignore patterns, generated bundles produce thousands of findings and hide
+  the ones in your code.
+
+Oxlint is installed like any dev dependency; see [[package-managers]] for how each package manager handles it.

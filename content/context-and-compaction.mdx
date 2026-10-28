@@ -1,0 +1,140 @@
+---
+title: Context and Compaction
+summary: >-
+  What fills an agent's context window, what Claude Code's compaction keeps and loses, and how Cole's context advisor,
+  background reflections and handoffs make sure nothing important depends on the summary.
+table: automata
+folio: 36
+aliases: [compaction, context window, context advisor]
+updated: 2026-10-28
+sources:
+  - title: Claude Code, explore the context window
+    url: https://code.claude.com/docs/en/context-window
+  - title: Claude Code, how Claude remembers your project
+    url: https://code.claude.com/docs/en/memory
+  - title: Claude Code prompt caching
+    url: https://code.claude.com/docs/en/prompt-caching
+  - title: Context advisor (dx)
+    url: https://github.com/coletebou/dx/blob/master/base/claude/context_advisor.py
+  - title: Claude Code hooks, event by event (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/claude-hooks.md
+---
+
+Every agent session has a context window: everything the model can see at once, from its instructions to the last
+tool result. When it fills, [[claude-code|Claude Code]] compacts the conversation, replacing the history with a
+summary so the session can keep going. Cole's setup treats compaction as a last resort. [[hooks|Hooks]] save what
+matters before it happens, an advisor suggests a fresh session at the right moment, and anything that has to survive
+lives in files rather than in the conversation.
+
+## What fills the window
+
+Before you type anything, a session already holds `CLAUDE.md` files, the start of the repository's auto memory (the
+first 200 lines or 25 KB of `MEMORY.md`), the names of MCP tools and the descriptions of skills. Then every file read,
+every command's output, every hook's added context and every reply adds to it. A [[skills-and-plugins|skill]]'s full
+text loads only when it is used, and a subagent keeps its large reads in its own window and returns only a summary.
+
+`/context` shows the breakdown for your own session at any moment. Several current models (Opus 4.6 and later,
+Sonnet 5 and later, Haiku 5.5 and the Fable models) support a 1-million-token window through their `[1m]` variants,
+which is what Cole's long sessions run on. Compaction works the same way at the larger size, just later.
+
+## What compaction keeps
+
+Claude Code's documentation is precise about what comes back after a compaction:
+
+| Kept or reloaded | Lost or squeezed |
+|---|---|
+| The system prompt and output style | The conversation itself, replaced by a structured summary |
+| The project-root `CLAUDE.md` and unscoped rules, re-read from disk | Instructions you only gave in chat |
+| Auto memory, re-read from disk | Context that hooks added earlier (summarized with the rest) |
+| Skill descriptions; invoked skill bodies, capped at 5,000 tokens each | Large skill bodies past the cap, oldest first |
+| The plan written in plan mode | Exact ids, numbers and wording that the summary skipped |
+| Up to five recently edited files, re-read | Everything else the session read |
+| Background commands and agents, still running | |
+| Output of `SessionStart` hooks that match the `compact` source | |
+
+The right column is the problem. A summary keeps the gist and drops the run id, the pull request number, the
+background task id and the exact words of the last request, which are precisely what the next step needs.
+
+## Cole's settings
+
+- **No idle compaction.** Claude Code can compact a large conversation left idle for nearly an hour, just before its
+  one-hour prompt cache expires. Cole turned that off fleet-wide: sessions sit idle for hours at a 1M context and
+  should come back with their full history.
+- **Prompt cache.** A session that comes back after more than an hour pays to rewrite its cache once. That is cheaper
+  than losing history, and it is also why [[cc-park]] can park a long-idle session at no extra cost.
+
+<ColesTake>
+
+I'd rather pay one cache rewrite when I come back than come back to a session that summarized itself while I was
+away.
+
+</ColesTake>
+
+## The context advisor
+
+A hook cannot compact, clear or edit a live conversation; there is no API for surgery. What a hook can do is save what
+matters before compaction loses it, and put the choice in front of the model and the human at the right moment. That
+is the context advisor's whole job. It runs on every prompt and before every model call.
+
+**The budget.** The advisory budget is the smaller of the compaction point and 900k tokens, just under where a 1M
+window compacts on its own, so long sessions get the fresh-session advice only near real compaction. A directory that
+wants it sooner sets a smaller budget in a per-machine file of path prefixes and token counts; the longest matching
+prefix wins, and it is re-read on every run, so it applies to sessions already running.
+
+**The exact count.** Token counts come from a small sensor file that Cole's [[claude-code-status-line|status line]]
+writes for each session, using Claude Code's own context data, so the count is right on any provider. Below 100k
+tokens the hook exits after reading that one file, so the common case costs nothing.
+
+**The stages.** As the session fills its model window, the advisor starts background reflections into the
+[[reflection-store|reflection store]]: a cheap Haiku pass at 20%, Sonnet passes at 40, 60 and 80%. Each costs only what
+was said since the last one, so by the time compaction comes, the store already holds what the session learned and
+left open.
+
+**The bands.**
+
+| Share of the advisory budget | What happens |
+|---|---|
+| 55% | A silent background reflection, unless a stage already saved one |
+| 70% | A small judge model is asked: is this a natural boundary? would a fresh session do better? is a delicate operation under way? is this a new topic? A short, factual recommendation goes to the model, and a one-line context note to the human |
+| 85% | The same, firmer |
+
+Each band fires once per compaction cycle and re-arms after `/compact` or `/clear`. A session that already handed off
+is told so instead of being urged again, because two sessions on the same work collide. The judge sees conversation
+excerpts, so a configurable data boundary can keep chosen sessions' excerpts from it; those sessions get the advice
+without them.
+
+When the recommendation lands at a natural stopping point, the session hands off on its own: it writes a brief and
+starts a successor in a new window ([[handoff-chains]]).
+
+### Codex mode
+
+[[codex|Codex]] runs the same hook in a lighter mode. It reads the token count from the newest usage event in the
+session's rollout file and the window from the model's own report (about 258k tokens on the GPT models Cole runs
+through Bedrock). Codex compacts on its own near that window, so its mode only reflects at the stages and adds one
+factual line at 70% and 85%: keep tool output lean, a reflection is saved, carry on.
+
+## What survives no matter what
+
+The pieces that make compaction safe in Cole's setup are all outside the conversation:
+
+- **The load-memory hook** runs at session start, including the start that follows a compaction or `/clear`, and puts
+  the repo's handoff file, its memory index and its open reflection items back in front of the model.
+- **The [[reflection-store|reflection store]]** holds the open items with ids, filed by the stages before compaction
+  and by the `PreCompact` hook right before it.
+- **The brief and the todo list.** Long tasks run from a brief file and a TODO tracker next to it, which compaction
+  cannot touch (see [[agent-fleet]]).
+- **Rules in files.** Anything that must persist goes in `CLAUDE.md`, not in chat; the project-root file is re-read
+  after every compaction.
+
+## Practical advice
+
+- **Hand off rather than compact.** A written brief keeps ids verbatim; a summary does not.
+- **If you must compact, aim it.** `/compact focus on the auth bug fix` keeps what you choose instead of what the
+  automatic pass guesses.
+- **Clear between unrelated tasks.** `/clear` costs nothing; old conversation crowds out the files you need next and
+  costs tokens on every message.
+- **Delegate big reads.** Send research to a subagent so its file contents stay out of your window.
+- **Keep tool output lean.** Filter logs with `rg` or `jq` before they reach the model; ask tools for summaries and
+  limits.
+- **Look before guessing.** `/context` shows what is actually loaded, and `/autocompact` sets how full the window gets
+  before the automatic pass.

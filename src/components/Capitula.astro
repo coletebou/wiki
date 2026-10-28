@@ -1,0 +1,27 @@
+---
+// The contents of a folio: in the inner margin on wide screens (following along as you read), inline otherwise.
+interface Props {
+  headings: { depth: number; text: string; id: string }[];
+  variant: 'margin' | 'inline';
+}
+const { headings, variant } = Astro.props;
+const list = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+{list.length > 1 && variant === 'margin' && (
+  <nav class="capitula" aria-label="Contents">
+    <h2>Capitula</h2>
+    <ol>
+      {list.map((h) => (
+        <li class={`depth-${h.depth}`}><a href={`#${h.id}`} data-capitulum={h.id}>{h.text}</a></li>
+      ))}
+    </ol>
+  </nav>
+)}
+{list.length > 2 && variant === 'inline' && (
+  <details class="capitula-inline">
+    <summary>Capitula · contents</summary>
+    <ol>
+      {list.filter((h) => h.depth === 2).map((h) => <li><a href={`#${h.id}`}>{h.text}</a></li>)}
+    </ol>
+  </details>
+)}

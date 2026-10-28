@@ -1,0 +1,70 @@
+---
+import { render } from 'astro:content';
+import { folioLabel } from '../../lib/schema.mjs';
+import Capitula from '../components/Capitula.astro';
+import ColesTake from '../components/ColesTake.astro';
+import Diagram from '../components/Diagram.astro';
+import InkStroke from '../components/InkStroke.astro';
+import Marginalia from '../components/Marginalia.astro';
+import Price from '../components/Price.astro';
+import Verso from '../components/Verso.astro';
+import Base from '../layouts/Base.astro';
+import { stichoi, tableOf, wiki } from '../lib/wiki';
+
+export async function getStaticPaths() {
+  const { pages } = await wiki();
+  return pages.map((page) => ({ params: { slug: page.id } }));
+}
+
+const { slug } = Astro.params;
+const { pages, bySlug, graph } = await wiki();
+const page = bySlug.get(slug!)!;
+const { Content, headings: rendered } = await render(page);
+// Astro names a heading's id `slug`; the contents want { depth, text, id }.
+const headings = rendered.map((h) => ({ depth: h.depth, text: h.text, id: h.slug }));
+const { title, summary, folio, table: tableId, updated } = page.data;
+const table = tableOf(tableId);
+const index = pages.indexOf(page);
+const citedBy = (graph.backlinks.get(page.id) ?? []).map((s: string) => bySlug.get(s)!).filter(Boolean);
+const cites = [...new Set((graph.outlinks.get(page.id) ?? []).map((l: { to: string }) => l.to))]
+  .filter((s) => s !== page.id)
+  .map((s) => bySlug.get(s)!)
+  .filter(Boolean)
+  .sort((a, b) => a.data.folio - b.data.folio);
+const lines = stichoi(page.body ?? '');
+const emended = updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+---
+<Base title={title} description={summary} ogType="article">
+  <main class="leaf" id="text">
+    <div class="running-head">
+      <a href="/">Codex Tebou</a>
+      <a href={`/pinakes/#table-${table.id}`} class="wide-only">{table.title}</a>
+      <span class="folio-no">{folioLabel(folio)}</span>
+    </div>
+    <div class="folio">
+      <aside class="margin-inner"><Capitula variant="margin" headings={headings} /></aside>
+      <article class="text-block" data-pagefind-body data-pagefind-filter={`table:${table.title}`}>
+        <header>
+          <p class="kicker"><a href={`/pinakes/#table-${table.id}`}>Table {table.numeral} · {table.title}</a></p>
+          <h1 class="title" data-pagefind-meta="title">{title}</h1>
+          <InkStroke seed={folio} />
+          <p class="summary">{summary}</p>
+          <p class="meta-line" data-pagefind-ignore>
+            <span>{folioLabel(folio)}</span><span>{lines.toLocaleString('en-US')} stichoi</span><span>emended {emended}</span>
+            {citedBy.length > 0 && <a href="#cited-by">cited by {citedBy.length}</a>}
+          </p>
+          <span hidden data-pagefind-meta="folio">{folioLabel(folio)}</span>
+          <span hidden data-pagefind-meta="table">{table.title}</span>
+        </header>
+        <Capitula variant="inline" headings={headings} />
+        <div class="prose">
+          <Content components={{ ColesTake, Price, Diagram }} />
+        </div>
+      </article>
+      <aside class="margin-outer" data-pagefind-ignore><Marginalia folio={folio} /></aside>
+      <div data-pagefind-ignore style="display:contents">
+        <Verso page={page} citedBy={citedBy} cites={cites} prev={pages[index - 1]} next={pages[index + 1]} stichoi={lines} />
+      </div>
+    </div>
+  </main>
+</Base>

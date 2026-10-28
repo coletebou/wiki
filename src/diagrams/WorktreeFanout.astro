@@ -1,0 +1,430 @@
+---
+// Study: worktree fan-out. One `pw launch` drawn as a botanical study: the repository is the trunk, each manifest row
+// grows a branch to its own worktree, the worktree is bootstrapped, its agent starts in a tmux window, and each
+// summary lands in the merged log between sentinel lines. Choose how many lanes, launch, or pick a lane.
+const lanes = [
+  { tag: 'search', branch: 'feat/search-filters', engine: 'claude', done: 'Filter chips and URL state; 14 tests pass.' },
+  { tag: 'export', branch: 'feat/csv-export', engine: 'claude', done: 'CSV export with streaming rows; e2e green.' },
+  { tag: 'docs', branch: 'docs/api-reference', engine: 'claude', done: 'Reference pages for 9 endpoints; links checked.' },
+  { tag: 'audit', branch: 'review/security', engine: 'codex:sol:xhigh', done: '2 findings, both with repro steps; no fixes made.' },
+  { tag: 'i18n', branch: 'feat/i18n-strings', engine: 'claude', done: 'Strings extracted to 3 locales; snapshots updated.' },
+  { tag: 'perf', branch: 'perf/cold-start', engine: 'codex:luna:high', done: 'Cold start 1.9 s to 1.1 s; flame graphs attached.' },
+];
+const boot = ['.env', '.npmrc', '.envrc', 'npm install'];
+const chipX = [0, 36, 86, 134];
+const laneY = (i: number) => 92 + i * 60;
+const trunkX = 262;
+const branchFrom = (i: number) => laneY(i) + 46;
+const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
+---
+<figure class="study fanout" data-pagefind-ignore data-lanes="4" aria-labelledby="wf-title">
+  <figcaption class="study-head">
+    <p class="study-title" id="wf-title"><b>Studium</b>Worktree fan-out</p>
+    <p class="study-hint">Choose how many lanes, press Launch, or pick a lane to see what it gets.</p>
+  </figcaption>
+  <div class="study-tools">
+    <button type="button" class="ink-btn" data-lanes="-1" aria-label="One lane fewer">−</button>
+    <span class="wf-count" aria-live="polite">4 lanes</span>
+    <button type="button" class="ink-btn" data-lanes="1" aria-label="One lane more">+</button>
+    <button type="button" class="ink-btn" data-launch>Launch <kbd>pw launch m.tsv</kbd></button>
+    <button type="button" class="ink-btn" data-reset>Reset</button>
+  </div>
+  <div class="study-scroll">
+    <svg class="study-svg wf-svg" viewBox="0 0 800 470" role="group" aria-label="One launch of parallel worktrees" style="min-width: 660px">
+      <defs>
+        <pattern id="wf-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="5" stroke="currentColor" stroke-width="0.9" opacity="0.4" />
+        </pattern>
+        <filter id="wf-ink" x="-3%" y="-3%" width="106%" height="106%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="11" result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="1.7" />
+        </filter>
+      </defs>
+
+      <text class="caps wf-head" x="20" y="74">The manifest</text>
+      <text class="caps wf-head" x="240" y="74">The repository</text>
+      <text class="caps wf-head" x="380" y="74">Worktrees</text>
+      <text class="caps wf-head" x="596" y="74">Window 0 · the merged log</text>
+
+      <g class="wf-tabs">
+        <g class="wf-tab log-tab">
+          <rect x="20" y="16" width="70" height="26" rx="4" />
+          <text x="55" y="34" text-anchor="middle">0:log</text>
+        </g>
+        {lanes.map((l, i) => (
+          <g class="wf-tab lane-tab" data-lane={i}>
+            <rect x={96 + i * 84} y="16" width="80" height="26" rx="4" />
+            <text x={136 + i * 84} y="34" text-anchor="middle">{i + 1}:{l.tag}</text>
+          </g>
+        ))}
+      </g>
+
+      <path class="trunk" d={`M${trunkX} 452 C ${trunkX - 6} 360, ${trunkX + 8} 200, ${trunkX - 2} 92`} filter="url(#wf-ink)" />
+      <path class="trunk-fine" d={`M${trunkX + 7} 452 C ${trunkX + 2} 360, ${trunkX + 14} 210, ${trunkX + 5} 104`} />
+      <path class="roots" d={`M${trunkX} 452 q -26 6 -40 14 M${trunkX + 3} 452 q 18 8 36 12 M${trunkX + 6} 450 q 4 10 2 18`} />
+      <text class="wf-root" x={trunkX + 16} y="465">origin/HEAD</text>
+
+      {lanes.map((l, i) => {
+        const y = laneY(i);
+        const fy = branchFrom(i);
+        return (
+          <g class="lane" data-lane={i} tabindex="0" role="button" aria-label={`Lane ${l.tag}: branch ${l.branch}, engine ${l.engine}`}>
+            <g class="row">
+              <rect class="row-box" x="16" y={y - 2} width="214" height="50" rx="5" />
+              <text class="row-tag" x="28" y={y + 18}>{l.tag}</text>
+              <text class={`row-engine ${l.engine.startsWith('codex') ? 'codex' : ''}`} x="218" y={y + 18} text-anchor="end">{l.engine}</text>
+              <text class="row-branch" x="28" y={y + 37}>{l.branch}</text>
+            </g>
+            <path class="branch" d={`M${trunkX + 2} ${fy} C ${trunkX + 50} ${fy - 6}, ${trunkX + 60} ${y + 24}, 380 ${y + 22}`} />
+            <path class="leaf" d={`M${trunkX + 26} ${fy - 8} q 10 -12 22 -6 q -8 10 -22 6`} />
+            <g class="tree">
+              <rect class="tree-shade" x="385" y={y + 3} width="196" height="46" rx="6" fill="url(#wf-hatch)" />
+              <rect class="tree-box" x="380" y={y - 2} width="196" height="46" rx="6" />
+              <text class="tree-path" x="392" y={y + 17}>.claude/worktrees/{l.tag}</text>
+              <g class="chips">
+                {boot.map((b, j) => (
+                  <text class="chip" data-chip={j} x={392 + chipX[j]} y={y + 35}>{b === 'npm install' ? 'npm i' : b}</text>
+                ))}
+              </g>
+              <circle class="agent" cx="562" cy={y + 21} r="7" />
+              <text class="agent-mark" x="562" y={y + 25.5} text-anchor="middle">{l.engine.startsWith('codex') ? '◎' : '✻'}</text>
+            </g>
+          </g>
+        );
+      })}
+
+      <rect class="log-box" x="592" y="86" width="196" height="370" rx="6" />
+      <g class="log-lines"></g>
+    </svg>
+  </div>
+  <div class="study-note wf-note" aria-live="polite">
+    <h4>One launch</h4>
+    <p>Each row of the manifest names a lane: a tag, a branch, the prompt and, if you like, the engine. Press Launch to watch <code>pw</code> turn rows into worktrees, worktrees into tmux windows, and finished work into the merged log.</p>
+  </div>
+  <script type="application/json" class="wf-data" set:html={data} />
+</figure>
+
+<style>
+  .wf-svg .wf-head {
+    font-size: 11.5px;
+    fill: var(--ink-3);
+  }
+  .wf-svg .wf-tab rect {
+    fill: var(--paper);
+    stroke: currentColor;
+    stroke-width: 1;
+    transition: opacity 0.3s, fill 0.3s;
+  }
+  .wf-svg .wf-tab text {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    fill: var(--ink-2);
+  }
+  .wf-svg .wf-tab.log-tab rect {
+    fill: color-mix(in srgb, var(--sanguine) 12%, var(--paper));
+  }
+  .wf-svg .trunk {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 5;
+    stroke-linecap: round;
+    opacity: 0.85;
+  }
+  .wf-svg .trunk-fine,
+  .wf-svg .roots {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
+    opacity: 0.55;
+    stroke-linecap: round;
+  }
+  .wf-svg .wf-root {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    fill: var(--ink-2);
+  }
+  .wf-svg .lane {
+    cursor: pointer;
+    outline: none;
+  }
+  .wf-svg .row-box {
+    fill: var(--paper);
+    stroke: var(--rule);
+    stroke-width: 1;
+  }
+  .wf-svg .row-tag {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    fill: var(--ink);
+  }
+  .wf-svg .row-engine {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    fill: var(--ink-3);
+  }
+  .wf-svg .row-engine.codex {
+    fill: var(--verdigris);
+  }
+  .wf-svg .row-branch {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    fill: var(--ink-2);
+  }
+  .wf-svg .branch {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-dasharray: 260;
+    stroke-dashoffset: 260;
+    transition: stroke-dashoffset 0.9s ease-out, stroke 0.2s;
+  }
+  .wf-svg .leaf {
+    fill: url(#wf-hatch);
+    stroke: currentColor;
+    stroke-width: 0.8;
+    opacity: 0;
+    transition: opacity 0.4s 0.5s;
+  }
+  .wf-svg .tree {
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .wf-svg .tree-box {
+    fill: var(--paper);
+    stroke: currentColor;
+    stroke-width: 1.2;
+  }
+  .wf-svg .tree-path {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    fill: var(--ink);
+  }
+  .wf-svg .chip {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    fill: var(--ink-3);
+    opacity: 0.25;
+    transition: opacity 0.25s, fill 0.25s;
+  }
+  .wf-svg .agent {
+    fill: var(--paper-2);
+    stroke: currentColor;
+    stroke-width: 1;
+  }
+  .wf-svg .agent-mark {
+    font-size: 11px;
+    fill: var(--ink-3);
+  }
+  .wf-svg .log-box {
+    fill: color-mix(in srgb, var(--paper) 70%, var(--code-bg));
+    stroke: currentColor;
+    stroke-width: 1.1;
+  }
+  .wf-svg :global(.log-line) {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    fill: var(--ink-2);
+  }
+  .wf-svg :global(.log-line.sentinel) {
+    fill: var(--sanguine);
+  }
+  .wf-svg :global(.log-line.summary) {
+    fill: var(--ink);
+    font-family: var(--font-text);
+    font-size: 11.5px;
+    font-style: italic;
+  }
+  /* States: which lanes exist, which have grown, which are working or done. */
+  .wf-svg .lane-tab {
+    opacity: 0;
+  }
+  .wf-svg .lane.grown .branch {
+    stroke-dashoffset: 0;
+  }
+  .wf-svg .lane.grown .leaf,
+  .wf-svg .lane.grown .tree {
+    opacity: 1;
+  }
+  .wf-svg .lane .chip.on {
+    opacity: 1;
+    fill: var(--ink-2);
+  }
+  .wf-svg .lane.working .agent {
+    fill: color-mix(in srgb, var(--sanguine) 25%, var(--paper));
+    stroke: var(--sanguine);
+  }
+  .wf-svg .lane.working .agent-mark {
+    fill: var(--sanguine);
+  }
+  .wf-svg .lane.done .agent {
+    fill: var(--verdigris);
+    stroke: var(--verdigris);
+  }
+  .wf-svg .lane.done .agent-mark {
+    fill: var(--paper);
+  }
+  .wf-svg .lane-tab.open {
+    opacity: 1;
+  }
+  .wf-svg .lane.picked .row-box,
+  .wf-svg .lane.picked .tree-box {
+    stroke: var(--sanguine);
+    stroke-width: 2;
+  }
+  .wf-svg .lane.picked .branch {
+    stroke: var(--sanguine-2);
+  }
+  .wf-svg .lane:focus-visible .row-box {
+    stroke: var(--sanguine);
+    stroke-dasharray: 4 3;
+    stroke-width: 2;
+  }
+  .wf-svg .lane-tab.picked rect {
+    stroke: var(--sanguine);
+    stroke-width: 2;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wf-svg .branch,
+    .wf-svg .leaf,
+    .wf-svg .tree,
+    .wf-svg .chip {
+      transition: none;
+    }
+  }
+  .wf-count {
+    min-width: 4.5rem;
+    text-align: center;
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .wf-note :global(code) {
+    font-size: 0.82em;
+  }
+</style>
+
+<script>
+  type Lane = { tag: string; branch: string; engine: string; done: string };
+  const NS = 'http://www.w3.org/2000/svg';
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const esc = (s: string) => s.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]!);
+
+  for (const fig of document.querySelectorAll<HTMLElement>('.fanout')) {
+    const { lanes, boot }: { lanes: Lane[]; boot: string[] } = JSON.parse(fig.querySelector('.wf-data')!.textContent!);
+    const note = fig.querySelector<HTMLElement>('.wf-note')!;
+    const count = fig.querySelector<HTMLElement>('.wf-count')!;
+    const logLines = fig.querySelector<SVGGElement>('.log-lines')!;
+    const laneEls = [...fig.querySelectorAll<SVGGElement>('.lane')];
+    const tabs = [...fig.querySelectorAll<SVGGElement>('.lane-tab')];
+    let timers: number[] = [];
+    let lines: { text: string; cls: string }[] = [];
+
+    const n = () => Number(fig.dataset.lanes);
+    const say = (title: string, html: string) => (note.innerHTML = `<h4>${esc(title)}</h4><p>${html}</p>`);
+    const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, reduced ? 0 : ms));
+
+    function drawLog() {
+      logLines.replaceChildren();
+      const shown = lines.slice(-27);
+      shown.forEach((l, i) => {
+        const t = document.createElementNS(NS, 'text');
+        t.setAttribute('x', '602');
+        t.setAttribute('y', String(106 + i * 13));
+        t.setAttribute('class', `log-line ${l.cls}`);
+        t.textContent = l.text.length > 32 ? `${l.text.slice(0, 31)}…` : l.text;
+        logLines.append(t);
+      });
+    }
+    function log(text: string, cls = '') {
+      lines.push({ text, cls });
+      drawLog();
+    }
+    function reset() {
+      timers.forEach(clearTimeout);
+      timers = [];
+      lines = [];
+      drawLog();
+      for (const el of laneEls) el.classList.remove('grown', 'working', 'done', 'picked');
+      for (const c of fig.querySelectorAll('.chip')) c.classList.remove('on');
+      for (const t of tabs) t.classList.remove('open', 'picked');
+    }
+    function setLanes(k: number) {
+      fig.dataset.lanes = String(Math.max(1, Math.min(lanes.length, k)));
+      count.textContent = `${n()} lane${n() === 1 ? '' : 's'}`;
+      reset();
+      laneEls.forEach((el, i) => el.setAttribute('display', i < n() ? 'inline' : 'none'));
+      tabs.forEach((el, i) => el.setAttribute('display', i < n() ? 'inline' : 'none'));
+      say('One launch', `${n()} row${n() === 1 ? '' : 's'} in the manifest, so ${n()} worktree${n() === 1 ? '' : 's'}, ${n()} tmux window${n() === 1 ? '' : 's'} and one log. Press Launch.`);
+    }
+    function launch() {
+      reset();
+      const k = n();
+      say('pw validate', 'Every prompt file exists and ends with the log footer; a missing one stops the launch before any worktree is made.');
+      log('# run started · transcripts:', 'sentinel');
+      for (let i = 0; i < k; i++) log(`#  ${lanes[i].tag}: …/${lanes[i].tag}.jsonl`);
+      let t = 700;
+      for (let i = 0; i < k; i++) {
+        const el = laneEls[i];
+        later(t, () => {
+          el.classList.add('grown');
+          say(`Lane ${i + 1}: a worktree`, `<code>wt-helper</code> branches <code>${esc(lanes[i].branch)}</code> from <code>origin/HEAD</code> into <code>.claude/worktrees/${esc(lanes[i].tag)}</code>, git-ignored inside the repository.`);
+        });
+        boot.forEach((b, j) => later(t + 500 + j * 160, () => el.querySelector(`[data-chip="${j}"]`)?.classList.add('on')));
+        later(t + 520, () => say(`Lane ${i + 1}: the bootstrap`, 'A fresh checkout lacks every ignored file, so <code>pw</code> copies the ones that exist (<code>.env</code>, <code>.env.keys</code>, <code>.env.local</code>, <code>.npmrc</code>, <code>.nvmrc</code> and a few more), writes an <code>.envrc</code> with <code>COMPOSE_PROJECT_NAME</code>, and runs <code>npm install</code>.'));
+        later(t + 1500, () => {
+          tabs[i].classList.add('open');
+          el.classList.add('working');
+          say(`Lane ${i + 1}: a window and an agent`, `Window ${i + 1} exports the lane's details and starts ${lanes[i].engine.startsWith('codex') ? 'Codex' : 'Claude Code'} with a fixed session id and the prompt as its first message.`);
+        });
+        t += reduced ? 0 : 1300;
+      }
+      const order = Array.from({ length: k }, (_, i) => i).sort((a, b) => ((a * 7 + 3) % 5) - ((b * 7 + 3) % 5));
+      let d = t + 1400;
+      for (const i of order) {
+        later(d, () => {
+          laneEls[i].classList.remove('working');
+          laneEls[i].classList.add('done');
+          log(`<<SESSION tag=${lanes[i].tag} branch=${lanes[i].branch}>>`, 'sentinel');
+          log(lanes[i].done, 'summary');
+          log(`<<END SESSION ${lanes[i].tag}>>`, 'sentinel');
+          say(`${lanes[i].tag} finished`, `Its footer piped the summary into <code>pw-append</code>, which takes a <code>mkdir</code> lock first, so two lanes that finish together never interleave. A merge agent can pull one lane out with a single <code>grep</code>.`);
+        });
+        d += reduced ? 0 : 1100;
+      }
+      later(d + 200, () => say('All lanes in', `${k} summaries in window 0, each between its sentinels. <code>pw log</code> follows it; <code>pw teardown</code> removes the worktrees when you are done, and the branches too with <code>--delete-branches</code>.`));
+    }
+    function pick(i: number) {
+      for (const el of laneEls) el.classList.toggle('picked', Number(el.dataset.lane) === i);
+      for (const t of tabs) t.classList.toggle('picked', Number(t.dataset.lane) === i);
+      const l = lanes[i];
+      say(
+        `Lane ${i + 1} · ${l.tag}`,
+        `Branch <code>${esc(l.branch)}</code>, worktree <code>.claude/worktrees/${esc(l.tag)}</code>, tmux window <code>${i + 1}:${esc(l.tag)}</code>, engine <code>${esc(l.engine)}</code>. The window exports <code>PARALLEL_TAG</code>, <code>PARALLEL_BRANCH</code>, <code>PARALLEL_LOG</code>, <code>PARALLEL_APPEND</code> and <code>COMPOSE_PROJECT_NAME=app-${esc(l.tag)}</code>, so the lane's Docker Compose project never collides with the main checkout's.`,
+      );
+    }
+
+    fig.addEventListener('click', (e) => {
+      const t = e.target as Element;
+      const step = t.closest<HTMLButtonElement>('[data-lanes]');
+      if (step && step.tagName === 'BUTTON') return setLanes(n() + Number(step.dataset.lanes));
+      if (t.closest('[data-launch]')) return launch();
+      if (t.closest('[data-reset]')) return setLanes(n());
+      const lane = t.closest<SVGGElement>('.lane');
+      if (lane) pick(Number(lane.dataset.lane));
+    });
+    fig.addEventListener('keydown', (e) => {
+      const lane = (e.target as Element).closest<SVGGElement>('.lane');
+      if (lane && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        pick(Number(lane.dataset.lane));
+      }
+    });
+    setLanes(4);
+    // Show the grown tree at rest, so the drawing is complete before anyone presses anything.
+    for (let i = 0; i < n(); i++) laneEls[i].classList.add('grown');
+  }
+</script>

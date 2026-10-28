@@ -1,0 +1,1428 @@
+/* Codex Tebou: Leonardo's notebooks bound into the Library of Alexandria. Readable first. */
+
+/* ── Reset and ground ─────────────────────────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-padding-top: 1.5rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--desk);
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgb(255 245 220 / 0.35), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgb(120 80 30 / 0.18), transparent 60%),
+    var(--grain);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: var(--step-0);
+  line-height: 1.62;
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+:root {
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .42  0 0 0 0 .3  0 0 0 0 .16  0 0 0 .11 0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+  --fibres: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='.006 .05' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .36  0 0 0 0 .18  0 0 0 .07 0'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>");
+}
+:root[data-theme='lucerna'] body {
+  background-image:
+    radial-gradient(ellipse at 50% -10%, rgb(255 170 80 / 0.1), transparent 60%),
+    var(--grain);
+}
+img,
+svg,
+video {
+  max-width: 100%;
+  height: auto;
+}
+::selection {
+  background: var(--sanguine-wash);
+  color: var(--ink);
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: 0;
+  transform: translateY(-150%);
+  z-index: 100;
+  padding: 0.5rem 0.9rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+}
+.skip:focus {
+  transform: translateY(1rem);
+}
+
+/* ── Masthead ─────────────────────────────────────────────────────────────────────────────────────────────── */
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1.5rem;
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: 1.1rem var(--gap) 0.9rem;
+}
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+.wordmark b {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.28rem;
+  letter-spacing: 0.16em;
+}
+.wordmark i {
+  font-size: 1.05rem;
+  color: var(--ink-2);
+}
+.wordmark:hover b {
+  color: var(--sanguine);
+}
+.masthead nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1.1rem;
+  font-size: 1.02rem;
+}
+@media (max-width: 34rem) {
+  .masthead {
+    gap: 0.35rem;
+    padding-top: 0.8rem;
+  }
+  .masthead nav {
+    gap: 0.2rem 0.85rem;
+    font-size: 0.98rem;
+  }
+  .masthead nav .wide-only {
+    display: none;
+  }
+  .wordmark i {
+    display: none;
+  }
+}
+.masthead nav a,
+.masthead nav button {
+  color: var(--ink-2);
+  text-decoration: none;
+  font: inherit;
+  background: none;
+  border: 0;
+  padding: 0.2rem 0;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+.masthead nav a:hover,
+.masthead nav button:hover,
+.masthead nav a[aria-current='page'] {
+  color: var(--sanguine);
+}
+.masthead nav a[aria-current='page'] {
+  text-decoration: underline 1px;
+  text-underline-offset: 0.3em;
+}
+.seek-button kbd {
+  margin-left: 0.35rem;
+  font-size: 0.72rem;
+}
+.theme-toggle .sun,
+:root[data-theme='lucerna'] .theme-toggle .flame {
+  display: none;
+}
+:root[data-theme='lucerna'] .theme-toggle .sun {
+  display: inline;
+}
+.theme-toggle svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  vertical-align: -0.2em;
+}
+
+/* ── The leaf (a sheet of parchment) ──────────────────────────────────────────────────────────────────────── */
+.leaf {
+  position: relative;
+  max-width: 78rem;
+  margin: 0 auto 3rem;
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(ellipse at 50% 50%, transparent 62%, rgb(140 95 40 / 0.12) 100%),
+    radial-gradient(circle at 12% 18%, rgb(150 100 40 / 0.06), transparent 9%),
+    radial-gradient(circle at 86% 72%, rgb(150 100 40 / 0.05), transparent 7%),
+    var(--fibres),
+    var(--grain);
+  box-shadow: var(--shadow);
+  border-radius: 2px;
+}
+:root[data-theme='lucerna'] .leaf {
+  background-image:
+    radial-gradient(ellipse at 50% 30%, rgb(255 190 110 / 0.06), transparent 70%),
+    var(--fibres),
+    var(--grain);
+}
+.leaf::before {
+  /* A faint ruled frame, as a scribe pricks and rules the leaf before writing. */
+  content: '';
+  position: absolute;
+  inset: clamp(0.6rem, 1.4vw, 1.2rem);
+  border: 1px solid color-mix(in srgb, var(--rule) 55%, transparent);
+  pointer-events: none;
+}
+.running-head {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: clamp(1.4rem, 3vw, 2.2rem) clamp(1.6rem, 5vw, 4rem) 0;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.running-head a {
+  color: inherit;
+  text-decoration: none;
+}
+.running-head a:hover {
+  color: var(--sanguine);
+}
+.folio-no {
+  font-family: var(--font-text);
+  font-style: italic;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--sanguine);
+}
+
+/* Three columns: the margin a scribe keeps for notes, the text block, the outer margin for marginalia. */
+.folio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 var(--gap);
+  padding: clamp(1.2rem, 3vw, 2.4rem) clamp(1.3rem, 5vw, 4rem) clamp(2rem, 4vw, 3.5rem);
+}
+@media (min-width: 72rem) {
+  .folio {
+    grid-template-columns: 12.5rem minmax(0, var(--measure)) minmax(9rem, 1fr);
+  }
+}
+.folio > .margin-inner {
+  display: none;
+}
+@media (min-width: 72rem) {
+  .folio > .margin-inner {
+    display: block;
+    position: relative;
+  }
+}
+.folio > .margin-outer {
+  display: none;
+}
+@media (min-width: 72rem) {
+  .folio > .margin-outer {
+    display: block;
+    position: relative;
+  }
+}
+.text-block {
+  min-width: 0;
+}
+
+/* ── Article head ─────────────────────────────────────────────────────────────────────────────────────────── */
+.kicker {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sanguine);
+}
+.kicker a {
+  color: inherit;
+  text-decoration: none;
+}
+h1.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-4);
+  line-height: 1.08;
+  letter-spacing: 0.03em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.underline-stroke {
+  display: block;
+  width: min(100%, 22rem);
+  height: 14px;
+  margin: 0.55rem 0 1rem;
+  color: var(--sanguine-2);
+}
+.summary {
+  margin: 0 0 1.6rem;
+  font-size: var(--step-1);
+  line-height: 1.45;
+  font-style: italic;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+.meta-line a {
+  color: var(--sanguine);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+}
+.meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1rem;
+  margin: -0.8rem 0 1.8rem;
+  font-size: var(--step--1);
+  color: var(--ink-3);
+}
+
+/* ── Prose ────────────────────────────────────────────────────────────────────────────────────────────────── */
+.prose {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  text-wrap: pretty;
+}
+.prose > * + * {
+  margin-top: 1.05em;
+}
+.prose p,
+.prose ul,
+.prose ol,
+.prose blockquote,
+.prose table,
+.prose pre {
+  margin-bottom: 0;
+}
+.prose > p:first-child::first-letter,
+.prose > .lede::first-letter {
+  float: left;
+  margin: 0.08em 0.12em 0 0;
+  padding: 0.06em 0.12em 0;
+  font-family: var(--font-display);
+  font-size: 3.55em;
+  line-height: 0.82;
+  color: var(--sanguine);
+  border: 1px solid color-mix(in srgb, var(--sanguine) 45%, transparent);
+  background:
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--sanguine) 14%, transparent) 0 1px, transparent 1px 5px);
+}
+.prose h2,
+.prose h3,
+.prose h4 {
+  position: relative;
+  scroll-margin-top: 1.5rem;
+  text-wrap: balance;
+}
+.prose h2 {
+  margin-top: 2.3em;
+  margin-bottom: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-2);
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+}
+.prose h2::before {
+  /* A pilcrow in red chalk, the rubricator's mark for a new section. */
+  content: '¶';
+  position: absolute;
+  left: -1.15em;
+  top: 0.02em;
+  font-family: var(--font-text);
+  color: var(--sanguine-2);
+  opacity: 0.8;
+}
+@media (max-width: 40rem) {
+  .prose h2::before {
+    position: static;
+    margin-right: 0.3em;
+  }
+}
+.prose h3 {
+  margin-top: 1.8em;
+  margin-bottom: 0;
+  font-size: var(--step-1);
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1.3;
+}
+.prose h4 {
+  margin-top: 1.5em;
+  margin-bottom: 0;
+  font-size: var(--step-0);
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.prose h2 + *,
+.prose h3 + *,
+.prose h4 + * {
+  margin-top: 0.55em;
+}
+.heading-anchor {
+  margin-left: 0.35em;
+  font-family: var(--font-text);
+  font-size: 0.75em;
+  color: var(--ink-3);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.prose :is(h2, h3, h4):hover .heading-anchor,
+.heading-anchor:focus-visible {
+  opacity: 1;
+}
+.prose a {
+  color: var(--sanguine);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.17em;
+  text-decoration-color: color-mix(in srgb, var(--sanguine) 55%, transparent);
+  transition: background-color 0.15s, text-decoration-color 0.15s;
+}
+.prose a:hover {
+  text-decoration-color: currentColor;
+  background-color: var(--sanguine-wash);
+}
+.prose a.wikilink {
+  text-decoration-style: solid;
+}
+.prose a[href^='http'] {
+  color: var(--verdigris);
+  text-decoration-color: color-mix(in srgb, var(--verdigris) 50%, transparent);
+}
+.prose a[href^='http']:hover {
+  background-color: var(--verdigris-wash);
+}
+.prose a[href^='http']::after {
+  content: '';
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  margin-left: 0.18em;
+  vertical-align: 0.38em;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  opacity: 0.7;
+}
+.prose strong {
+  font-weight: 650;
+}
+.prose ul,
+.prose ol {
+  padding-left: 1.4em;
+}
+.prose li + li {
+  margin-top: 0.35em;
+}
+.prose li::marker {
+  color: var(--sanguine);
+}
+.prose ul > li::marker {
+  content: '❧  ';
+  font-size: 0.85em;
+}
+.prose ol > li::marker {
+  font-variant-numeric: lining-nums;
+}
+.prose blockquote {
+  margin-left: 0;
+  margin-right: 0;
+  padding: 0.2em 0 0.2em 1.2em;
+  border-left: 2px solid var(--rule);
+  color: var(--ink-2);
+  font-style: italic;
+}
+.prose hr {
+  border: 0;
+  height: 1.5rem;
+  margin: 2.2em auto;
+  background: center / 7rem 1.5rem no-repeat
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 112 24'><g fill='none' stroke='%23b8552f' stroke-width='1.2' stroke-linecap='round'><path d='M4 12 C 30 4, 40 20, 56 12 S 82 4, 108 12'/><circle cx='56' cy='12' r='2.6' fill='%23b8552f'/></g></svg>");
+}
+.prose img {
+  display: block;
+  margin-inline: auto;
+  border: 1px solid var(--rule);
+}
+
+/* Inline code, kbd and code blocks */
+.prose code,
+.prose kbd,
+.prose samp {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  font-variant-ligatures: none;
+}
+.prose :not(pre) > code {
+  padding: 0.08em 0.32em;
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  border: 1px solid color-mix(in srgb, var(--rule) 50%, transparent);
+  overflow-wrap: anywhere;
+  hyphens: none;
+}
+kbd {
+  display: inline-block;
+  min-width: 1.7em;
+  padding: 0.06em 0.42em 0.12em;
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--ink);
+  background: linear-gradient(var(--paper), var(--paper-2));
+  border: 1px solid var(--rule);
+  border-bottom-width: 2.5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.prose pre {
+  position: relative;
+  padding: 1rem 1.15rem;
+  overflow-x: auto;
+  background: var(--code-bg) !important;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  tab-size: 2;
+  hyphens: none;
+  box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--paper) 40%, transparent);
+}
+.prose pre code {
+  font-size: 0.86rem;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.prose pre[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.3rem;
+  right: 0.6rem;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.copy-code {
+  position: absolute;
+  bottom: 0.4rem;
+  right: 0.45rem;
+  padding: 0.12rem 0.5rem;
+  font: 0.72rem var(--font-text);
+  color: var(--ink-2);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.prose pre:hover .copy-code,
+.copy-code:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .copy-code {
+    opacity: 0.85;
+  }
+}
+
+/* Tables: ruled in ink, like a ledger */
+.table-wrap {
+  overflow-x: auto;
+  margin-top: 1.05em;
+}
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.93em;
+  line-height: 1.45;
+  font-variant-numeric: lining-nums tabular-nums;
+  hyphens: none;
+}
+.prose th,
+.prose td {
+  padding: 0.45em 0.7em;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+}
+.prose thead th {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  border-bottom: 1.5px solid var(--ink-3);
+}
+.prose tbody tr:hover {
+  background: color-mix(in srgb, var(--paper-2) 60%, transparent);
+}
+
+/* ── Cole's take: a marginal note in red chalk ─────────────────────────────────────────────────────────────── */
+.coles-take {
+  position: relative;
+  margin: 1.8em 0 !important;
+  padding: 1.1rem 1.25rem 1rem 1.35rem;
+  background:
+    linear-gradient(var(--sanguine-wash), var(--sanguine-wash)),
+    repeating-linear-gradient(-45deg, transparent 0 7px, color-mix(in srgb, var(--sanguine) 5%, transparent) 7px 8px);
+  border-left: 3px solid var(--sanguine);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.coles-take > .label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sanguine);
+}
+.coles-take > .label svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+.coles-take > .body > :first-child {
+  margin-top: 0;
+}
+.coles-take > .body > * + * {
+  margin-top: 0.75em;
+}
+.coles-take > .body {
+  font-size: 1.04em;
+}
+
+/* ── Prices: amount, then when and where it was read ──────────────────────────────────────────────────────── */
+.price {
+  white-space: nowrap;
+}
+.price-amount {
+  font-variant-numeric: lining-nums;
+  font-weight: 600;
+}
+.price-asof {
+  font-size: 0.82em;
+  color: var(--ink-3);
+  white-space: normal;
+}
+.price-asof a {
+  color: inherit !important;
+}
+.price-unverified {
+  color: var(--sanguine);
+  font-style: italic;
+}
+
+/* ── Contents (capitula) and the inner margin ─────────────────────────────────────────────────────────────── */
+.capitula {
+  position: sticky;
+  top: 1.2rem;
+  max-height: calc(100vh - 2.4rem);
+  overflow-y: auto;
+  padding-right: 0.4rem;
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+.capitula h2,
+.margin-head {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 0.75rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.capitula ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: cap;
+}
+.capitula li {
+  margin: 0.38rem 0;
+}
+.capitula li.depth-3 {
+  margin-left: 0.85rem;
+  font-size: 0.92rem;
+}
+.capitula a {
+  display: block;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-left: 1.5px solid transparent;
+  padding-left: 0.55rem;
+}
+.capitula a:hover {
+  color: var(--sanguine);
+}
+.capitula a.active {
+  color: var(--sanguine);
+  border-left-color: var(--sanguine);
+}
+.capitula-inline {
+  margin: 0 0 1.6rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--paper-2) 50%, transparent);
+}
+.capitula-inline summary {
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.capitula-inline ol {
+  margin: 0.6rem 0 0.2rem;
+  padding-left: 1.2rem;
+}
+.capitula-inline a {
+  color: var(--ink-2);
+}
+@media (min-width: 72rem) {
+  .capitula-inline {
+    display: none;
+  }
+}
+
+/* Mirror-script marginalia: ornament only (aria-hidden), Leonardo's right-to-left hand. */
+.marginalia {
+  position: sticky;
+  top: 2rem;
+  display: grid;
+  gap: 3.5rem;
+  padding-top: 4rem;
+  pointer-events: none;
+  user-select: none;
+}
+.marginalia p {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 1.95rem;
+  line-height: 1;
+  color: var(--sanguine-2);
+  opacity: 0.32;
+  transform: scaleX(-1) rotate(var(--tilt, -4deg));
+  text-align: right;
+}
+.marginalia svg {
+  width: 100%;
+  max-width: 11rem;
+  color: var(--ink-3);
+  opacity: 0.45;
+}
+
+/* ── The verso: back matter of the folio ──────────────────────────────────────────────────────────────────── */
+.verso {
+  grid-column: 1 / -1;
+  margin-top: 3.5rem;
+  padding-top: 2.2rem;
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 2rem 3rem;
+}
+@media (min-width: 52rem) {
+  .verso {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.verso-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-1);
+  letter-spacing: 0.06em;
+}
+.verso-head .folio-no {
+  font-size: 1.25rem;
+}
+.verso section h3 {
+  margin: 0 0 0.7rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.verso ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.verso li {
+  margin: 0.45rem 0;
+  line-height: 1.35;
+}
+.verso li small {
+  display: block;
+  color: var(--ink-3);
+  font-size: 0.86rem;
+}
+.verso a {
+  color: var(--sanguine);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+}
+.verso .empty {
+  color: var(--ink-3);
+  font-style: italic;
+}
+.emend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.turn {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  padding-top: 1.2rem;
+  border-top: 1px dashed color-mix(in srgb, var(--rule) 80%, transparent);
+  font-size: 1.02rem;
+}
+.turn a {
+  color: var(--ink-2);
+  text-decoration: none;
+  max-width: 48%;
+}
+.turn a:hover {
+  color: var(--sanguine);
+}
+.turn small {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.turn .next {
+  text-align: right;
+  margin-left: auto;
+}
+
+/* ── Sillybos: the parchment tag that hung from a scroll, here hung from a link ─────────────────────────────── */
+.sillybos {
+  position: absolute;
+  z-index: 60;
+  width: min(23rem, calc(100vw - 1.5rem));
+  padding: 0.95rem 1.1rem 0.9rem 1.35rem;
+  color: var(--ink);
+  background-color: var(--paper-2);
+  background-image: var(--fibres), var(--grain);
+  border: 1px solid var(--rule);
+  border-radius: 3px 10px 10px 3px;
+  box-shadow: 0 14px 34px -14px rgb(60 35 10 / 0.55), 0 2px 5px rgb(60 35 10 / 0.18);
+  transform-origin: var(--tag-origin, 12% 0%);
+  pointer-events: auto;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.sillybos[hidden] {
+  display: none;
+}
+.sillybos::before {
+  /* The punched hole the string runs through. */
+  content: '';
+  position: absolute;
+  left: 0.55rem;
+  top: 0.55rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--desk);
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.35);
+}
+.sillybos.above::before {
+  top: auto;
+  bottom: 0.55rem;
+}
+.sillybos.sheet::before {
+  display: none;
+}
+.sillybos .tag-off {
+  margin-left: auto;
+  padding: 0;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--ink-3);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sillybos .tag-table {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sanguine);
+}
+.sillybos .tag-title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+}
+.sillybos .tag-summary {
+  display: block;
+  margin-top: 0.4rem;
+  font-style: italic;
+  color: var(--ink-2);
+}
+.sillybos .tag-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.55rem;
+  font-size: 0.84rem;
+  color: var(--ink-3);
+}
+.sillybos .tag-foot .folio-no {
+  font-size: 0.95rem;
+}
+.sillybos .tag-open {
+  display: none;
+}
+.sillybos.sheet {
+  position: fixed;
+  left: 0.75rem !important;
+  right: 0.75rem;
+  top: auto !important;
+  bottom: 0.75rem;
+  width: auto;
+  border-radius: 10px;
+}
+.sillybos.sheet .tag-open {
+  display: inline-flex;
+  margin-top: 0.7rem;
+  padding: 0.45rem 0.9rem;
+  color: var(--paper);
+  background: var(--sanguine);
+  border-radius: var(--radius);
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.sillybos.sheet .tag-close {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--ink-3);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.sillybos .tag-close {
+  display: none;
+}
+.sillybos.sheet .tag-close {
+  display: block;
+}
+.sillybos-string {
+  position: absolute;
+  z-index: 59;
+  pointer-events: none;
+  overflow: visible;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sillybos.swing {
+    animation: swing 0.6s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  }
+  @keyframes swing {
+    0% {
+      opacity: 0;
+      transform: rotate(-5deg) translateY(-4px);
+    }
+    55% {
+      opacity: 1;
+      transform: rotate(1.6deg);
+    }
+    100% {
+      transform: rotate(0);
+    }
+  }
+}
+
+/* ── Search (the seeker) ──────────────────────────────────────────────────────────────────────────────────── */
+.seek-dialog {
+  width: min(42rem, calc(100vw - 1.5rem));
+  max-height: min(80vh, 46rem);
+  padding: 0;
+  color: var(--ink);
+  background: var(--paper);
+  background-image: var(--fibres), var(--grain);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  box-shadow: 0 30px 80px -20px rgb(40 20 5 / 0.65);
+}
+.seek-dialog::backdrop {
+  background: rgb(40 25 10 / 0.45);
+  backdrop-filter: blur(2px);
+}
+.seek-form {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+.seek-form svg {
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  color: var(--sanguine);
+}
+.seek-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.2rem;
+  font: inherit;
+  font-size: 1.2rem;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.seek-input::placeholder {
+  color: var(--ink-3);
+  font-style: italic;
+}
+.seek-results {
+  max-height: calc(min(80vh, 46rem) - 5rem);
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.4rem 0;
+  list-style: none;
+}
+.seek-results li a {
+  display: block;
+  padding: 0.65rem 1.1rem;
+  color: var(--ink);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+}
+.seek-results li a:hover,
+.seek-results li a[aria-selected='true'] {
+  background: var(--sanguine-wash);
+  border-left-color: var(--sanguine);
+}
+.seek-results .r-title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  letter-spacing: 0.02em;
+}
+.seek-results .r-meta {
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+.seek-results .r-excerpt {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.95rem;
+  color: var(--ink-2);
+}
+.seek-results mark {
+  background: none;
+  color: var(--sanguine);
+  font-weight: 650;
+}
+.seek-empty {
+  padding: 1.2rem 1.1rem;
+  color: var(--ink-3);
+  font-style: italic;
+}
+.seek-hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  padding: 0.55rem 1.1rem;
+  border-top: 1px solid color-mix(in srgb, var(--rule) 60%, transparent);
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+
+/* ── Footer and edition switcher ──────────────────────────────────────────────────────────────────────────── */
+.colophon {
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: 0 var(--gap) 2.5rem;
+  display: grid;
+  gap: 1.2rem;
+  font-size: 0.98rem;
+  color: var(--ink-2);
+}
+@media (min-width: 52rem) {
+  .colophon {
+    grid-template-columns: 1.3fr 1fr;
+    align-items: start;
+  }
+}
+.colophon p {
+  margin: 0;
+}
+.colophon a {
+  color: var(--ink-2);
+}
+.colophon a:hover {
+  color: var(--sanguine);
+}
+.editions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.editions .label {
+  margin-right: 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.editions a,
+.editions span[aria-current] {
+  display: inline-block;
+  padding: 0.15rem 0.65rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+.editions span[aria-current] {
+  color: var(--paper);
+  background: var(--sanguine);
+  border-color: var(--sanguine);
+}
+
+/* ── Pinakes (the catalogue) and the frontispiece ─────────────────────────────────────────────────────────── */
+.pinax {
+  margin-top: 2.6rem;
+}
+.pinax-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1.5px solid var(--ink-3);
+}
+.pinax-head .numeral {
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  line-height: 1;
+  color: var(--sanguine);
+}
+.pinax-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-2);
+  letter-spacing: 0.04em;
+}
+.pinax-head p {
+  grid-column: 2;
+  margin: 0;
+  font-style: italic;
+  color: var(--ink-2);
+}
+.pinax ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pinax li {
+  display: grid;
+  grid-template-columns: 4.2rem minmax(0, 1fr) auto;
+  gap: 0 1rem;
+  align-items: baseline;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 55%, transparent);
+}
+.pinax .entry-folio {
+  font-style: italic;
+  color: var(--sanguine);
+}
+.pinax .entry-title {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  text-decoration: none;
+}
+.pinax .entry-title:hover {
+  color: var(--sanguine);
+}
+.pinax .incipit {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--ink-2);
+  font-size: 0.98rem;
+}
+.pinax .incipit i::before {
+  content: 'inc. ';
+  font-style: normal;
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.pinax .stichoi {
+  font-size: 0.85rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+@media (max-width: 36rem) {
+  .pinax li {
+    grid-template-columns: 3.2rem minmax(0, 1fr);
+  }
+  .pinax .stichoi {
+    grid-column: 2;
+  }
+}
+
+.frontispiece {
+  text-align: center;
+  padding: clamp(0.5rem, 3vw, 2rem) 0 1rem;
+}
+.frontispiece .greek {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 0.95rem;
+  letter-spacing: 0.4em;
+  color: var(--ink-3);
+}
+.frontispiece h1 {
+  margin: 0.4rem 0 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2.6rem, 1.6rem + 5.5vw, 5.6rem);
+  line-height: 1;
+  letter-spacing: 0.12em;
+}
+.frontispiece .beast {
+  margin: 0.6rem 0 0;
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  letter-spacing: 0.08em;
+  color: var(--sanguine);
+}
+.frontispiece .being {
+  max-width: 36rem;
+  margin: 1.1rem auto 0;
+  font-size: var(--step-1);
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-wrap: balance;
+}
+.frontispiece .vitruvian {
+  display: block;
+  width: min(15rem, 60vw);
+  margin: 1.4rem auto 0.4rem;
+  color: var(--ink-2);
+}
+.seek-large {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: min(32rem, 100%);
+  margin: 1.6rem auto 0;
+  padding: 0.75rem 1rem;
+  font: inherit;
+  font-size: 1.1rem;
+  color: var(--ink-3);
+  text-align: left;
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  cursor: text;
+  font-style: italic;
+}
+.seek-large svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  color: var(--sanguine);
+}
+.seek-large kbd {
+  margin-left: auto;
+  font-style: normal;
+}
+.tables-grid {
+  display: grid;
+  gap: 1.1rem;
+  margin-top: 2.4rem;
+}
+@media (min-width: 40rem) {
+  .tables-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 64rem) {
+  .tables-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.table-card {
+  position: relative;
+  display: block;
+  padding: 1.1rem 1.2rem 1rem;
+  color: var(--ink);
+  text-decoration: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--paper-2) 45%, transparent);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.table-card:hover {
+  border-color: var(--sanguine);
+  box-shadow: 0 10px 26px -16px rgb(70 40 10 / 0.6);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .table-card:hover {
+    transform: translateY(-2px) rotate(-0.3deg);
+  }
+}
+.table-card .numeral {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--sanguine);
+}
+.table-card h3 {
+  margin: 0.35rem 0 0.2rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.2rem;
+  letter-spacing: 0.04em;
+}
+.table-card p {
+  margin: 0;
+  font-size: 0.98rem;
+  font-style: italic;
+  color: var(--ink-2);
+}
+.table-card .count {
+  position: absolute;
+  top: 1rem;
+  right: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+.section-title {
+  margin: 3rem 0 0.3rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-2);
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+.section-sub {
+  margin: 0 auto;
+  max-width: 34rem;
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-2);
+}
+
+/* ── Print: the codex on real paper ───────────────────────────────────────────────────────────────────────── */
+@media print {
+  body,
+  .leaf {
+    background: #fff !important;
+    box-shadow: none;
+  }
+  .masthead nav,
+  .colophon,
+  .margin-outer,
+  .margin-inner,
+  .copy-code,
+  .sillybos {
+    display: none !important;
+  }
+  .prose a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    border: 0;
+    width: auto;
+    height: auto;
+    font-size: 0.8em;
+  }
+}
+@media (max-width: 34rem) {
+  .running-head .wide-only {
+    display: none;
+  }
+}

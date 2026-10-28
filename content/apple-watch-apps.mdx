@@ -1,0 +1,131 @@
+---
+title: Apple Watch Apps
+summary: >-
+  watchOS apps: watch-only or with an iPhone companion, SwiftUI on a tiny screen, WidgetKit complications, and a
+  background budget measured in a few wakes. Cole's example is Drover's watch app, which buzzes when an agent waits.
+table: atelier
+folio: 76
+aliases: [watchOS, Apple Watch, complications, watch apps]
+updated: 2026-10-28
+sources:
+  - title: Creating independent watchOS apps
+    url: https://developer.apple.com/documentation/watchos-apps/creating-independent-watchos-apps
+  - title: Keeping your watchOS content up to date
+    url: https://developer.apple.com/documentation/watchos-apps/keeping-your-watchos-app-s-content-up-to-date
+  - title: Migrating ClockKit complications to WidgetKit
+    url: https://developer.apple.com/documentation/widgetkit/converting-a-clockkit-app
+  - title: Managing your simulated and physical devices in Device Hub
+    url: https://developer.apple.com/documentation/xcode/managing-your-simulated-and-physical-devices-in-device-hub
+  - title: Enabling Developer Mode on a device
+    url: https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device
+  - title: Drover for Apple Watch README (Cole's public repo)
+    url: https://github.com/coletebou/drover/blob/master/native/Apps/watchOS/README.md
+---
+
+An Apple Watch app is a watchOS app: SwiftUI on a screen the size of a postage stamp, with a strict budget for
+running in the background. It can stand alone or ship alongside an iPhone app, and its most visible part is often not
+the app at all but a complication on the watch face or a notification that taps your wrist. Cole's example is the
+Drover watch app, which lists the agent sessions waiting on Cole, shows each one's last message, and answers with a
+canned reply or dictation. Watch apps are built with [[xcode|Xcode]] like the rest of [[ios-development]].
+
+## Three kinds of watch app
+
+| Kind | What it means |
+|---|---|
+| Watch-only | No iPhone app. Xcode still creates a small iOS stub target, used for the bundle ID and App Store packaging, but nothing installs on the phone |
+| Independent, with a companion | Ships with an iPhone app but installs and runs without it ("Supports Running Without iOS App Installation") |
+| Dependent | Installs on the watch, but cannot launch until the iPhone app is installed |
+
+Apple's advice is to make watch apps independent, because people expect them to "just work, even when they don't have
+their iPhones with them," and they can buy watch apps directly from the App Store on the watch. A watch app with a
+companion shares universal in-app purchases with it.
+
+## Getting data onto the watch
+
+A watch reaches the internet three ways, and a request can take any of them: through the paired iPhone over
+Bluetooth, over a known Wi-Fi network, or over its own cellular connection. Apple asks you to test all three.
+
+- **Use URLSession directly.** In the foreground a default session is fastest. In the background use a background
+  session, which guarantees a response eventually, even if the app is suspended.
+- **Treat the iPhone as a bonus.** WatchConnectivity can push data from the companion app, but it "isn't always
+  available," so Apple says to use it "as an opportunistic optimization, rather than the primary means of supplying
+  fresh data."
+- **Expect very little background time.** Background refresh tasks are "strictly limited — both in the number of
+  times your app can wake per day, and in the amount of time it can run when it wakes," and the system favors apps
+  with a complication on the active watch face and apps in the dock.
+
+## Complications are widgets
+
+Complications, the small readouts on the watch face, are built with WidgetKit on watchOS 9 and later. ClockKit-based
+complications are deprecated as of watchOS 10. Because they are WidgetKit, the same SwiftUI views can often power both
+a watch complication and a Lock Screen widget on the iPhone.
+
+## The worked example: Drover for Apple Watch
+
+[Drover's watch app](https://github.com/coletebou/drover/blob/master/native/Apps/watchOS/README.md) is a companion
+to the Drover iPhone app (SwiftUI, watchOS 10 and later, Swift 6). It shows the [[drover|Drover]] sessions waiting on
+Cole and the last message of each, and replies with one tap (yes, no, continue, go ahead, status?) or with dictated
+text that it asks to confirm before sending. New waiting items buzz the watch.
+
+How it stays current, within the watch's rules:
+
+- **In the foreground**, every time the app becomes active, it fetches the daemon's summary, writes it into the watch's
+  shared container, reloads the complications, and buzzes for waiting items it has not seen before.
+- **In the background**, an app-refresh task asks to run about every 15 minutes, backing off to two hours after
+  errors, while watchOS decides the real schedule. A suspended watch app can only use the network through a background
+  URL session, so the task queues a download; when it finishes, the system wakes the app, which writes the summary,
+  reloads the complications and posts a local notification. That notification is what makes the wrist buzz when the
+  app is not on screen.
+- **There is no push.** The Drover daemon has no Apple push service and no push certificate, by design, so nothing
+  leaves Cole's own network; the watch learns about a new item only when it refreshes.
+
+<ColesTake>
+
+On the watch, Drover does one job: buzz when an agent is waiting on me, and let me answer it with a word.
+
+</ColesTake>
+
+Credentials get the same care as on the phone:
+
+- **The iPhone hands them over.** The iPhone app sends the server address and two tokens with
+  `WCSession.transferUserInfo`, which the system encrypts between the paired devices.
+- **The watch has its own Keychain and its own container.** The iPhone's Keychain and App Group are not shared with
+  the watch, so the tokens go into the watch's own Keychain, readable only on that device after first unlock, and the
+  watch app and its complications share the watch's own App Group.
+- **Least privilege by default.** Background refreshes and complications use a read-only widget token; the full token
+  is used only for replies. Tokens are never logged or put in a URL, and "Unpair this watch" deletes them along with
+  the cache.
+
+The networking rule that bites: App Transport Security blocks plain HTTP to anything but local addresses, so the
+watch reaches the daemon over HTTPS, which Drover's setup provides by publishing the daemon on the
+[[tailscale|tailnet]] with `tailscale serve`.
+
+For testing, the watch app's logic compiles and runs as plain tests on a Mac, a separate script compiles the sources
+against the watchOS SDK to catch errors a typecheck misses, and a `--mock` launch argument runs the app on built-in
+sample data for screenshots.
+
+## Running it on your watch
+
+- **Developer Mode on both devices.** To pair an Apple Watch with Xcode, turn on Developer Mode on the watch and on its
+  paired iPhone (see [[push-to-your-phone]]).
+- **Pair the iPhone first.** In Device Hub, the watch comes through its companion iPhone. Apple Watch Series 5 and
+  older also need the Mac on the same Bonjour-compatible Wi-Fi network as the watch.
+- **Wireless is better now.** Xcode 27 pairs iPhones and watches running iOS 27 and watchOS 27 over the network,
+  which Apple says "provides a more reliable experience for pairing watches." With older iOS versions, the iPhone has
+  to stay connected to the Mac by cable to run an app on any Apple Watch.
+- **TestFlight works on the watch.** A watch app embedded in an iPhone app travels with it through
+  [[testflight|TestFlight]], the way Drover's does.
+- **Agents can test it too.** In Xcode 27, coding agents can verify watchOS apps in the simulator, "including rotating
+  and pressing the Digital Crown, and pressing the side and Action buttons."
+
+## Gotchas
+
+- **The background budget is real.** Design for a refresh every quarter hour at best. Show the time of the last update
+  instead of pretending the data is live.
+- **Nothing is shared by default.** A setting saved on the iPhone does not exist on the watch until you send it, and
+  that includes Keychain items.
+- **Test the network routes.** A request that works through the phone can fail on Wi-Fi alone or on cellular.
+- **Dictation needs a confirm step.** Speech recognition on a wrist makes mistakes; Drover shows dictated text and asks
+  before sending it to a session.
+- **Complications get priority.** An app whose complication is on the active face gets background time first, which
+  is one more reason to ship one.

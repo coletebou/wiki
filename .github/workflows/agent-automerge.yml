@@ -1,0 +1,64 @@
+# Agent edits merge themselves: a pull request labelled agent-edit is squash-merged as soon as the required checks pass,
+# but only when it was opened by the repository owner from a branch of this repository (never a fork), targets master,
+# is not a draft, and changes nothing but pages in content/. Anything else is held for review, and a pull request that
+# stops qualifying (say, a later commit touches a workflow) has its auto-merge switched off again.
+name: agent-automerge
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+
+permissions: {}
+
+concurrency:
+  group: automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  agent-automerge:
+    name: agent-automerge
+    if: contains(github.event.pull_request.labels.*.name, 'agent-edit') || (github.event.action == 'unlabeled' && github.event.label.name == 'agent-edit')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Decide
+        id: decide
+        env:
+          OWNER: coletebou
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+          LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'agent-edit') }}
+        run: |
+          reason=""
+          [ "$LABELLED" = "true" ] || reason="it is not labelled agent-edit"
+          [ "$HEAD_REPO" = "$REPO" ] || reason="it comes from a fork"
+          [ "$AUTHOR" = "$OWNER" ] || reason="it was opened by $AUTHOR, not $OWNER"
+          [ "$BASE_REF" = "master" ] || reason="it targets $BASE_REF, not master"
+          [ "$DRAFT" = "false" ] || reason="it is a draft"
+          if [ -z "$reason" ]; then
+            # Every file the pull request touches, and where a renamed file came from, must be a page in content/.
+            outside=$(gh api "repos/$REPO/pulls/$PR/files" --paginate \
+              --jq '.[] | [.filename, (.previous_filename // empty)] | .[] | select(test("^content/[a-z0-9]+(-[a-z0-9]+)*\\.mdx$") | not)')
+            [ -z "$outside" ] || reason="it changes files outside content/"
+          fi
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+      - name: Enable squash auto-merge on this exact head commit
+        if: steps.decide.outputs.reason == ''
+        run: gh pr merge "$PR" --repo "$REPO" --auto --squash --match-head-commit "$HEAD_SHA"
+      - name: Hold for review
+        if: steps.decide.outputs.reason != ''
+        env:
+          REASON: ${{ steps.decide.outputs.reason }}
+        run: |
+          gh pr merge "$PR" --repo "$REPO" --disable-auto >/dev/null 2>&1 || true
+          echo "::notice title=agent-automerge::Not merging automatically: $REASON."

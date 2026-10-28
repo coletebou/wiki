@@ -1,0 +1,128 @@
+---
+title: Codex
+summary: >-
+  OpenAI's coding agent CLI and Cole's second engine: how Codex runs next to Claude Code with the same skills, hooks and
+  memory, and where a different model family earns its place, from reviews to outage diagnosis.
+table: automata
+folio: 28
+aliases: [Codex CLI, OpenAI Codex]
+updated: 2026-10-28
+sources:
+  - title: Codex CLI
+    url: https://learn.chatgpt.com/docs/codex/cli
+  - title: Codex agent approvals and security
+    url: https://learn.chatgpt.com/docs/agent-approvals-security
+  - title: Codex hooks
+    url: https://learn.chatgpt.com/docs/hooks
+  - title: Codex non-interactive mode
+    url: https://learn.chatgpt.com/docs/non-interactive-mode
+  - title: The codex plugin (dx)
+    url: https://github.com/coletebou/dx/tree/master/plugins/codex
+---
+
+Codex is OpenAI's coding agent for the terminal, and the second engine in Cole's [[agent-fleet|fleet]]. Codex sessions
+run in tmux right next to [[claude-code|Claude Code]] sessions, with the same skills, the same hooks and the same
+memory, but a different model family underneath. That difference is the point: Codex gives the independent second
+review, takes lanes in a parallel fan-out, and keeps working when Anthropic's API is having a bad hour.
+
+## What it is
+
+The CLI is a terminal UI (`codex`), a non-interactive runner for scripts (`codex exec`), and `codex resume` to reopen a
+recent session. It reads project instructions from `AGENTS.md` files, the way Claude Code reads `CLAUDE.md`, and its
+settings from `~/.codex/config.toml`.
+
+Two settings decide how much it may do on its own:
+
+| Sandbox | What it allows |
+|---|---|
+| `read-only` | Read files and run commands inside a read-only sandbox |
+| `workspace-write` | Edit and run commands in the working directory; network off unless enabled; approval needed outside it |
+| `danger-full-access` | No sandbox at all |
+
+Approval policies (`on-request`, `never`) decide when Codex stops to ask, and
+`--dangerously-bypass-approvals-and-sandbox` turns both off, the equivalent of Claude Code's bypass mode. The model
+and its reasoning effort are per invocation: `-m <model>` and `-c model_reasoning_effort="high"`, or `/model` inside a
+session.
+
+## Installing and signing in
+
+```sh
+npm install -g @openai/codex      # or: brew install --cask codex
+codex                             # then choose "Sign in with ChatGPT"
+```
+
+Cole signs in with a ChatGPT Pro subscription (<Price id="chatgpt-pro" />), the top individual plan, because a fleet
+runs a lot of Codex; ChatGPT Plus (<Price id="chatgpt-plus" />) is the place to start. Codex can also run OpenAI models through Amazon
+Bedrock, which Cole uses for automated reviews on AWS.
+
+## How Cole uses it
+
+**Second reviews.** Cole's rule for any non-trivial change: two independent reviews of the same frozen commit before
+it ships, one on Codex and one on Claude, gated on severity. Every finding is checked against the real code before
+anyone fixes it, because a plausible finding is not a real one.
+
+<ColesTake>
+
+Every change that matters gets two reviewers, Codex and Claude, over the same commit. Different models miss different
+things, and every finding still gets checked against the real code before anyone fixes it.
+
+</ColesTake>
+
+**Lanes in a fan-out.** The [[parallel-worktrees|parallel worktrees]] launcher runs any lane on Codex, either for the
+whole run (`--engine=codex`) or per manifest row (`codex:sol:xhigh` picks a model alias and an effort). Each Codex window
+unsets any API key so it uses the ChatGPT login, and starts with approvals and sandbox bypassed, because an
+unattended lane in its own worktree needs `git` and `gh` with network access.
+
+**Subagents through tmux.** The `codex-subagents` skill lets any agent fan a task out to Codex: one tmux window split
+into four panes, one interactive `codex` per pane (read-only, `-s read-only`, for reviewers), each briefing written to
+a file and pasted in as a tmux buffer, then a check that every pane really started. For a single bounded job,
+`codex exec --output-last-message <file>` runs headless and leaves its answer in a file.
+
+**Outage diagnosis.** When a Claude turn dies on an API error that retrying will not fix, Cole's
+[[hooks#api-error-recovery|recovery hook]] starts a diagnostic agent, and it picks Codex when Codex is installed: a
+different provider still works during an Anthropic outage.
+
+**From Drover.** [[drover|Drover]] runs one read-only `codex app-server` per machine and reads every thread through
+it, so Codex sessions show up on the same board as Claude's, and a message to a Codex session in a terminal goes in
+through `codex queue`. A launch can start Codex at any reasoning effort the model supports.
+
+## What it shares with Claude Code
+
+Codex is not a separate world on Cole's machines. The [[dotfiles]] give it the same pieces:
+
+- **Rules.** A global `AGENTS.md` carries the same working style, todo-list habit, definition of done and safety rules
+  as Claude Code's `CLAUDE.base.md`, plus a section on reading instructions written for Claude: a skill's knowledge
+  (conventions, checklists, commands) applies as written, while Claude-only mechanics (the `Skill` and `Agent` tools,
+  slash commands) are translated to what Codex has.
+- **Skills.** The installer links every skill in `~/.claude/skills/` into `~/.codex/skills/`, never touching Codex's own
+  bundled ones. Codex reads the same `SKILL.md` format, so one copy serves both. See [[skills-and-plugins]].
+- **Hooks.** `~/.codex/hooks.json` points at the same scripts Claude Code runs: tmux window names, turn timestamps,
+  the stop-too-early nudge, the background reflector before compaction and at session end, and a Codex mode of the
+  context advisor. See [[hooks]].
+- **Memory.** A `SessionStart` hook hands each Codex session the repo's open items from the
+  [[reflection-store|reflection store]]. A bridge copies Cole's curated Claude memory into Codex's memory folder as
+  reference material (never as instructions), and copies Codex's own memory summary back for Claude to see. Both
+  agents also read and write the [[shared-brain|shared brain]] over [[mcp|MCP]].
+
+## Reading what Codex did
+
+The Codex TUI collapses tool output just like Claude Code's does, so a pane is a poor witness. Every session writes a
+rollout file under `~/.codex/sessions/<year>/<month>/<day>/`, and Codex keeps thread state in a local SQLite database.
+The `codex-transcripts` skill reads both: the real commands, outputs and reasoning, and the history a compacted
+session no longer shows. Cole's rule is the same as for Claude: read the transcript, or ask the session; do not trust
+the pane.
+
+## Gotchas
+
+- **Multi-line prompts can submit early.** Typing a long prompt into the TUI with `tmux send-keys` sends it at the
+  first newline. Paste it as a buffer (`tmux load-buffer`, then `paste-buffer -p`), then press Enter once.
+- **An Enter after a paste can be lost.** Check the pane for Codex's working status line, and send one more Enter if
+  the text is still sitting in the composer.
+- **`workspace-write` has no network.** It is a good default by hand, but an unattended lane that runs `gh` stalls
+  there.
+- **Hooks need trust.** Codex skips a new or changed hook until someone reviews it in `/hooks`, so every machine needs
+  one visit after a hook changes.
+- **Codex compacts on its own.** Its window is smaller than a 1M Claude session's, so the context advisor's Codex mode
+  only reflects and adds a one-line note; the `PreCompact` hook saves a reflection first.
+- **Keep subagent defaults on the command line.** Pass model, effort and sandbox per invocation instead of editing
+  `~/.codex/config.toml`, so one run never changes the next.

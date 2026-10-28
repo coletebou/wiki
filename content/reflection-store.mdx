@@ -1,0 +1,147 @@
+---
+title: The Reflection Store
+summary: >-
+  One searchable record per repository of what agents learned and left open, filled in the background as sessions run
+  and shown to every new session at start, so open items get finished instead of forgotten.
+table: automata
+folio: 31
+aliases: [reflections, reflections store]
+updated: 2026-10-28
+sources:
+  - title: Agent memory (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/memory/README.md
+  - title: The reflections CLI (dx)
+    url: https://github.com/coletebou/dx/blob/master/scripts/reflections
+  - title: The session reflector (dx)
+    url: https://github.com/coletebou/dx/blob/master/base/claude/session_reflector.py
+  - title: Claude Code hooks reference
+    url: https://code.claude.com/docs/en/hooks
+---
+
+The reflection store is one searchable record, per repository, of what Cole's agents learned and what they left open:
+learnings, decisions, gotchas, ideas, handoffs, and action items that can be marked done. Background reflections fill
+it while sessions run, before they compact and when they end; every new session starts by reading its open items.
+Claude Code and Codex use it through the same small CLI, `reflections`.
+
+It exists because the other places memory could live each miss something. A transcript is complete but huge and gets
+compacted. Compaction keeps a conversation going, not what it decided or left unfinished. A curated `MEMORY.md` is
+short by design. The store sits between them: every open thread gets a row with an id, and a row stays open until
+someone closes it with evidence.
+
+<ColesTake>
+
+Compaction keeps the gist and loses the ids. The reflection store is where the open items go, so the next session
+actually finishes them instead of starting over.
+
+</ColesTake>
+
+## What goes in it
+
+Each item has a kind, a title, a body and an id like `#a1b2`. Actionable kinds start open; knowledge kinds are notes.
+
+| Kind | Starts as | Example |
+|---|---|---|
+| `action` | open | "Wire the retry budget into the importer" |
+| `question` | open | "Does the nightly job still need the old flag?" |
+| `handoff` | open | A handoff prompt, recorded so the receiving session can close it |
+| `learning`, `decision`, `gotcha`, `idea`, `note` | note | "tmux 3.4 escapes control characters in format output" |
+
+An open item nobody has touched for seven days reads as **stale** (thirty days for what a person or the `/reflect`
+skill wrote). Stale is derived when the index is built, never written, so no machine has to sweep and none can race;
+editing, reopening or re-adding the same title brings an item back.
+
+```sh
+reflections add --kind action --title "Wire X" --body "…"    # prints the new id
+reflections list [--all] [--status open|stale|done|dropped|note|all]
+reflections search sqlite wal                # reflections plus every memory file
+reflections done <id> --note "shipped in abc123"
+reflections context                           # what a new session is shown
+```
+
+## Who writes to it
+
+- **The background reflector**, through [[hooks]]. It is the main writer, described below.
+- **The `/reflect` skill**, Cole's end-of-session retrospective, which records follow-ups and closes what the session
+  finished.
+- **The `/handoff` skill.** It writes a portable handoff prompt; a hook adds one step in Cole's sessions, recording the
+  handoff as an open row so the receiving session can close it with `reflections done`.
+- **Anyone**, person or agent, with `reflections add`.
+
+## How the reflector works
+
+The reflector runs at checkpoints as a session's context fills (a cheap Haiku pass at 20% of the model window,
+Sonnet passes at 40, 60 and 80%), right before compaction, and when the session ends. Each run:
+
+1. **Detaches.** The hook validates its input, double-forks into its own process session and returns in about 50
+   milliseconds, so compaction never waits and the end of a session is never slowed.
+2. **Condenses.** It reads the transcript from where its last run stopped (it keeps a byte offset per session) and
+   keeps prompts, assistant text, tool calls and errors, dropping tool output. A checkpoint costs only what was said
+   since the one before.
+3. **Gathers candidates.** `reflections candidates` gives the model this session's own items, open and stale items that
+   match the excerpt, the repo's freshest items and recently closed ones, all with their ids.
+4. **Reconciles.** The model answers with a summary, updates and new items. Updates close, drop, reopen or edit
+   offered items, each with its evidence in a note (`[reflector stage 60%] tests green …`); only ids it was offered
+   count. New items are added only when the store does not already hold them.
+5. **Summarizes.** One rolling summary note per session is rewritten at every checkpoint, with the summary so far as
+   input.
+
+The deep pass, before compaction and at session end, uses the strongest model. Subagents and headless `claude -p`
+automation are skipped, only one reflection per session runs at a time (the final ones wait for a running stage, so
+the end of a session is never dropped), and every model call it makes is marked so no hook reflects on a reflection.
+On a real 1.1 MB transcript it produced nine items in 22 seconds.
+
+## Where it lives
+
+- **One file per machine.** Each change is one JSON line appended to `reflections/<host>.jsonl` inside the repo's
+  memory home. Each machine appends only to its own file, so git never has to merge one, and items fold
+  latest-event-wins.
+- **Synced with the dotfiles.** The memory homes live in Cole's private dotfiles repository, so the logs reach every
+  machine on the next `dotsync` with no new sync path. See [[dotfiles]].
+- **An index, never committed.** A SQLite full-text index under `~/.local/state/` is derived and rebuildable, refreshes
+  in about ten milliseconds when nothing changed, and also indexes Claude Code's memory files, Codex's memory and the
+  nightly analyzer's reports, so one search spans everything both agents remember.
+- **Redacted on the way in.** Credential-shaped strings are replaced before a line is written, and the pre-push secret
+  scan is the backstop (see [[git]]).
+
+## Where it shows up
+
+- **At session start.** Claude Code's load-memory hook prints the repo's open items after its handoff file; it runs
+  again after `/compact` and `/clear`, so the items survive compaction. Codex gets the same list from its own
+  `SessionStart` hook. See [[context-and-compaction]].
+- **In the status line.** A segment shows the number of open items for the current repo, refreshed every two minutes.
+  See [[claude-code-status-line]].
+- **In Drover.** [[drover|Drover]] indexes every item for search by meaning, and its `drover_reflections` tool lists,
+  searches, closes and batch-edits items from any session on any machine.
+
+## Keeping it clean
+
+A store that only grows becomes noise. Three things keep it useful: stale items drop out of the session-start list
+on their own; the reflector closes items the transcript shows were finished; and a dedupe pass asks a cheap model for
+groups of open items that describe the same work and drops all but one, noting which item it duplicated (reversible
+with `reopen`). The first big cleanup, in October 2026, took the store from 3,080 open items to 1,258 fresh ones,
+with 1,792 gone stale and 40 duplicates dropped.
+
+## The rest of the memory stack
+
+The store is one layer of four, all on top of the auto-memory directory Claude Code already loads:
+
+| Piece | When | What it writes |
+|---|---|---|
+| The reflection store | Whenever anyone records something | Rows that can be searched and closed |
+| The session reflector | Background checkpoints, before compaction, at session end | Rows for that session, reconciled with the open ones |
+| The session analyzer | Nightly | Unfinished work, repeated corrections, memory candidates |
+| Dreaming | Nightly, after the analyzer | Promotions into `MEMORY.md` and a narrative diary |
+
+Only one machine is allowed to promote into `MEMORY.md`, so two machines never rewrite it at once. Above all of it sits
+the [[shared-brain|shared brain]], one memory across every agent and every machine.
+
+A data boundary keeps chosen sessions out of all of this: a command you configure answers "is this session
+restricted?" before any memory tool reads a transcript or calls a model, and a missing or failing check counts as
+restricted.
+
+## Setting it up
+
+The pieces are public in [dx](https://github.com/coletebou/dx): `./install.sh --with memory,claude` installs the CLIs
+and the hooks, the three `claude/*.conf.example` files map your repositories to their memory homes, and
+`./install.sh --with schedules` adds the nightly analyzer and dream sweep. Keep the memory itself in a private
+repository; it is data, not code.

@@ -1,0 +1,235 @@
+---
+title: Cloudflare
+summary: >-
+  DNS for every domain Cole owns, plus the proxy, firewall, bot rules, tunnels, logins and email routing in front of
+  the sites and APIs: what each plan includes, which settings to turn on, and why one zone pays for Pro.
+table: works
+folio: 53
+aliases: [Cloudflare DNS, Cloudflare WAF, Bot Fight Mode]
+updated: 2026-10-28
+sources:
+  - title: Cloudflare plans
+    url: https://www.cloudflare.com/plans/
+  - title: WAF custom rules (Cloudflare docs)
+    url: https://developers.cloudflare.com/waf/custom-rules/
+  - title: Rate limiting rules (Cloudflare docs)
+    url: https://developers.cloudflare.com/waf/rate-limiting-rules/
+  - title: Security features interoperability (Cloudflare docs)
+    url: https://developers.cloudflare.com/waf/feature-interoperability/
+  - title: Bot Fight Mode (Cloudflare docs)
+    url: https://developers.cloudflare.com/bots/get-started/bot-fight-mode/
+  - title: Super Bot Fight Mode (Cloudflare docs)
+    url: https://developers.cloudflare.com/bots/get-started/super-bot-fight-mode/
+  - title: Block AI bots (Cloudflare docs)
+    url: https://developers.cloudflare.com/bots/additional-configurations/block-ai-bots/
+  - title: Encryption modes (Cloudflare docs)
+    url: https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/
+  - title: Leaked credentials detection (Cloudflare docs)
+    url: https://developers.cloudflare.com/waf/detections/leaked-credentials/
+  - title: Cloudflare in front of self-hosted services (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/infra/cloudflare.md
+---
+
+Cloudflare does all of Cole's DNS: every domain, no exceptions. In front of the sites and APIs that run on Cole's AWS
+[[servers]], it is also the reverse proxy, the TLS terminator, the web application firewall, the bot filter and the
+CDN, and it carries traffic to those servers through tunnels, so none of them has an open port. It routes custom email
+for every domain too.
+
+Most of that is free. One zone, the one that takes real production traffic, pays for the Pro plan, and the reasons are
+specific: more firewall rules, real rate limits and bot protection that can make exceptions.
+
+## What it does in Cole's setup
+
+| Piece | What it does | More |
+|---|---|---|
+| DNS | Authoritative DNS for every zone, with records reviewed as code | [[domains]], [[opentofu]] |
+| Proxy, TLS and CDN | Proxied names get Cloudflare's edge: certificates, DDoS protection, caching | below |
+| WAF and rate limits | Custom rules, managed rules and rate limiting, before a request reaches a server | below |
+| Bot protection | Bot Fight Mode or Super Bot Fight Mode, and an AI crawler policy | below |
+| Tunnels | `cloudflared` on each server dials out to Cloudflare, so no server listens on the internet | [[cloudflare-front-door]] |
+| Access | A login in front of private hostnames: staging sites, dashboards, web terminals | [[cloudflare-front-door]] |
+| Email Routing | Custom addresses on every domain, forwarded to a real inbox or a Worker | [[cloudflare-email-routing]] |
+| R2 and Workers | S3-compatible object storage for app assets and media, small functions at the edge | below |
+| Registrar | Domains sold at cost | [[domains]] |
+| The API and `cf` | All of the above, scriptable, and the new CLI Cole uses for it | [[cloudflare-api]] |
+
+The diagram on [[cloudflare-front-door]] follows one request through these pieces.
+
+## DNS for every domain
+
+Every zone is a **full setup**: the domain's nameservers are Cloudflare's, so Cloudflare answers every DNS query for
+it. Each record is either **proxied** (the orange cloud: the name resolves to Cloudflare, which forwards the request
+to the origin) or **DNS-only** (the grey cloud: the name resolves straight to the target).
+
+| Proxied | DNS-only |
+|---|---|
+| Everything behind a tunnel, and anything that should get the WAF, rate limits, HTTPS redirects and caching | Hosts that issue their own certificates or run their own CDN, such as a frontend on [[vercel\|Vercel]]; mail records; records a provider requires DNS-only |
+
+Proxying hides the origin's address and puts every request through the rules below. A redirect rule, for example,
+only runs on a proxied name. Records are configuration, not clicks: each zone's records live in a zone root of
+[[opentofu|OpenTofu]] code, keyed by content, and any change is a pull request with a plan. A domain bought through
+Cloudflare's own registrar has to use Cloudflare's nameservers, which suits this setup anyway.
+
+## The plans
+
+Every plan, Free included, has unmetered DDoS protection, Universal SSL, the CDN, the WAF with Cloudflare's free
+managed ruleset, and Workers. The differences that matter for a small team are the rule counts and the bot features
+(prices as of October 28, 2026, from cloudflare.com):
+
+| | Free | Pro | Business |
+|---|---|---|---|
+| Price per zone | <Price id="cloudflare-free" format="bare" /> | <Price id="cloudflare-pro" format="bare" /> | <Price id="cloudflare-business" format="bare" /> |
+| WAF custom rules | 5 | 20 | 100, with regular expressions |
+| Rate limiting rules | 1, with a fixed 10-second window and 10-second block | 2, windows up to 1 minute, blocks up to 1 hour | 5, windows up to 10 minutes, blocks up to a day |
+| Bot protection | Bot Fight Mode (on or off) | Super Bot Fight Mode (actions per bot class, exceptions) | Super Bot Fight Mode with basic bot analytics |
+| Cloudflare Rules, all kinds | 70 | 225 | 450 |
+
+Enterprise contracts raise everything (1,000 custom rules, 100 rate limiting rules) and add Bot Management. Plans are
+per zone, so one domain can be on Pro while the rest stay on Free.
+
+## Why one zone pays for Pro
+
+Cole's production zone carries an app's public site and its API, and the API is called by browsers, mobile apps,
+payment and telephony webhooks, uptime monitors and Cole's own agents. Five custom rules do not cover that. In
+evaluation order, its custom rules are:
+
+1. **Skips first.** Each provider webhook skips the managed rules on its exact path and user agent (the app checks
+   the provider's signature itself), and verified bots plus the uptime monitor skip the rest of the custom rules.
+2. **Blocks.** Scripted clients (`curl`, `python-requests`, `wget` and friends, or an empty user agent) are blocked
+   on the expensive chat endpoint, which only the app itself should call.
+3. **Challenges.** A managed challenge on that endpoint for a short list of high-risk countries.
+
+It also runs two rate limiting rules, which Free cannot express: one on the authentication endpoints (excluding the
+OAuth callbacks the sign-in providers post to, because rate-limiting a callback looks exactly like a broken login), and
+one that quickly blocks a client whose login attempts use passwords already known from breaches
+(`cf.waf.credential_check.password_leaked`, available on every plan). Both need windows and blocks longer than Free's
+fixed ten seconds. The public dx guide has the same pair as a
+[template](https://github.com/coletebou/dx/blob/master/docs/infra/cloudflare.md#rate-limits).
+
+And it uses Super Bot Fight Mode instead of Bot Fight Mode, because the API serves automated clients on purpose.
+Super Bot Fight Mode can be skipped for one path or user agent with a custom rule; Bot Fight Mode cannot be skipped at
+all. Every other zone, from side projects to parked domains, stays on Free.
+
+### Checking Cole's numbers
+
+Cole said: "we have the $20/month Pro plan just so you can do more WAF rules." Cloudflare's own pricing page says
+<Price id="cloudflare-pro" />, so the twenty-dollar figure is right for a plan paid a year at a time, and monthly
+billing costs more. The reason is right too: Pro raises custom rules from 5 to 20 and rate limiting rules from 1 to 2,
+with windows long enough to be useful, and its bot protection can make exceptions.
+
+## Bot Fight Mode, and what to use instead
+
+Bot Fight Mode is Cloudflare's free bot filter, a single switch per zone. When it is on, Cloudflare matches traffic
+against patterns of known bots and answers them with computationally expensive challenges, which makes scraping
+costly. It also turns on JavaScript detections, which a strict Content Security Policy has to allow (scripts under
+`/cdn-cgi/challenge-platform/`).
+
+Two properties decide whether you want it:
+
+- **It cannot be skipped.** Bot Fight Mode runs outside Cloudflare's rules engine, so no custom rule, page rule or
+  skip action exempts anything. Your own scripts, your CI's smoke tests, a mobile app's API calls and your agents all
+  get the same treatment as a scraper.
+- **It protects the whole zone.** There is no per-path setting.
+
+So the rule of thumb is simple. Turn Bot Fight Mode on for a zone that serves only people in browsers: a marketing
+site, a blog, a parked domain. Leave it off for a zone with an API that scripts or agents call. On Pro and above,
+use **Super Bot Fight Mode** instead: it sets an action per class (definitely automated, likely automated, verified
+bots), protects static resources if you want, and runs in its own phase after the custom rules, so a custom rule with
+the *Skip* action can exempt your webhook paths and your own clients. Two cautions from Cloudflare's docs: turn Bot
+Fight Mode off before turning on Super Bot Fight Mode, and if the zone uses Cloudflare Tunnel, keep *definitely
+automated* on *Allow*, or the tunnel's own connections can fail with `websocket: bad handshake`.
+
+Separately, every plan can set an **AI crawler policy** per kind of AI traffic: *Search* (indexing to answer questions
+later), *Agent* (fetching in real time on someone's behalf) and *Training*. Each can be blocked everywhere, blocked on
+pages with ads, or allowed. Cloudflare changed the defaults for new domains on September 15, 2026 to block training and
+agent bots on pages with ads. Think before blocking *Agent* outright: that also blocks the assistants your own users,
+and your own agents, use to read your site. AI Labyrinth, a further option, feeds crawlers that ignore no-crawl
+instructions a maze of hidden links instead of blocking them.
+
+All of these are switches in the API as well as the dashboard (see [[cloudflare-api]]):
+
+```sh
+cf bot-management update -z example.com \
+  --body '{"fight_mode": true, "ai_bots_protection": "block"}' --dry-run
+```
+
+## Settings worth turning on
+
+| Setting | Value | Why |
+|---|---|---|
+| SSL/TLS encryption mode | Full (strict) | Cloudflare verifies the origin's certificate. *Flexible* encrypts only the visitor's half of the trip and should be avoided. A tunnel needs no origin certificate at all. |
+| Minimum TLS version | 1.2 | 1.3 on a zone whose clients all support it |
+| Always Use HTTPS | On | Redirects every plain HTTP request |
+| HSTS | On, with subdomains, once every name serves HTTPS | Turn on preload only if that will stay true: leaving a browser preload list takes months |
+| Bot protection | See above | Bot Fight Mode for browser-only zones, Super Bot Fight Mode with skips for zones with APIs |
+| AI crawler policy | A decision per kind | Block *Training* if you do not want to train models; think before blocking *Agent* |
+| Browser Integrity Check | On, then test your own clients | It rejects some scripting user agents with error 1010 |
+| A leaked-password rule | Block or challenge `cf.waf.credential_check.password_leaked` on login | Free on every plan |
+| Noindex for non-production names | A response header rule: `X-Robots-Tag: noindex, nofollow` | Staging and preview hostnames stay out of search |
+| DNSSEC | On, together with the DS record at the registrar | Never turn it off while the registrar still publishes the DS record: the zone stops resolving |
+| No-mail records | `MX 0 .`, `v=spf1 -all`, `DMARC p=reject` | For a domain that sends no mail, so nobody can send as it |
+
+After turning on any bot or security feature, run the clients you own through the edge (`curl`, the mobile app, an
+agent's HTTP client) before calling it done.
+
+## Rules run in a fixed order
+
+Cloudflare evaluates its security rules in phases, always in this order: HTTP DDoS protection, then **custom rules**,
+then **rate limiting rules**, then **managed rules**, then **Super Bot Fight Mode**. A terminating action (block,
+challenge) in one phase stops the request before the later phases run. Bot Fight Mode, Browser Integrity Check, IP
+access rules and the security level sit outside this pipeline and run on their own.
+
+That order is why skip rules go first, and why a skip has to say what it skips:
+
+```json
+{
+  "description": "Payment webhook skips the managed rules",
+  "expression": "http.request.uri.path eq \"/api/webhooks/payments\" and http.user_agent contains \"PaymentProvider/\"",
+  "action": "skip",
+  "action_parameters": { "phases": ["http_request_firewall_managed"] }
+}
+```
+
+`"ruleset": "current"` in a skip rule skips only the remaining custom rules, not the managed rules. Naming the managed
+phase, as above, is what keeps the managed WAF off a webhook's payload. Skipping Super Bot Fight Mode works the same
+way, with the `http_request_sbfm` phase.
+
+## R2 and Workers
+
+R2 is Cloudflare's S3-compatible object storage, and Cole keeps app assets, shared files and media there, next to the
+DNS and rules that serve them. Workers are small functions that run at the edge, and Cole uses them for jobs that
+belong near the traffic, such as handling inbound mail for a domain. Workers code and its routes are deployed with
+the project's own tooling, next to the code; OpenTofu only creates the shared buckets and outputs their names. Archives
+and backups go to AWS instead (see [[s3-and-glacier]]).
+
+## Managing it as code
+
+Every zone, record, ruleset, tunnel object, Access application and email rule is managed by [[opentofu|OpenTofu]],
+with plans on pull requests and applies on merge. Two Cloudflare-specific lessons from that work:
+
+- **A ruleset update replaces the whole phase.** Whether it comes from OpenTofu or `cf rulesets entrypoint update`, the
+  new list replaces every rule in that phase. A rule someone added in the dashboard and never wrote down is gone after
+  the next update, so export the live phase and diff it first.
+- **Some records belong to other products.** Email Routing, Workers custom domains, R2 custom domains and Pages own
+  their DNS records, and the API marks them read-only. Leave them out of the managed records.
+
+## Gotchas
+
+- **A published container port bypasses the edge.** Docker writes its own firewall rules ahead of UFW's, so a port
+  published as `3100:3100` answers on the server's public address whatever the firewall says. Publish on loopback:
+  `127.0.0.1:3100:3100`.
+- **An explicit record beats a wildcard.** With `*.example.com` pointed at a tunnel, adding an `A` record for one name
+  "to be safe" sends that name around the tunnel to an origin that is not listening.
+- **A record pointing at a deleted tunnel** answers error 1033 (HTTP 530), and a wildcard pointing at one breaks every
+  name under it. Delete the records with the tunnel.
+- **Rate limits are approximate.** Counters are kept per data center and update within seconds, so a few requests over
+  the limit can reach the origin. Put exact limits in the app.
+- **Plan limits move.** Rule counts, windows and bot features change; read the current docs before designing around
+  them.
+
+<ColesTake>
+
+Cloudflare does all of our DNS. We have the Pro plan on the one zone that takes real traffic, just so I can write more
+WAF rules and real rate limits. Everything else is on the free plan, and the free plan is plenty for most domains.
+
+</ColesTake>

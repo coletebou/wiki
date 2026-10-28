@@ -1,0 +1,176 @@
+---
+title: Monero
+summary: >-
+  The cryptocurrency that is private by default: ring signatures hide the sender, stealth addresses the receiver,
+  RingCT the amount. How it works, the FCMP++ upgrade still in testing, its limits, and why Cole rates it so highly.
+table: mint
+folio: 81
+aliases: [XMR, FCMP++, ring signatures, stealth addresses, RingCT, Carrot, privacy coins]
+updated: 2026-10-28
+sources:
+  - title: Monero FAQ (getmonero.org)
+    url: https://www.getmonero.org/get-started/faq/
+  - title: Moneropedia (stealth addresses, ring signatures, RingCT, view keys, pruning)
+    url: https://www.getmonero.org/resources/moneropedia/
+  - title: Full-Chain Membership Proofs (getmonero.org, 2024)
+    url: https://www.getmonero.org/2024/04/27/fcmps.html
+  - title: Deprecating Monero's custom transaction unlock time (getmonero.org, May 2026)
+    url: https://www.getmonero.org/2026/05/10/deprecating-unlock-time.html
+  - title: Monero 0.18.5.4 released (getmonero.org, October 2026)
+    url: https://www.getmonero.org/2026/10/16/monero-0.18.5.4-released.html
+  - title: Monero 0.18.0.0 released (ring size 16, Bulletproofs+, view tags)
+    url: https://www.getmonero.org/2022/07/19/monero-0.18.0.0-released.html
+  - title: FCMP++ and Carrot beta stressnet releases
+    url: https://github.com/seraphis-migration/monero/releases
+  - title: Shielded and transparent Zcash (z.cash)
+    url: https://z.cash/learn/what-is-the-difference-between-shielded-and-transparent-zcash/
+  - title: Binance delists XMR (February 2024)
+    url: https://www.binance.com/en/support/announcement/detail/f73b083ba6834771b07dbe5319917ae5
+  - title: The Monero 51% attack, explained (Halborn, August 2025)
+    url: https://www.halborn.com/blog/post/explained-the-monero-51-percent-attack-august-2025
+---
+
+Monero is a cryptocurrency whose transactions are private by default. Where [[bitcoin|Bitcoin]] publishes every
+sender, receiver and amount for anyone to read forever, Monero hides all three in every transaction, for every user,
+with no setting to forget. Cole's words for it were blunt: Monero is the only thing that is really private right now,
+and the government sees everything with Bitcoin. This page lays out the case behind that view, where it holds and
+where it doesn't, the big upgrade in testing as of late October 2026, and how to use it. It describes what the
+software does; it is not financial advice.
+
+<ColesTake>
+
+Monero is the only thing that's really private right now. With Bitcoin, the government sees everything.
+
+</ColesTake>
+
+## Private by default
+
+The Monero FAQ sums up the design: "Monero uses three different privacy technologies: ring signatures, ring
+confidential transactions (RingCT), and stealth addresses. These hide the sender, amount, and receiver in the
+transaction, respectively." And then the part that matters most: "All transactions on the network are private by
+mandate; there is no way to accidentally send a transparent transaction."
+
+That last point is the nuance behind Cole's take. Other systems can be private too: Bitcoin has privacy tools
+([[bitcoin#privacy-tools-and-how-far-they-go|PayJoin, silent payments, CoinJoin]]), and Zcash's shielded transactions
+use strong cryptography. But on Bitcoin privacy is something you add, one careful step at a time, and Zcash itself
+describes its users as having "the option to keep your financial information private (shielded), or transparent."
+When privacy is optional, using it can itself stand out, and the crowd you hide in is only the people who opted in.
+On Monero everyone is in the same crowd, all the time, which is also why the project says plainly that Monero is not
+a mixer: there is nothing to opt into.
+
+## How it works
+
+### Stealth addresses hide the receiver
+
+You publish one address, but every payment to it lands at a fresh one-time address on the blockchain that no one else
+can connect to yours. In Moneropedia's words, "only the sender and receiver can determine where a payment was sent."
+Every wallet has a private view key (to find incoming payments), a private spend key (to spend them), and a public
+address built from both. Subaddresses let you hand each payer a different address that still belongs to one wallet.
+
+### Ring signatures hide the sender
+
+Each input of a transaction is signed with a *ring*: the coin actually being spent plus decoys picked from the
+blockchain, 16 members in all since the network upgrade of August 2022. Anyone can verify that one member of the ring
+signed, and no one can tell which. A ring signature "makes use of your account keys and a number of public keys (also
+known as outputs) pulled from the blockchain," chosen with a statistical distribution meant to look like real spending.
+
+### RingCT hides the amount
+
+Ring Confidential Transactions, mandatory for every transaction since September 2017, hide amounts while still
+letting every node verify that no money was created from nothing. The range proofs that make this work were upgraded
+to Bulletproofs+ in the same 2022 upgrade that raised the ring size.
+
+### Dandelion++ hides where a transaction came from
+
+Since version 0.16 (2020), nodes relay new transactions with Dandelion++, which passes a transaction along a random
+path before broadcasting it, so the first node that announces it is probably not the one that created it.
+
+### View keys allow selective transparency
+
+Monero calls itself "private, optionally transparent." Sharing a private view key lets someone see every incoming
+payment to an address, for an accountant or an audit, though not reliably its outgoing ones. To prove a single
+payment, you can share that transaction's key instead, which reveals just that payment;
+[[cake-wallet#proving-a-monero-payment|Cake Wallet's page]] shows how.
+
+## FCMP++: the upgrade in testing
+
+Rings are Monero's weakest link. Getmonero.org's FCMP++ announcement lists the problems: rings are "vulnerable to
+attacks such as the EAE attack, have difficulties upon chain reorganizations, and in general enable statistical
+analysis." With 16 members, a ring only hides the real coin among 16 possibilities.
+
+FCMP++ (Full-Chain Membership Proofs, plus spend authorization and linkability) replaces rings with a proof that the
+coin being spent is one of *all* the outputs on the chain. The current test release explains it this way: instead of
+proving you own one of 16 outputs, "you make a proof that you own 1 of the 150 million+ Monero outputs from across
+the entire Monero blockchain." It ships with Carrot, a new addressing protocol that keeps existing addresses working.
+The design also makes room for outgoing view keys, transaction chaining for layer-two protocols, and privacy that
+holds up even against an attacker with a quantum computer, with wallets adopting those features on their own schedule
+afterward.
+
+Where it stands as of October 28, 2026:
+
+- **It is not live.** The released Monero software is version 0.18.5.4 (October 16, 2026), and the protocol still
+  uses rings of 16. The project's May 2026 announcement said "a FCMP++ fork date is not set," and no mainnet date has
+  been announced on getmonero.org since.
+- **It is in public testing.** The FCMP++ and Carrot beta stressnet, version 3.0, hard-forked from the test network on
+  October 5, 2026, at block 3,102,800. Version 3.1 followed on October 26 and fixed, among other things, "a detectable
+  inflation vulnerability" that was exposed for the first 24 hours of that test fork: exactly the kind of bug the test
+  exists to find before real money is involved.
+- **One feature is going away.** Custom transaction unlock times will be removed at the FCMP++ fork; new transactions
+  created after June 1, 2026 with an unlock time past the fork will unlock as soon as the fork block arrives.
+
+Until it ships, there is nothing for a user to do except keep wallet software current and update when getmonero.org
+announces the release.
+
+## What it does not protect
+
+The Monero FAQ is refreshingly honest about this: "There is no such thing as 100% anonymous." Its list:
+
+- **The crowd is only Monero users.** "Your anonymity set is the set of people using Monero."
+- **Software has bugs**, and "ways may exist to infer some information through Monero's privacy layers, either now or
+  later. Attacks only get better."
+- **Your own actions leak.** "If you use Monero but give your name and address to another party, the other party will
+  not magically forget your name and address." The exchange that sold you Monero knows who you are, and so does the
+  merchant who ships you a package.
+- **Remote nodes see your IP.** A node operator "is able to see from what IP address a transaction comes from (even if
+  cannot see the recipient nor the amount)." Run your own node, or reach a remote one over Tor or I2P.
+
+Two more limits come from outside the protocol:
+
+- **Fewer on-ramps.** Several regulated exchanges have dropped Monero; Binance, the largest, delisted it in February
+  2024. Buying and selling it usually means a smaller exchange or a swap service, each with its own rules.
+- **Privacy is not the same as security.** In August 2025 the Qubic mining pool gained enough of Monero's hashrate to
+  reorganize recent blocks, a six-block reorganization by the security firm Halborn's account. Transactions stayed
+  private, but a reorganization can undo recent confirmations, which is why careful merchants and exchanges wait for
+  more of them.
+
+## Mining
+
+Monero uses RandomX, a proof of work designed to be ASIC-resistant: it "strongly reduces the efficiency of ASICs,
+making them not profitable to build," so ordinary computers can mine. That is the opposite of Bitcoin, where a
+[[bitaxe|Bitaxe]] needs a dedicated chip. Monero also has no maximum supply: since June 2022 every block pays a
+constant 0.6 XMR "tail emission," an inflation rate under 1% that falls toward zero over time, so miners always have a
+reason to secure the chain.
+
+## Using it
+
+- **A wallet.** [[cake-wallet|Cake Wallet]] on a phone is the wallet on Cole's list. The official GUI wallet runs on
+  Windows, macOS and Linux, and the official command line tools also ship for Android and FreeBSD. A *lightweight*
+  wallet gives its view key to a server that scans for you, which is convenient and less private.
+- **A node.** The official `monerod` can run pruned: `monerod --prune-blockchain` removes most of the old ring
+  signature data, syncs about a third of the chain from scratch, and has "no privacy or security downsides." The
+  project still prefers a full node when you can, and a pruned node over a remote one. If your node runs at home, a
+  phone wallet can reach it from anywhere over a private network such as [[tailscale|Tailscale]] instead of a
+  stranger's remote node. (Bitcoin's version of this setup is [[sparrow-wallet|Sparrow]] talking to your own Bitcoin
+  Core.)
+- **Verify downloads.** Each release post lists SHA-256 hashes, and the GPG-signed hashes file on getmonero.org "should
+  be treated as canonical." See [[pgp]] for checking signatures.
+
+## Gotchas
+
+- **Seeds stay offline.** The FAQ again: "If you backup your seed in the cloud, you'll be poorer soon."
+- **Restore heights.** Restoring a wallet from a block height after its first transaction can hide older funds.
+- **Swaps are a hop.** A swap service sees both sides of the trade, like an exchange.
+- **Old guides are getting older.** Anything written about unlock times or ring sizes changes again at the FCMP++
+  fork. Check dates.
+- **The wiki never shows an address.** Monero addresses are long strings that start with a 4 or an 8, and this wiki's
+  safety check rejects them, like keys and seeds.

@@ -1,0 +1,14 @@
+---
+// Study: the agent fleet, in six views (the fleet, hooks, messages, handoff, parking, the brain).
+import { SCENES } from '../data/agent-fleet';
+import InkMap from './InkMap.astro';
+
+const { scene } = Astro.props as { scene?: string };
+---
+<InkMap
+  scenes={SCENES}
+  initial={scene ?? 'fleet'}
+  uid={`fleet-${scene ?? 'all'}`}
+  title="The agent fleet"
+  hint="Choose a view, step through it, or click any part to see what it does."
+/>

@@ -1,0 +1,186 @@
+---
+title: GitHub Actions
+summary: >-
+  How CI/CD works in Cole's repositories: workflows on every pull request, required checks, deploys on merge, why
+  public repositories run free while private ones pay by the minute, and how Cole stopped a runaway CI bill.
+table: works
+folio: 59
+aliases: [CI, CI/CD, GitHub CI, workflows, self-hosted runners]
+updated: 2026-10-28
+sources:
+  - title: GitHub Actions billing (GitHub docs)
+    url: https://docs.github.com/en/billing/concepts/product-billing/github-actions
+  - title: GitHub pricing
+    url: https://github.com/pricing
+  - title: Workflow syntax (GitHub docs)
+    url: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+  - title: Secure use reference (GitHub docs)
+    url: https://docs.github.com/en/actions/reference/security/secure-use
+  - title: Self-hosted runners (GitHub docs)
+    url: https://docs.github.com/en/actions/concepts/runners/self-hosted-runners
+  - title: Deployments and environments (GitHub docs)
+    url: https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments
+  - title: dx's CI workflow
+    url: https://github.com/coletebou/dx/blob/master/.github/workflows/ci.yml
+  - title: dx's GitHub repo kit
+    url: https://github.com/coletebou/dx/tree/master/github-kit
+---
+
+GitHub Actions runs the checks on every pull request in Cole's repositories, and for the infrastructure it runs the
+deploys too. *CI* (continuous integration) means every change is built, linted and tested automatically before it can
+merge; *CD* (continuous delivery) means a merge ships itself. Agents open many of Cole's pull requests, so CI is what
+tells a good change from a plausible one.
+
+## How CI/CD works
+
+A **workflow** is a YAML file in `.github/workflows/`. It runs when an **event** happens: a push, a pull request being
+opened or updated, a label, a schedule, a manual dispatch. A workflow is made of **jobs**, each running on a fresh
+**runner** (a virtual machine GitHub hosts, or a machine you register yourself), and each job is a list of **steps**:
+reusable actions (`uses:`) or shell commands (`run:`). Jobs run in parallel unless one `needs` another.
+
+```yaml
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request cancels the older run; pushes to master always finish.
+concurrency:
+  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@<full commit sha> # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@<full commit sha> # v5
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+```
+
+Each job reports a **check** on the pull request. A branch ruleset on `master` makes the important ones *required*,
+so a red check blocks the merge, and with "require branches to be up to date" the checks must pass against the latest
+`master`, not an old one. That is the CI half. A green check is not the whole review, though: reviewer bots and the
+merge gate that waits for their findings are on [[git#pull-requests|Git habits]].
+
+The CD half depends on what ships:
+
+- **Frontends** deploy through [[vercel|Vercel]]'s own Git integration: a preview for every branch, production on
+  merge. No workflow needed.
+- **Infrastructure** deploys through four workflows (checks, plan, apply, drift) that plan every change on the pull
+  request and apply it on merge; [[opentofu]] describes them.
+- **Services on servers** deploy from a job that runs on the server it deploys to, after the checks pass.
+
+## Habits from Cole's workflows
+
+- **Pin every action to a full commit SHA**, with the version in a comment. A tag can be moved to different code; a
+  SHA cannot.
+- **Least privilege.** `permissions: contents: read` at the top, and each job asks for more only if it needs it.
+  `persist-credentials: false` on checkout when a job never pushes.
+- **No cloud keys in secrets.** Jobs that need AWS get short-lived credentials through GitHub's OIDC, scoped to one
+  role.
+- **Scan for secrets.** gitleaks runs over every pull request's commits and every push.
+- **Lint the workflows themselves** with actionlint, pinned by image digest.
+- **Test on both platforms when it matters.** Cole's public dotfiles, [dx](https://github.com/coletebou/dx), run every
+  test suite on Ubuntu and macOS, since the same shell scripts run on both kinds of machine (see [[posix]]).
+- **Skip runs that cannot matter.** Path filters keep a docs-only or sync-only push from starting a full test run.
+- **Two lanes for agents.** In repositories built from Cole's
+  [GitHub repo kit](https://github.com/coletebou/dx/tree/master/github-kit), a draft pull request runs a fast lane,
+  and marking it ready (or adding the `ci:full` label) runs the full lane. The kit also labels each pull request by size
+  and by the evidence it carries, and can run a Claude Code review when a pull request is opened. The full kit is
+  public.
+
+## What it costs
+
+Two facts decide most of the bill, both from GitHub's own billing docs:
+
+- **Public repositories are free.** "GitHub Actions usage is free for self-hosted runners and for public repositories
+  that use standard GitHub-hosted runners." That includes macOS and Windows runners.
+- **Private repositories get a monthly quota, then pay per minute.** GitHub Free (<Price id="github-free" />)
+  includes <Price id="github-actions-free-minutes" />, and GitHub Pro (<Price id="github-pro" />) includes
+  <Price id="github-pro-actions-minutes" />. The quota resets each billing cycle, and usage is charged to the
+  repository's owner, not to whoever triggered the run.
+
+Past the quota, minutes are billed by runner type:
+
+| Standard runner | Per minute |
+|---|---|
+| Linux, 2 cores (x64) | <Price id="github-actions-linux-minute" format="bare" /> |
+| macOS | <Price id="github-actions-macos-minute" format="bare" /> |
+
+(As of October 28, 2026, from GitHub's docs.) A macOS minute costs about ten times a Linux minute, which is the number
+that matters for anyone building iOS apps in CI (see [[ios-development]]). Artifact and cache storage past the included
+amounts are billed too.
+
+### Checking Cole's numbers
+
+Cole said: "public repos actions are free but private pays over certain amounts of minutes." That is exactly what
+GitHub's docs say. The "certain amounts" are <Price id="github-actions-free-minutes" /> on the Free plan and
+<Price id="github-pro-actions-minutes" /> on Pro, after which a Linux minute costs
+<Price id="github-actions-linux-minute" /> and a macOS minute <Price id="github-actions-macos-minute" />.
+
+## How a CI bill runs away
+
+Cole learned the macOS part the expensive way. Over the late summer and fall of 2026, the private repositories' Actions
+bill grew every month, from a few dollars to several hundred, and almost all of it was macOS minutes. The largest single
+cause was one repository whose tests ran two macOS jobs on every push, and an automated sync commits to that repository
+many times a day: each commit nobody would ever look at started two macOS jobs.
+
+What fixed it, in order:
+
+1. **Path filters.** Pushes that only sync files no longer start the test suites, which removed about 95% of that
+   repository's runs.
+2. **A spending budget**, which stops hosted jobs when it is reached. A job refused by a budget shows "The job was not
+   started because an Actions budget is preventing further use." Cole kept the budget and did not raise it.
+3. **Self-hosted runners for every private repository.** Linux jobs run on Cole's own AWS servers, macOS jobs on the
+   [[mac-mini|Mac mini]] when it has room, and overflow on short-lived EC2 runners that each take one job (see
+   [[servers#burst-capacity|burst capacity]]). Public repositories stay on GitHub's hosted runners: they are free there.
+
+## Self-hosted runners, safely
+
+A self-hosted runner executes whatever a workflow tells it to, on your machine. Cole's rules for them:
+
+- **Never on a public repository.** A pull request from a fork could run code on the machine.
+- **One unprivileged system user per runner pool**: no password, no login shell, no sudo, no Docker group.
+- **Hard resource caps.** Each runner runs in a capped systemd slice (memory, CPU, IO), so a runaway build cannot
+  starve the services on the same server.
+- **One job at a time per pool.**
+- **A separate, trusted pool for jobs that hold secrets.** It has no default labels, so only a job that names it
+  explicitly reaches it, and pull-request workflows never name it.
+- **Registration tokens never reach the runner's user**, and the runner software is checked against the SHA-256
+  published with its release before it is installed.
+
+A job picks its runner by labels:
+
+```yaml
+jobs:
+  build:
+    runs-on: [self-hosted, linux]
+```
+
+## Gotchas
+
+- **Environment protection rules depend on the plan.** On the Free, Pro and Team plans, required reviewers and wait
+  timers on environments only work in public repositories. That is why the [[opentofu|OpenTofu]] pipeline gates its
+  applies on pull-request approval, checked again by the apply job.
+- **Forks get no secrets.** A pull request from a fork runs without your secrets and without an OIDC token, which is
+  safe. `pull_request_target` runs with them, on the fork's code if you check it out: avoid it.
+- **Artifacts cost storage.** Set `retention-days` on uploads you only need for a week.
+- **A budget stops jobs quietly.** Refused jobs have no steps and no logs, only that one message.
+
+<ColesTake>
+
+Public repos get Actions for free. Private repos pay once you're over the included minutes, and macOS minutes add up
+fast, so our private CI runs on our own machines now.
+
+</ColesTake>

@@ -1,0 +1,38 @@
+{
+  "name": "coletebou-wiki",
+  "version": "1.0.0",
+  "private": true,
+  "description": "How to Be a Beast: Cole Tebou's wiki of tools, agents and infrastructure (wiki.coletebou.com)",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build && pagefind --site dist --output-subdir pagefind && node scripts/postbuild.mjs dist/pagefind",
+    "preview": "astro preview",
+    "check:content": "node scripts/check-content.mjs",
+    "check:safety": "node scripts/safety-lint.mjs",
+    "check:links": "node scripts/check-links.mjs dist",
+    "safety:denylist": "node scripts/denylist.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "npm run check:content && npm run check:safety && npm test"
+  },
+  "dependencies": {
+    "@astrojs/markdown-satteri": "0.4.5",
+    "@astrojs/mdx": "8.1.1",
+    "@astrojs/sitemap": "3.7.4",
+    "@fontsource-variable/eb-garamond": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@fontsource/cinzel": "5.3.0",
+    "@fontsource/italianno": "5.3.0",
+    "astro": "7.4.2",
+    "pagefind": "1.5.2",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@mdx-js/mdx": "3.1.1",
+    "github-slugger": "2.0.0"
+  }
+}

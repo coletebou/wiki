@@ -1,0 +1,114 @@
+---
+title: Env Files and dotenvx
+summary: >-
+  Where Cole's configuration and secrets live: env files, one secrets file per machine rendered from an encrypted
+  vault, dotenvx for encrypting what must be committed, and the habits that keep secrets out of agents' transcripts.
+table: workshop
+folio: 43
+aliases: [dotenvx, .env files, env-secrets]
+updated: 2026-10-28
+sources:
+  - title: dotenvx documentation
+    url: https://dotenvx.com/docs/quickstart
+  - title: dotenvx README (encryption, multiple environments, agents)
+    url: https://github.com/dotenvx/dotenvx
+  - title: Docker Compose, interpolation and .env
+    url: https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/
+  - title: Private first, secrets near agents (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/workflow/publication.md
+---
+
+Env files hold the settings and secrets a program reads when it starts: `KEY=value` lines in `.env`, `.env.local`,
+`.env.production`. They are simple, every framework understands them, and they are the easiest way to leak a key.
+Cole's setup keeps three rules around them: each machine's secrets live in one place; nothing secret is committed in
+plaintext (what must be committed is encrypted with [dotenvx](https://dotenvx.com)); and secrets never appear on a
+command line or in an agent's transcript.
+
+## Env files, briefly
+
+An app or framework loads `.env` at start, and so does Docker Compose, which uses it to fill `${VAR}` placeholders in
+`compose.yaml`. Two details catch people out:
+
+- **The shell wins.** Compose takes a variable from the invoking shell's environment before it looks at `.env`. A
+  region or a credential exported in your shell profile silently overrides the file, and the symptom (a "token
+  invalid" error with keys that are fine) points everywhere but there. Compare `env` with `.env`, or run the one
+  command with the variable removed: `env -u AWS_REGION docker compose up -d`.
+- **They are not in git, so they are not in new checkouts.** A fresh clone or [[git-worktrees|worktree]] has no
+  `.env`. Without one, Compose warns about every unset variable, and if a service mounts `./.env` it creates an empty
+  directory with that name. Cole's [[parallel-worktrees|worktree launcher]] copies `.env`, `.env.local` and
+  `.env.keys` into every new worktree for this reason, and Claude Code's `.worktreeinclude` does the same for its own.
+
+## One secrets file per machine
+
+On Cole's machines, keys live in `~/.env_secrets`, which `zshenv` sources in every zsh. That means every shell, and
+every agent's shell, has them. It also means a dotfiles repository that holds no secrets at all: the
+[public dx](https://github.com/coletebou/dx) README is explicit that no secrets live there and none should.
+
+<ColesTake>
+
+Every shell on my machines has the secrets loaded, so every agent's shell does too. The rule is simple: test that a
+key is set, never print it.
+
+</ColesTake>
+
+On Cole's personal machines that file is not edited by hand any more. It is generated from an encrypted vault kept in
+the private dotfiles repository:
+
+- Each vault line is `KEY=encrypted:…`, dotenvx ciphertext of the exact value. Comments stay readable.
+- One keypair covers an identity's whole vault. The public key sits in the vault files; the private key lives in a
+  user-only file on each machine and never in git.
+- Rendering decrypts the vault into plain `export KEY=…` lines, and refuses to write anything that would not source
+  silently in a clean shell.
+- Setting a value reads it from standard input or a hidden prompt, never from an argument, because other users can
+  see a process's arguments. Rotating a key leaves a tombstone, so a retired value can never be rendered again.
+- A CI check confirms that every vault file holds only ciphertext.
+- The dotfiles sync imports hand edits into the vault and renders it again on every machine; a new machine receives the
+  private key over SSH standard input.
+
+## dotenvx
+
+dotenvx is a drop-in loader for env files with encryption built in. It encrypts each value with its own ephemeral key
+(AES-256), and protects those keys with a public-key scheme (ECIES on the secp256k1 curve, the one [[bitcoin|Bitcoin]]
+uses), so the encrypted file is safe to commit and only the private key can read it.
+
+```sh
+dotenvx set HELLO "production encrypted" -f .env.production    # encrypts on write
+dotenvx encrypt                                                  # encrypt an existing .env in place
+DOTENV_PRIVATE_KEY_PRODUCTION="<private key>" dotenvx run -- node index.js
+```
+
+- `dotenvx encrypt` writes the public key into the file as `DOTENV_PUBLIC_KEY` and the private key into `.env.keys`.
+  Commit the `.env`; never commit `.env.keys` (`dotenvx gitignore --pattern .env.keys` adds it to `.gitignore`).
+- At run time the private key comes from the environment. The suffix picks the file: `DOTENV_PRIVATE_KEY_PRODUCTION`
+  loads `.env.production`, `DOTENV_PRIVATE_KEY_CI` loads `.env.ci`. In CI and production you set only that one secret.
+- Encrypting needs only the public key, so anyone can add a value; only key holders can read one.
+- `dotenvx run --redact -- <command>` replaces secret values with `[REDACTED]` in the command's output, which is
+  exactly what you want around an agent.
+
+dotenvx is not PGP, though both are public-key encryption. PGP encrypts and signs whole messages and files for people
+with keyrings; dotenvx encrypts individual values inside one file for programs. See [[pgp]].
+
+## Keeping secrets away from agents
+
+A secret an agent prints once is in its transcript for good: transcripts persist, get rendered into handoffs, get
+traced into [[langfuse|Langfuse]] and get searched. So the habits are about never printing, not about cleaning up
+after:
+
+- **Test presence, never values.** `[ -n "$TOKEN" ] && echo set || echo unset`. Not a masked prefix, and not an
+  unsalted hash, since a short value's hash is a lookup away.
+- **Test the clean case in a clean environment.** The agent's shell has already sourced your secrets;
+  `env -i HOME="$HOME" PATH=/usr/bin:/bin bash -c '…'` shows what a process gets without them.
+- **One secret, one process.** Cole's password manager session is blanked in every Claude Code session, and a small
+  wrapper injects a single field into a single child process when a task needs it.
+- **References, not values, in config.** `.mcp.json` uses `${VAR}`, Codex uses `bearer_token_env_var`, and
+  [[drover|Drover]]'s credential pool stores only `$NAME` references, so config files never hold a key.
+- **Redact what gets rendered.** The handoff tool redacts credential shapes and the literal values of secret
+  environment variables from every transcript it renders.
+- **Scan on the way out.** Every commit and every push runs a secret scan that fails closed (see [[git]]), and the
+  [[shared-brain|shared brain]] refuses any note or query with a secret's shape.
+
+## Env files and agents' worktrees
+
+Each worktree also gets an `.envrc` with its own `COMPOSE_PROJECT_NAME`, which [direnv](https://direnv.net) loads on
+`cd`, so containers started from different worktrees never share a project. The full list of what to carry into a
+fresh worktree is on [[git-worktrees#what-to-carry-over|Git Worktrees]].

@@ -1,0 +1,189 @@
+---
+title: The Agent Fleet
+summary: >-
+  How Cole runs dozens of Claude Code and Codex sessions at once across the Mac mini and AWS servers, and the hooks,
+  messages, handoffs, parking, memory and control plane that keep them working as one team.
+table: automata
+folio: 29
+aliases: [agent fleet]
+updated: 2026-10-28
+sources:
+  - title: Claude Code, run agents in parallel
+    url: https://code.claude.com/docs/en/agents
+  - title: Running fleets of agents (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/workflow/README.md
+  - title: Parallel work (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/workflow/parallel.md
+  - title: Briefs, decisions and handoffs (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/workflow/briefs.md
+  - title: Drover README
+    url: https://github.com/coletebou/drover
+---
+
+Cole does not run one coding agent; Cole runs a fleet. On a busy day that means dozens of [[claude-code|Claude Code]]
+and [[codex|Codex]] sessions at once, spread across the [[mac-mini|Mac mini]] at the desk and a set of AWS servers,
+each in its own [[tmux]] window and often its own [[git-worktrees|git worktree]]. What makes that work is not the
+number of agents but the plumbing between them: hooks that save what each session learns, messages between sessions,
+handoffs when a context fills, parking when a session goes idle, a shared memory, and one control plane that sees all
+of it.
+
+This page is the map. Each piece has its own page; the diagram below shows how they connect.
+
+<Diagram name="agent-fleet" />
+
+The diagram has six views. **The fleet** is the overview: the phone, the Mac mini, the AWS servers, the agents and
+Drover daemons on each, and the shared stores they write to (the brain, Langfuse, the truth file). **Hooks** shows the
+moments in a session's life where Cole's hooks run and where each one writes. **Messages** shows how a session reaches
+another one, on the same machine or across the fleet. **Handoff** shows a long session passing its work to a fresh
+successor. **Parking** shows idle sessions being shut down and brought back. **The brain** shows where memory lives and
+how it reaches every machine and every agent. Click any part of a view to see what it does.
+
+## The machines
+
+Cole works at the Mac mini, in [[ghostty|Ghostty]] and tmux, and checks in from the phone with
+[[termius|Termius]]. The heavy, long-running work happens on AWS servers: agent sessions that run for hours, test
+suites that would stall a laptop, and the production bots. The rule of thumb is simple: anything that should keep
+running when the laptop lid closes runs on a server. (See [[servers]] for how they are built, and [[opentofu|OpenTofu]]
+for how the infrastructure is managed as code.)
+
+The machines reach each other over [[ssh|SSH]] on a private [[tailscale|Tailscale]] network (Drover's daemons talk
+over those SSH connections and listen only on loopback themselves), and every machine runs the same [[dotfiles]]: the
+same shell, the same hooks, the same skills, the same rules. A sync tool, `dotsync`, commits and pulls the dotfiles on
+each machine, and the memory, reflections and truth file travel with them. A session started anywhere behaves the
+same way and can be handed off anywhere.
+
+## The agents
+
+| Agent | Role in the fleet | Page |
+|---|---|---|
+| Claude Code | The workhorse: coordinators, workers, reviewers | [[claude-code]] |
+| Codex | A second engine: independent reviews, parallel lanes, a diagnostic agent during an outage | [[codex]] |
+| Grok bots | Hosted bots that report status and take tasks through Drover's bot gateway | [[drover#the-other-engines\|Drover]] |
+| The fleet manager | An OpenClaw agent that answers "who is waiting on me?" for the whole fleet | [[drover#the-other-engines\|Drover]] |
+
+Two different engines matter more than it sounds. When Anthropic's API has a bad hour, the Codex sessions keep
+going, and the hook that retries failed Claude turns can start a Codex agent to diagnose the failure. When a change
+needs review, a Claude reviewer and a Codex reviewer read the same frozen commit independently, so their blind spots
+do not overlap.
+
+## Roles: owner, coordinator, workers
+
+A fleet without roles is a group of agents editing the same files. Cole's [workflow
+docs](https://github.com/coletebou/dx/blob/master/docs/workflow/README.md) name five:
+
+| Role | Owns | Never |
+|---|---|---|
+| Owner (Cole) | The goal, decisions, approval of anything outward or irreversible | Is asked something the agents could find out |
+| Coordinator | The brief, the TODO list, the split into slices, reviews, the final report | Writes a worker's slice, or decides for the owner |
+| Worker | One slice: its files, its branch, its tests, its report | Touches files it does not own |
+| Reviewer | Findings against a frozen commit | Edits the tree under review |
+| Release coordinator | Merging slices that arrived reviewed and gated | Merges a commit that was not the one reviewed |
+
+The coordinator writes a **brief** for each worker before it starts: goal, scope (which files it owns and which it
+must not touch), constraints, acceptance checks and the shape of the final report. Workers inherit nothing from the
+coordinator's conversation, so the brief spells out every rule. When Cole changes the task, the change is appended to
+the brief as an amendment that quotes Cole word for word, with the time and the [[message-ids|id of the message]],
+because a paraphrase can turn a preference into a rule.
+
+## Splitting the work
+
+There are three ways to run work in parallel, and picking the right one matters more than the number of workers:
+
+- **Subagents inside one session** for read-only research, audits, drafts to choose from, and independent reviews of
+  one diff. One working tree, nothing to merge. Cole caps routine fan-out at about three so the coordinator stays on
+  the critical path and available.
+- **One [[git-worktrees|worktree]] per writer** when writers would touch the same files, `node_modules`, a build
+  directory, a Docker Compose project or database migrations. [[parallel-worktrees|Parallel worktrees]] launches N
+  sessions this way from one manifest, each in its own tmux window, with a merged log.
+- **Both**: each worktree session runs its own subagents when its slice is big enough to split again.
+
+When one slice consumes what another produces, the coordinator posts a versioned contract first (shapes, errors,
+flags, which lane owns each side), and every brief names the exact version. A change is a new version posted next to
+the old one, never an edit.
+
+<ColesTake>
+
+Running a dozen agents at once is where the speed comes from, and also where the damage comes from: two writers on
+one file, a build that starves every other session on the box, a successor that starts while its predecessor is
+still typing. Most of the tooling on these pages exists to keep the speed and lose the damage.
+
+</ColesTake>
+
+## The connective tissue
+
+Each of these is a page of its own, and each is one view of the diagram above.
+
+### Hooks
+
+[[hooks|Hooks]] are commands Claude Code and Codex run at points in a session's life: when it starts, before each
+model call, when a turn ends, before compaction, when it ends. Cole's hooks load the repo's memory and open items at
+start, rename the tmux window, watch the context window, retry failed API turns, file background reflections,
+capture each prompt for later, report sessions that need a human to Drover, and give subagents their contract.
+
+### Messages between sessions
+
+A session can message another one: "the schema migration landed, rebase now". Claude Code does this natively on one
+machine, through a per-session inbox socket, and Drover carries it across machines, records every message in its
+truth file, and follows a handoff chain to the live successor when the original session is gone. See
+[[agent-messaging]].
+
+### Handoffs
+
+A long session eventually fills its context. Instead of letting compaction squash the history, the session writes a
+brief and hands its open work to a fresh session in a new tmux window, as the next generation of a chain. The old
+window closes once the new session has replied and adopted any background jobs. See [[handoff-chains]] and
+[[context-and-compaction]].
+
+### Parking
+
+An idle session still holds its memory and its helper processes (MCP servers, language servers). [[cc-park]] exits
+idle sessions cleanly, leaves the last screen and the exact resume command in the pane, and closes the windows of
+sessions that had finished. On the Mac a scheduled job does this every 30 minutes for anything idle six hours or
+more.
+
+### Memory
+
+Two layers. The [[reflection-store|reflection store]] is per repository: learnings, decisions and open action items,
+written by background reflections and closed when done, shown to the next session at start. The
+[[shared-brain|shared brain]] sits above it: one memory that Claude Code, Codex, ChatGPT and the bots read and write
+over MCP, from any machine.
+
+### The control plane
+
+[[drover|Drover]] is a daemon on every machine plus a browser UI, a terminal UI, native apps and an MCP server. It
+shows every session on every host in three lanes (waiting on you, working, idle), answers permission dialogs with one
+key, launches new agents anywhere, waits on workers' status files, searches every transcript, and keeps one
+append-only truth file of features, notes, messages and launches.
+
+## Rules that keep a fleet sane
+
+These come from Cole's rules and workflow docs, and every one of them was learned the hard way:
+
+- **One coordinator at a time.** A resumed session or an early successor that also thinks it is in charge is the most
+  common way two agents end up writing the same files.
+- **Silence is not a yes.** An idle peer, a timeout or a green CI run is not approval. Irreversible steps wait for an
+  explicit message.
+- **Outward actions need the owner.** Pushes, pull requests, merges, messages to people, deploys and spending need
+  Cole's go unless the brief grants them.
+- **Read the transcript, not the pane.** A terminal UI collapses tool output; a pane that looks idle may be mid
+  command. Every session writes its full transcript, or you can just ask it.
+- **Never type into a pane that waits on a human.** A permission prompt has an option preselected, and the Enter at
+  the end of a broadcast approves it. Cole's tools refuse to.
+- **Check the load before anything heavy.** Look at `uptime` and free memory, check for the same job by exact process
+  name (`pgrep -x`), and treat a failure under load as no result until it is rerun alone.
+- **Budget disk before a fan-out.** A worktree with its dependencies installed can take gigabytes.
+
+## Starting your own
+
+You do not need all of this on day one. A path that works:
+
+1. Run one [[claude-code|Claude Code]] session per task, each in its own [[tmux]] window, launched with a short
+   alias like [[yu]].
+2. When two tasks would touch the same repository, give each its own [[git-worktrees|worktree]].
+3. Add the cheap [[hooks]] first: rename the window, timestamp each turn, show the repo's notes at start.
+4. Add a memory: a handoff file per repo, then a [[reflection-store|store of open items]].
+5. When you have more sessions than you can watch, add a control plane like [[drover|Drover]], so the ones waiting on
+   you come to you.
+
+Cole's whole setup is public as [dx](https://github.com/coletebou/dx) (dotfiles, hooks and a skills marketplace) and
+[Drover](https://github.com/coletebou/drover) (the control plane). Take one plugin, or all of it.

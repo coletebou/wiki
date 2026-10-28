@@ -1,0 +1,115 @@
+---
+title: tm, the Session Picker
+summary: >-
+  One word to get back into tmux: tm lists every session in an fzf picker, most recently used first, and attaches to the
+  one you pick. Its sibling tl jumps straight to the last session.
+table: shell
+folio: 13
+aliases: [tm session picker, tl]
+updated: 2026-10-28
+sources:
+  - title: tm and tl in Cole's aliases.sh (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/aliases.sh
+  - title: fzf, a command-line fuzzy finder
+    url: https://github.com/junegunn/fzf
+  - title: tmux(1) manual
+    url: https://man.openbsd.org/tmux.1
+---
+
+`tm` is Cole's way back into [[tmux]]: type two letters and an fzf picker lists every session on the machine, most
+recently used first, with a "new session" entry pinned on top. Pick one and you are attached. Cole describes it as a
+"custom picker using FZF, which automatically lists our most recent tmux sessions with a cache and all that". It is
+built to be the first thing you type after logging in to a machine, from the desktop or from a phone.
+
+## What it looks like
+
+```text
+tmux>
+  [+ new session]
+  site: 6 windows (created Tue Oct 27 21:14:02 2026) (attached)
+  agents: 23 windows (created Mon Oct 26 08:02:41 2026)
+  notes: 2 windows (created Sun Oct 25 19:40:13 2026)
+```
+
+The picker opens right below the prompt, 40 percent of the terminal tall, and lists sessions top-down. Type a few letters to filter, use
+the arrow keys to move, press Enter to attach, or Esc to back out without doing anything. Each line is the session's
+own `tmux ls` entry, so the window count and the attached marker come for free.
+
+[fzf](https://github.com/junegunn/fzf) does the picking. It is a general-purpose fuzzy finder: any list piped into it
+becomes a searchable menu, and whatever line you choose comes out on standard output. `tm` is a short shell function
+around it, in Cole's
+[base/aliases.sh](https://github.com/coletebou/dx/blob/master/base/aliases.sh):
+
+```zsh
+    selected=$(printf '%s\n%s\n' "$new_item" "$ordered" \
+        | fzf --height=40% --reverse --prompt="tmux> ")
+```
+
+## How the ordering works
+
+The useful part is the order. The session you were just in should be first, the one before that second, and so on. `tm`
+scores each session with the larger of two timestamps:
+
+1. **tmux's own record.** tmux keeps `#{session_last_attached}`, the time any client last attached to each session.
+   It updates however you attach: through `tm`, through `tl`, with a plain `tmux attach`, or from an editor.
+2. **The picks log.** Every pick through `tm` appends one line, the current time and the session name, to
+   `~/.cache/tm/picks`. This is the cache Cole mentions. It covers the one case tmux cannot: a brand-new session you
+   just named, which tmux has not recorded an attach for yet.
+
+Taking the maximum means neither signal can go stale. Sessions that were never attached score zero and sort to the
+bottom, alphabetically. The log is trimmed to its last 200 lines on every pick, so it never grows. The sorting itself
+is one awk pass plus a numeric `sort`, fast enough that the picker appears instantly even with dozens of sessions.
+
+## New sessions
+
+The top entry, `[+ new session]`, asks for a name. If a session by that name already exists, `tm` attaches to it;
+otherwise it creates one. Naming sessions after what they hold (a project, a client, a long job) makes the picker read
+like a table of contents.
+
+## tl: the last session, no picker
+
+`tl` skips the menu and attaches to whichever session tmux saw attached most recently:
+
+```zsh
+tl() {
+    local target
+    target=$(tmux list-sessions -F '#{session_last_attached} #{session_name}' 2>/dev/null \
+        | sort -k1,1nr | head -1 | cut -d' ' -f2-)
+```
+
+It goes on to check `$TMUX`: inside tmux it switches the current client to that session instead of trying to nest
+one tmux inside another. Outside, it attaches. After a disconnect, `tl` is the fastest way back to exactly where you
+were.
+
+## Safe for scripts and agents
+
+When `tm` is not talking to a terminal, because its input or output is a pipe or an agent's shell, it skips the picker
+and just prints the `tmux ls` list, or "No tmux sessions". An agent that runs `tm` to look around gets a list instead
+of hanging on a menu nobody can see.
+
+## Gotcha: inside tmux, use tl or the Alt keys
+
+`tm` always attaches with `tmux attach`. From inside a tmux pane, tmux refuses that: running it on tmux 3.7 stops with
+"sessions should be nested with care, unset $TMUX to force". Inside tmux, switch with `tl`, prefix <kbd>s</kbd> for
+the session chooser, or <kbd>Alt</kbd>+<kbd>s</kbd> to cycle sessions (see the [[tmux-keymap]]). If you copy `tm`
+into your own setup, borrowing `tl`'s `$TMUX` check and calling `switch-client` there removes the trap.
+
+## Where it fits
+
+- **On the phone.** From [[termius]], over [[tailscale|Tailscale]] and [[ssh|SSH]], `tm` is the shortest path from
+  "connected" to "looking at the agent I left running". The picker fits a phone screen.
+- **With the status line.** Once attached, the second row of the [[tmux-status-line|tmux status line]] lists every
+  session, so a picker is only needed to get in.
+- **With agents.** Sessions created by [[parallel-worktrees]] or parked by [[cc-park]] show up in the list like any
+  other, so returning to a fan-out of ten agents is `tm` and Enter.
+
+## Set it up
+
+1. Install fzf: `brew install fzf` on a Mac ([[homebrew]]) or `sudo apt install fzf` on Debian and Ubuntu. Cole's
+   [[bootstrap-script|installer]] puts it on every machine.
+2. Copy the `tm` and `tl` functions from
+   [base/aliases.sh](https://github.com/coletebou/dx/blob/master/base/aliases.sh) into your shell config, or install
+   the whole shell component of [[dotfiles|Cole's dotfiles]].
+3. Open a new shell and type `tm`.
+
+The [[yu]] page covers the other one-word commands in the same file, the ones that start agents.

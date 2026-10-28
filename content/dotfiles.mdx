@@ -1,0 +1,223 @@
+---
+title: Dotfiles
+summary: >-
+  One git repository holds Cole's shell, git, tmux, prompt and Claude Code setup, arranged by identity and role,
+  installed by one script and synced to every machine with one command. A curated public copy, dx, is free to borrow.
+table: shell
+folio: 18
+aliases: [dx, dotsync]
+updated: 2026-10-28
+sources:
+  - title: coletebou/dx (the public dotfiles)
+    url: https://github.com/coletebou/dx
+  - title: dx README
+    url: https://github.com/coletebou/dx/blob/master/README.md
+  - title: Private first, published through a gate (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/workflow/publication.md
+  - title: Claude Code settings (Claude Code docs)
+    url: https://code.claude.com/docs/en/settings
+  - title: gitleaks
+    url: https://github.com/gitleaks/gitleaks
+---
+
+Dotfiles are the configuration files that make a machine yours: the shell, git, tmux, the prompt, and now the rules,
+settings and hooks for your coding agents. Cole keeps all of them in one git repository, arranged on two axes (who you
+are on a machine, and what the machine is for), installed by one script and synced to every machine by one command.
+A curated public copy, [dx](https://github.com/coletebou/dx), is open for anyone to take a piece from.
+
+## Why keep dotfiles in git
+
+The name comes from the files themselves: `~/.zshrc`, `~/.gitconfig`, `~/.tmux.conf`, hidden in your home directory
+because they start with a dot. Left alone, they drift. Each machine collects its own tweaks, and a new laptop means a
+weekend of remembering.
+
+In a repository they become one thing. The real files live in `~/.dotfiles`, and the installer links each one into
+the place the program expects it, so editing `~/.tmux.conf` edits the repository. You get history for every change, a
+way to undo a bad one, and a new machine that feels like the old one within minutes. With agents in the picture there
+is a second reason: an agent's rules, hooks and status line are configuration too, and they should be the same on
+every machine an agent might run on.
+
+<ColesTake>
+
+Every machine should feel like the same machine.
+
+</ColesTake>
+
+## Two axes: identity and role
+
+Two settings decide what a machine runs, and the installer records both in `~/.df-profile`:
+
+- **Identity** is who you are on this machine: your git name and email, the short labels for your machines, your
+  Claude Code rules and settings, your shell additions. Personal and work are separate identities, so credentials and
+  config from one never leak into the other. dx ships one synthetic identity, `example`, to copy and edit.
+- **Role** is what the machine is for. `local` is a workstation (macOS, Linux or [[wsl|WSL]]); `server` is a box that
+  runs agents and services, with a leaner shell.
+
+Everything else is shared. The layout follows from that:
+
+```text
+base/                 shared by every machine: zsh, git, tmux, starship
+base/claude/          Claude Code rules, settings, hooks, statusline
+roles/{local,server}/ per-role shell and MCP additions
+identities/example/   a synthetic identity to copy
+scripts/              the CLIs (cc-handoff, wt-helper, reflections, dream, ...)
+scripts/tests/        the test suites
+install.sh            the installer
+```
+
+`df-switch` changes identity or role for the current shell only, which is handy for testing what another profile
+would see. New shells go back to the installed default.
+
+### Where a new setting goes
+
+The two axes turn "where do I put this?" into a short checklist:
+
+| If it should apply to | It goes in |
+|---|---|
+| Every machine, whoever you are | `base/` |
+| Only workstations, or only servers | `roles/local/` or `roles/server/` |
+| One identity: your git email, your machine labels, rules for that context | `identities/<id>/` |
+| This one machine | an uncommitted `.local` file (below) |
+| A secret | `~/.env_secrets`, never the repository |
+
+The same split applies to agent config. A rule every agent should follow goes in the shared rules file; a rule for one
+identity's projects goes in that identity's rules file; a rule for one repository goes in that repository's own
+`CLAUDE.md`.
+
+## How the shell is assembled
+
+zsh reads two entry points, and the split between them matters:
+
+- **`~/.zshenv` runs for every zsh**, including the non-interactive ones that scripts, SSH commands and agents' tools
+  start. It loads the profile and the machine's identity, sources the secrets file, raises the open-file limit (macOS
+  defaults to 256, which is not enough for a coding agent scanning its skills), guarantees a UTF-8 locale, and puts
+  Homebrew and `~/.local/bin` ahead of the system directories.
+- **`~/.zshrc` runs for interactive shells.** It pulls in `base/zshrc` (history, completion, key bindings, the
+  [[starship|Starship]] prompt, fzf, zoxide, the zsh plugins), then the alias chain: the shared
+  [base/aliases.sh](https://github.com/coletebou/dx/blob/master/base/aliases.sh) first, then the role's and the
+  identity's files. A local machine starts its first shell in `~/code`.
+
+Two small hooks in `base/zshrc` do a lot of work elsewhere. One reports the current directory to the terminal on every
+prompt with an OSC 7 escape sequence, which is how a new [[tmux]] window opened from an SSH pane lands in the same
+remote directory. The other wraps `ssh` so that a session that dies inside remote tmux cannot leave your terminal stuck
+in mouse-reporting mode (see [[ssh]]).
+
+The files are also unusually careful about speed. Completion setup runs its full security check once a day instead of
+on every shell, and the prompt logs any draw over 100 milliseconds, so a slow shell gets noticed and fixed rather than
+tolerated.
+
+## Secrets never live here
+
+Keys and tokens go in `~/.env_secrets`, a file that is yours, never committed, and contains only `export` lines.
+`zshenv` sources it in every zsh, so a key rotated this morning is in every new shell and every agent started from
+one. It must stay silent: any output from it breaks `scp`, `rsync` and `sftp`, which run a shell on the far side.
+
+The repository defends itself on top of that. Git hooks run [gitleaks](https://github.com/gitleaks/gitleaks) on every
+commit and every push and refuse to run without it, so a pasted key stops at the commit, not after it is public. The
+[[env-files]] page covers the same discipline for project secrets.
+
+## Claude Code config is generated
+
+Claude Code reads `~/.claude/settings.json` and `~/.claude/CLAUDE.md`. Cole's are built, not hand-edited:
+
+- **settings.json** is a jq merge of layers: the shared `base/claude/settings.base.json` (hooks, the status line,
+  permissions), the role's settings, the identity's settings, and an uncommitted local file for the one machine. A
+  merge tool means the hooks every machine needs are defined once.
+- **CLAUDE.md** is a short stub that imports the shared rules,
+  [CLAUDE.base.md](https://github.com/coletebou/dx/blob/master/base/claude/CLAUDE.base.md), and the identity's own
+  rules, with Claude Code's `@` import syntax.
+- **MCP servers** are merged the same way and registered through Claude Code's own CLI
+  (`claude mcp add-json --scope user`), never by editing its state file, and only when the server's command is
+  installed.
+
+The [[hooks]] page goes through what those hooks do, and [[skills-and-plugins]] covers the skills that ship beside
+them as a plugin marketplace. The [[claude-code-status-line|status line]] is one of the files in `base/claude/`.
+
+## dotsync: one command, every machine
+
+Changing a file on one machine is half the job. `dotsync` does the other half:
+
+1. Commit local changes. A small model describes the diff for the commit message, and a generic subject stands in
+   when it is slow or unavailable, so the description never blocks a sync.
+2. Pull and rebase onto everyone else's changes, then push.
+3. Fan out over [[ssh|SSH]] to every other machine with the same identity. Each one pulls, and reruns the installer
+   only when the change touched something the installer acts on (the installer itself, a script, a scheduled job,
+   the Claude Code layers).
+
+A manual run returns as soon as the local machine is pushed; the other machines update in the background, and
+`dotsync status` shows how that went. An hourly timer runs it too, with a guard: it skips the run when an agent is
+editing the dotfiles, when any file changed in the last ten minutes, or while a pause file exists (`dotsync pause` and
+`dotsync resume`). The identity boundary is strict: a sync never crosses from personal machines to work ones, and a
+machine whose profile cannot be read is skipped rather than guessed at.
+
+The machines find each other through [[tailscale|Tailscale]], and the fan-out is plain SSH with keys, so nothing new
+runs on any machine to make this work.
+
+## Private first, public through a gate
+
+The live repository holds things that must never be public: machine names, identities, private tooling. dx, the public
+copy, is built from it by an export with an allowlist. In the words of the
+[publication doc](https://github.com/coletebou/dx/blob/master/docs/workflow/publication.md), "a file reaches the
+public only by being named for export, and only after a scrub gate passes on the whole result". The gate runs secret
+scanners over the tree and the whole history, and a denylist of shapes (emails, phone numbers, private addresses, host
+names, home-directory paths, account ids) over every file, path and commit message. It fails closed: a missing scanner
+or an unreadable file is a failure, not a skip. And it prints only the file, line and rule, never the matched text, so
+the gate's own output cannot leak what it caught.
+
+dx is also a [[skills-and-plugins|Claude Code plugin marketplace]], so you can take one tool without the rest:
+
+| Plugin | What it gives you |
+|---|---|
+| `session` | [[cc-park]], to park idle Claude Code sessions and resume them with one key, and fresh-session handoffs ([[handoff-chains]]) |
+| `worktrees` | [[parallel-worktrees]]: N Claude Code or Codex sessions in their own worktrees and tmux windows, plus branch stacking |
+| `tmux` | `tmux-archive` and `tmux-organize`, to snapshot every pane and to rename and regroup windows by what is in them |
+| `memory` | End-of-session reflections, a nightly memory consolidation, and a scan of transcripts for unfinished work ([[reflection-store]]) |
+| `codex` | Codex subagents driven through tmux, and reading what a Codex agent really did from its transcript |
+| `review` | Adversarial review, a canary test proving an MCP server cannot leak its secrets, and a second-opinion advisor |
+
+To take only the skills, in Claude Code:
+
+```text
+/plugin marketplace add coletebou/dx
+/plugin install worktrees@dx
+```
+
+## Machine-local escape hatches
+
+Some settings belong to one machine only. Each layer has an uncommitted file for that, read last so it wins:
+`~/.zshenv.local` for environment overrides, `~/.zshrc_machine` for interactive extras, `~/.gitconfig.local`,
+`claude/settings.local.json` and `claude/mcp.local.json` inside the repository, and `~/.ssh/config.local`. The host
+labels shown in the [[tmux-status-line|tmux bar]] and the prompt come from the identity's hosts file: names only, never
+addresses.
+
+## Tested like code
+
+The dotfiles have a test suite (`scripts/tests/run-all.sh`) that covers the tmux scripts, the SSH-aware window helper,
+the status line, the installer, the git hooks, the worktree helpers and more. It is not ceremony. The comments in these
+files record bugs the tests now hold the line on: a `stat` flag that differs between macOS and Linux, a zsh array that
+counts from one, a status bar that blanked out on a 75-window session.
+
+A few portability rules run through all of it, and they are worth adopting:
+
+- **Assume macOS's bash 3.2.** It is still `/bin/bash` on a Mac, so scripts avoid newer bash features or say they need
+  them. See [[posix]] for the wider picture.
+- **Probe, don't guess, GNU versus BSD.** `date`, `stat`, `sed -i` and `md5sum` all differ between Linux and macOS.
+- **Define functions after unaliasing.** zsh expands aliases while it parses, so re-sourcing a file that turns an old
+  alias into a function fails with a parse error unless the alias is removed first.
+- **Assume `~/.dotfiles`.** Lots of files refer to that path, so the installer links `~/.dotfiles` to the checkout when
+  you clone it anywhere else.
+
+## Start your own
+
+```bash
+git clone https://github.com/coletebou/dx ~/.dotfiles
+cd ~/.dotfiles
+./install.sh --list                  # what each component installs
+./install.sh --all --dry-run         # every change it would make, making none
+./install.sh --all                   # or --with shell,git,tmux,claude,...
+```
+
+Copy `identities/example` to `identities/<you>`, edit it, and install with `--identity <you>`. Anything the installer
+would replace is moved to a dated backup first, with a log of every change, and a second run changes nothing. The
+[[bootstrap-script]] page goes through the installer itself, [[homebrew]] covers the package list on a Mac, and the
+[[tmux]], [[yu]] and [[ssh]] pages cover the biggest pieces it installs.

@@ -1,0 +1,226 @@
+---
+title: tmux
+summary: >-
+  The terminal multiplexer that keeps every shell, agent and server session alive in one place, reachable from the
+  desktop or a phone. Cole's config, piece by piece, and why agents live inside it.
+table: shell
+folio: 11
+aliases: [terminal multiplexer]
+updated: 2026-10-28
+sources:
+  - title: tmux(1) manual
+    url: https://man.openbsd.org/tmux.1
+  - title: tmux on GitHub
+    url: https://github.com/tmux/tmux
+  - title: Cole's tmux.conf (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/tmux.conf
+  - title: tmux-resurrect
+    url: https://github.com/tmux-plugins/tmux-resurrect
+  - title: tmux-continuum
+    url: https://github.com/tmux-plugins/tmux-continuum
+  - title: tmux-sensible
+    url: https://github.com/tmux-plugins/tmux-sensible
+---
+
+tmux is a terminal multiplexer: one program that holds many shells at once, keeps them running when you disconnect, and
+lets you reattach from any terminal, including a phone. In Cole's setup it is where everything lives: every
+[[claude-code|Claude Code]] and [[codex|Codex]] agent, every server session, every long build, on the
+[[mac-mini|Mac mini]] and on every server.
+
+## What tmux does
+
+tmux runs as a small server process in the background. You talk to it through a client, the `tmux` command in your
+terminal. Inside the server there are three levels:
+
+- **Sessions**, one per project or job. Cole names them after what they hold.
+- **Windows**, the tabs of a session. Each one usually holds one shell, one agent or one server connection.
+- **Panes**, splits of a window, when you want two things side by side.
+
+The trick is that the server outlives the client. Close the terminal, let the laptop sleep, lose the phone's
+connection: the shells and everything running in them keep going. Later you attach again, from the same machine or
+over [[ssh|SSH]] from another one, and the screen is exactly where you left it.
+
+That property is why agents live in tmux. An agent run can take hours. In tmux it survives a closed lid, a dropped
+Wi-Fi network and a walk to the kitchen, and you can check on it from [[termius|Termius]] on the phone, answer a
+question, and put the phone away. Long agent sessions run on a server rather than the laptop for the same reason: the
+server never sleeps.
+
+## How Cole uses it
+
+Cole's config is written for a crowded server: its comments talk about picking a live session out of fifteen and
+coloring a list of fifty windows. Two habits keep that manageable:
+
+- **Getting in is one word.** [[tm]] opens an fzf picker of every session, most recently used first, and `tl` jumps
+  straight back to the last one.
+- **Moving around is one chord.** <kbd>Alt</kbd>+<kbd>h</kbd> and <kbd>Alt</kbd>+<kbd>l</kbd> walk the windows,
+  <kbd>Alt</kbd>+<kbd>s</kbd> cycles sessions, and <kbd>Alt</kbd>+<kbd>a</kbd> opens a new agent window in the current
+  directory. The [[tmux-keymap]] page lists every binding.
+
+The [[tmux-status-line|status line]] at the bottom answers the rest at a glance: which machine this is, which session,
+which windows are busy right now, which agents handed off, and the time in UTC.
+
+On the desktop, tmux runs inside [[ghostty|Ghostty]]. On the phone it runs inside Termius, over SSH and
+[[tailscale|Tailscale]], which is why several bindings are designed to be typed on a phone keyboard.
+
+## The config, piece by piece
+
+The whole file is public at
+[base/tmux.conf](https://github.com/coletebou/dx/blob/master/base/tmux.conf), and it is unusually well commented: every
+non-obvious line says why it is there. It opens with a map of everything outside the file that reads, writes or hooks
+into it, which is worth copying as a habit. The highlights:
+
+### Scrollback and the mouse
+
+```tmux
+# Increase scrollback buffer (Claude outputs can be long)
+set -g history-limit 50000
+```
+
+Fifty thousand lines per pane, because agent output is long and you want to scroll back through all of it. The mouse is
+on, for scrolling, selecting and clicking between panes, with two deliberate changes covered on the
+[[tmux-keymap#the-mouse|keymap page]]: selecting text no longer snaps you back to the bottom, and the wheel direction is
+inverted to match Termius.
+
+### Colors, keys and links
+
+The default terminal type is `tmux-256color`, with true-color overrides for any 256-color terminal and an explicit RGB
+entry for Ghostty. Three more settings matter more than they look:
+
+- **The overrides are reset before they are added.** `terminal-overrides` and `terminal-features` lines append, so
+  every reload used to add another copy of each entry. The comment records the result: "a 13-day-old server had 276
+  overrides and 140 features". The config now clears both with `set -su` first and starts each load from tmux's
+  defaults.
+- **The terminal type heals itself on attach.** tmux captures `TERM` once, when the server starts. If the first client
+  was a plain SSH session rather than Ghostty, every later window inherited the wrong terminal type and rendered badly.
+  A `client-attached` hook now copies the attaching client's `TERM` into the server's global environment, so the next
+  window always gets the right one.
+- **Extended keys and hyperlinks are on.** CSI u key encoding keeps Ghostty's Alt and Ctrl combinations from leaking
+  into panes as escape characters, and the `hyperlinks` terminal feature passes OSC 8 links through, so the issue link
+  in the [[claude-code-status-line|Claude Code status line]] stays clickable inside tmux. Styled underlines are spliced
+  in too, so editor diagnostics show as curly red underlines.
+
+### Window names and numbers
+
+Windows name themselves. A shell window shows its directory, anything else shows the running command:
+
+```tmux
+set -g automatic-rename on
+set -g automatic-rename-format '#{?#{==:#{pane_current_command},zsh},#{b:pane_current_path},#{pane_current_command}}'
+```
+
+A Claude Code session can do better. When you name a session with `/rename`, a small [[hooks|hook]]
+(`tmux-rename-hook.sh`) renames its tmux window to match, on the next prompt or at the end of the turn. Agent windows
+opened with <kbd>Alt</kbd>+<kbd>a</kbd> keep the fixed name `yolo`, and windows opened from an SSH pane are named for
+their host.
+
+Windows and panes count from 1, so the first window sits under the 1 key, and `renumber-windows on` closes gaps when a
+window closes. New windows go right after the current one rather than at the end, which keeps related work together.
+
+### The terminal title
+
+tmux also sets the terminal emulator's tab title, as the short machine label plus the current window name. When a tab
+is attached to tmux on a server, the tab says which server. The label comes from the same hosts file the status bar and
+the [[starship|Starship]] prompt read, so one machine has one name everywhere. A window whose agent handed off gets a
+red marker in the title too, since that is the one place colors cannot reach.
+
+### Clipboard
+
+```tmux
+set -g allow-passthrough on
+set -s set-clipboard on
+```
+
+With these two lines, a copy made inside tmux on a server reaches the clipboard of the machine you are typing on. tmux
+sends it to the outer terminal as an OSC 52 escape sequence, which Ghostty and most modern terminals accept, and
+programs inside tmux, like Neovim, can send their own. The <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>c</kbd> binding uses
+this to copy a whole pane's history in one keystroke.
+
+## Saving and restoring sessions
+
+A tmux server lives in memory. A reboot ends it, and with it every window. Three pieces put things back.
+
+**tmux-resurrect** saves every session, window, pane, working directory and the visible pane contents, with prefix
+<kbd>Ctrl</kbd>+<kbd>s</kbd>, and restores them with prefix <kbd>Ctrl</kbd>+<kbd>r</kbd>. **tmux-continuum** saves
+automatically every 15 minutes. Cole leaves continuum's automatic restore off: restoring is a deliberate step.
+
+**The agent hooks** are Cole's addition. Resurrect knows that a pane was running `claude`, but not which conversation.
+Two scripts close that gap:
+
+```tmux
+set -g @resurrect-hook-post-save-all    'bash ~/.dotfiles/scripts/tmux-resurrect-claude-save'
+set -g @resurrect-hook-post-restore-all 'bash ~/.dotfiles/scripts/tmux-resurrect-claude-restore'
+```
+
+On save, the first script writes a table of which Claude Code or Codex session ID ran in which pane, whether it ran
+with permission prompts off, and for Codex which model provider profile it used. On restore, the second script types
+the right `claude --resume` or `codex resume` command into each pane. It refuses to act when that would cause harm: it
+skips a conversation that is already running somewhere else, skips any pane that is not sitting at an idle shell (keys
+typed into an editor or an SSH session would land in the wrong place), and never resumes one conversation in two panes.
+
+**The backstop timer** covers a gap the config documents carefully. Continuum schedules its saves through the status
+bar, and tmux only redraws the status bar for an attached client. A detached server, which is the normal state of a
+server full of agents, never auto-saves, no matter the interval. The comment records a busy detached server that went
+more than four hours without a snapshot while holding dozens of agent sessions. The fix lives outside tmux: a systemd
+user timer on Linux and a launchd agent on macOS run a save every 15 minutes, and stand down when continuum is
+already saving for an attached client.
+
+## tmux and the agent fleet
+
+Because every agent is a process in a pane, tmux doubles as the control surface for the whole
+[[agent-fleet|agent fleet]]:
+
+- **[[cc-park]]** parks idle Claude Code sessions to free memory. The pane keeps the session's last screen as text,
+  with the exact resume command typed at the prompt, so pressing Enter brings the conversation back. On Macs it runs
+  every 30 minutes for sessions idle six hours or more.
+- **[[parallel-worktrees]]** creates a session with one window per git worktree and types the launch command into each,
+  so ten agents start with one command.
+- **[[handoff-chains|Handoff chains]]** move a long session into a fresh one in a new window, and mark the old window
+  with a red badge in the status bar and the window chooser, so a finished session reads as finished.
+- **[[drover]]** reads panes and types into them across machines, which is how one agent can check on, or message,
+  another.
+- **Forks stay visible.** When you fork a Claude Code conversation with `/branch`, the session in front of you becomes
+  the fork. A start-up hook (`branch-tmux-hook.sh`) reopens the original conversation in a new window, so both are a
+  keystroke apart.
+- **Activity colors.** Each Claude Code pane registers itself with tmux from its status line script, so the window
+  list can color a Claude window by real transcript activity rather than by screen redraws. The
+  [[tmux-status-line]] page explains why that distinction matters.
+
+Two skills from Cole's [[skills-and-plugins|plugin marketplace]] round it out: `tmux-archive` snapshots every pane's
+scrollback to disk, linked to its agent transcript, and `tmux-organize` renames and regroups windows based on what is
+in them, without ever killing a pane.
+
+## Plugins
+
+The config uses the Tmux Plugin Manager (TPM) with three plugins: tmux-sensible for agreed-upon defaults,
+tmux-resurrect and tmux-continuum. Cole's [[bootstrap-script|installer]] pins each plugin to an exact commit instead of
+taking whatever is newest. One subtlety: tmux-sensible changes `status-interval` from 15 to 5 seconds whenever it
+finds the default of 15, since it cannot tell "set to 15" from "never set". The config now says 5 explicitly, which is
+what the bar had really been doing all along.
+
+## Gotchas
+
+- **Version floor.** The config is tested on tmux 3.4 and newer. Features from 3.7, like the second status row, are
+  turned on only after probing for an option that 3.7 introduced, so the same file works on an older server.
+- **Nested attach fails.** Running `tmux attach` from inside a tmux pane stops with "sessions should be nested with
+  care, unset $TMUX to force". Switch sessions with <kbd>Alt</kbd>+<kbd>s</kbd>, prefix <kbd>s</kbd> or `tl`, which
+  uses `switch-client` when it is already inside tmux.
+- **The server's environment is a snapshot.** Commands that tmux starts inherit the environment from when the server
+  started. That is why the agent bindings wrap `claude` in `zsh -lic`: see
+  [[tmux-keymap#agent-windows|agent windows]].
+- **Status line formats have a time budget.** tmux 3.7 stops expanding a status line after 100 milliseconds and draws
+  what is left as empty. A busy bar can blank out on a server with many windows, which is why Cole's per-window colors
+  are computed by a script and only looked up in the format.
+- **Ctrl-k is taken.** It clears the pane's scrollback and never reaches the shell.
+
+## Set it up
+
+1. Install tmux 3.4 or newer: `brew install tmux` on a Mac ([[homebrew]]) or `sudo apt install tmux` on Debian and
+   Ubuntu. Check with `tmux -V`.
+2. Take the config: clone [coletebou/dx](https://github.com/coletebou/dx) and run `./install.sh --with tmux`, or copy
+   the parts you want from `base/tmux.conf` into `~/.tmux.conf`.
+3. Install TPM with `git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm`, start tmux, and press prefix
+   <kbd>Shift</kbd>+<kbd>i</kbd> to fetch the plugins.
+4. Add a picker like [[tm]] so getting back in is one word.
+
+The [[dotfiles]] page covers how the same file reaches every machine, and the [[yu]] page covers the launchers that
+start agents inside it.

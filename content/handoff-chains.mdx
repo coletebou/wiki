@@ -1,0 +1,173 @@
+---
+title: Handoff Chains
+summary: >-
+  How a long Claude Code session hands its open work to a fresh one before its context runs out: a written brief, a
+  successor in a new tmux window, the old window closed once the new one answers, on this machine or another.
+table: automata
+folio: 34
+aliases: [cc-handoff, fresh-session handoff]
+updated: 2026-10-28
+sources:
+  - title: Handoff chains (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/handoff.md
+  - title: fresh-session-handoff skill (dx)
+    url: https://github.com/coletebou/dx/blob/master/plugins/session/skills/fresh-session-handoff/SKILL.md
+  - title: handoff skill (agent-skills)
+    url: https://github.com/coletebou/agent-skills/blob/main/skills/handoff/SKILL.md
+  - title: Claude Code sessions
+    url: https://code.claude.com/docs/en/sessions
+---
+
+A handoff chain is how a long [[claude-code|Claude Code]] session passes its open work to a fresh session before its
+context runs out. The session writes a brief, a tool called `cc-handoff` opens a successor in a new tmux window right
+next to it, with the chain's history printed above the new prompt, and the old window closes by itself once the
+successor has replied. The successor is the next generation of the chain; the chain keeps every generation's brief
+and transcript, and any later generation can hand off again, on this machine or another one.
+
+<Diagram name="agent-fleet" scene="handoff" />
+
+The diagram follows one handoff: the passer writing its brief, the successor's window opening beside it, the history
+echoed into the new window, the first reply, and the passer's window closing once nothing holds it open.
+
+## Why hand off instead of compacting
+
+Claude Code compacts a full conversation by summarizing it, and that is fine for keeping a chat going. For real work
+it loses the things the next step needs most: run ids, pull request numbers, background task ids, the exact words of
+the last request, the gate that triggers the next irreversible step. A written brief keeps them verbatim. And quality
+and usage limits degrade well before a 1M-token window actually compacts, so waiting for compaction means doing the
+hardest part of a task with the most crowded context.
+
+So Cole's sessions hand off instead. The [[context-and-compaction|context advisor]] watches each session's context
+and, at 70% and again at 85% of its advisory budget, asks a small judge model whether this is a natural stopping
+point. If it is, the session is told so, and the `fresh-session-handoff` skill does the rest without waiting to be
+asked.
+
+<ColesTake>
+
+An agent that says "you might want a fresh session" and keeps going has not helped. At the stopping point it should
+just hand off, and tell me where the new window is.
+
+</ColesTake>
+
+The one rule about timing: hand off at a natural stopping point, never in the middle of a rebase, a migration, a
+deploy or a debugging chain. Finish, or reach a safe pause, first.
+
+## The flow
+
+```sh
+cc-handoff init                       # start or continue the chain; prints this generation's brief path
+$EDITOR <brief>                       # the agent fills every FILL placeholder
+cc-handoff launch [--go] [<brief>]    # open the successor; close this window after its first reply
+cc-handoff launch --host <alias>      # the same, on another machine
+cc-handoff status                     # one line per generation
+```
+
+1. **Init.** A session the tool started already knows its chain and generation; any other session starts a new chain
+   with itself as generation 1. Init writes the brief's skeleton with every live fact already filled in: ids, paths,
+   the transcript, the tmux pane, the working directory and its git state, the running background jobs, the first
+   prompt and the active `/goal`.
+2. **Fill.** The agent writes the parts only it knows. `launch` refuses a brief with a placeholder left, an empty
+   section or a missing summary line, and starts nothing.
+3. **Launch.** The tool renders the passer's transcript next to the brief, gives the successor a fresh session id,
+   writes its short inline prompt, opens a tmux window right after the passer's, and starts a watcher.
+4. **Start the successor.** The new window prints the chain's history (briefs 1 to n-1, then the passer's rendered
+   transcript), copies that transcript to a tmux buffer and the clipboard, and starts Claude Code with the prompt as
+   an argument. Nothing is typed into the pane, because long text through `tmux send-keys` breaks on quotes, newlines
+   and dollar signs.
+5. **Close the passer.** The watcher runs as a child of the tmux server, so it outlives the passer's window, and
+   closes that window once it is safe (below).
+
+## The brief
+
+Every section is required; "none" is a fine answer, an empty section is not.
+
+| Section | What goes in it |
+|---|---|
+| Summary | Exactly three lines: `Continuing:`, `Done:`, `Left:`. They are lifted into the successor's prompt. |
+| What happened | What was asked (the latest unfinished request quoted word for word), what was tried, what was learned |
+| Done | Each finished item with its evidence: commands and results, commits, links |
+| Left | Open items in priority order, each with its next action and whether it needs Cole's go. This is the successor's todo list. |
+| Proposed improvements | What the next session, or the tooling, should do differently |
+| Driver and manager | Who drives this session, who it reports to and how, which sessions it manages |
+| Background jobs | Every running job, and who takes it over |
+| IDs and paths | Filled by init |
+| Rules | What the successor may do without asking |
+
+Every fact must come from something checked in the session; the skill says to write "not verified" rather than
+guess.
+
+## The successor's prompt
+
+About eight lines, written by the tool. It says which generation the session is and which session it continues,
+that the tool wrote it and no person typed it, and that it is only a summary: the brief is the source of truth. It
+tells the successor to read the brief in full, check it against the end of the passer's own transcript and trust the
+transcript where they disagree (a session with a crowded context writes a worse summary than the work it did),
+rebuild its todo list from the brief's Left section, tell the sessions that manage it its new name, then verify the
+live state and ask which item to start. With `--go`, given only when Cole authorized the whole brief, it does all of
+it instead. An active `/goal` carries forward to the successor.
+
+## Closing the old window
+
+The watcher closes the passer's window only when all of these hold:
+
+- **The successor replied**, with real text or a tool call, not an API error. No reply in 30 minutes and the passer
+  stays.
+- **No job holds it.** The passer's live background shells and agents either finished or were adopted by the
+  successor (`cc-handoff adopt --all`). While any runs, the window is held, for up to twelve hours.
+- **Nobody is using it.** No one typed in the passer after the handoff, and the pane still belongs to it.
+- **The passer is quiet**: its turn has ended and its transcript has been still for ten seconds.
+
+Then it closes that one window or pane by its exact id. `cc-handoff` never kills a tmux server or session: the shell
+side refuses every kill command, and the Python side allows only one window or pane, named explicitly. The handed-off
+session stays resumable with `claude --resume <id>`, and `cc-handoff keep` keeps the window for good.
+
+## Chains, names and messages
+
+```text
+~/code/.briefs/<chain>/
+  chain.json            name, root, created
+  gen-01/session.json   who ran generation 1, where, and what became of its window
+  gen-01/brief.md       written by generation 1 for generation 2
+  gen-01/transcript.md  generation 1's transcript, rendered and redacted
+  gen-01/watch.log      every decision the watcher made
+  gen-02/prompt.txt     the prompt generation 2 started with
+```
+
+Names follow the chain: a session named `ocean` hands to `ocean-2`, then `ocean-3`, because tools that deliver by
+name need one live session per name. `--notify <session>` tells a managing session the new name once the successor
+has replied, and [[drover|Drover]] goes further: a message sent to `ocean` after it handed off is delivered to the
+newest live generation (see [[agent-messaging]]).
+
+## Handing off to another machine
+
+`--host <alias>` moves the work to another machine over [[ssh|SSH]]: the whole chain and the passer's raw transcript
+(compressed, readable only by its owner) are copied there, the successor's window opens in that machine's `handoffs`
+tmux session, and the watcher here asks the target for the first reply. `--host auto` asks Drover's placement for the
+machine with the most room for one more session. This is how a session that started on the Mac mini continues on an
+AWS server, where long agent work belongs (see [[servers]]).
+
+Before anything starts, a preflight checks the target: the tools are installed, the identity matches (work and
+personal never cross), the working directory exists and Claude Code trusts it, and a target that runs Claude Code as
+root is marked as a sandbox (bypass mode refuses root otherwise).
+
+## The details that make it safe
+
+- **Same provider route.** The successor runs the way the passer did: a session on Bedrock never hands off to a
+  subscription, or the other way round. When no launcher on the machine reproduces the route, nothing starts.
+- **Same permissions.** A successor started with plain `claude` skips permission prompts only if the passer's own
+  command line did.
+- **Redaction.** Everything rendered or echoed (transcripts, briefs, the tmux buffer, the clipboard) is redacted:
+  credential shapes, the values of secret environment variables, email addresses and phone numbers.
+- **Visible state.** The successor's [[claude-code-status-line|status line]] shows its generation (`⤷2`); the passer's
+  shows a red badge while the handoff is in flight, after it lands, and while jobs hold the window, and its tmux tab
+  gets a red marker.
+- **Tested in a sandbox.** The test suite runs whole chains against a fake Claude and a fake second host, inside a
+  private tmux sandbox that refuses any real socket. It exists because, once, a manual `kill-server` during testing
+  reached the real tmux server and every session on it.
+
+## The other handoff
+
+`/handoff` is a different tool for a different job: it writes a portable, clipboard-ready prompt for another agent or
+person, with no file paths, framed as a discussion that asks the receiver to do its own review first. It comes from the
+public [agent-skills](https://github.com/coletebou/agent-skills) collection. In Cole's sessions a [[hooks|hook]] adds
+one step, recording the handoff as an open item in the [[reflection-store]] so the receiving session can close it.

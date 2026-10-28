@@ -1,0 +1,97 @@
+---
+title: Sparrow Wallet
+summary: >-
+  A free, open-source desktop Bitcoin wallet for Windows, macOS and Linux, built around hardware wallets, PSBTs, coin
+  control and your own node. The Bitcoin wallet on Cole's list for the desktop, and how to set it up privately.
+table: mint
+folio: 79
+aliases: [Sparrow]
+updated: 2026-10-28
+sources:
+  - title: Sparrow Wallet features
+    url: https://sparrowwallet.com/features/
+  - title: Sparrow best practices
+    url: https://sparrowwallet.com/docs/best-practices.html
+  - title: Sparrow download and release verification
+    url: https://sparrowwallet.com/download/
+  - title: Sparrow releases and change log
+    url: https://github.com/sparrowwallet/sparrow/releases
+---
+
+Sparrow is a desktop Bitcoin wallet for Windows, macOS and Linux. It is free and open source under the Apache 2
+license (<Price id="sparrow-wallet" />), and it is built for people who want to see and control exactly what their
+wallet does: which coins it spends, which server it asks, which device signs. It is the Bitcoin wallet on Cole's list
+for the desktop, next to [[cake-wallet|Cake Wallet]] on the phone. This page covers what it does and a sensible,
+private way to set it up; [[bitcoin]] covers why the privacy part matters. Nothing here is financial advice.
+
+## What it does
+
+- **Every wallet type.** Single signature and multisig, with all the legacy and SegWit script types.
+- **PSBTs from the ground up.** Sparrow builds Partially Signed Bitcoin Transactions, so the computer that builds a
+  transaction never needs the keys: a hardware wallet or an offline device signs it.
+- **Hardware wallets.** In Sparrow's words, "all common hardware wallets are supported and can be easily imported
+  using USB or their own file formats."
+- **Coin control.** You see every coin (UTXO) and can choose which ones a payment spends. Automatic selection uses
+  the same Branch and Bound and Knapsack strategies as Bitcoin Core, and a byte-level viewer shows the finished
+  transaction.
+- **Labels.** Name your addresses, transactions and coins, and Sparrow carries the labels along when you send.
+- **PayJoin.** Supported since 2020 (BIP 78): the receiver adds an input to your payment, which breaks the assumption
+  that every input belongs to the sender.
+- **Silent payments.** Since version 2.3.0 (October 2025) Sparrow can send to silent payment addresses, including
+  ones found through BIP 353 human-readable names.
+
+The current version is 2.5.5, released September 17, 2026. Sparrow is Bitcoin only; for [[monero|Monero]], use a
+wallet like Cake. And for a home miner such as a [[bitaxe|Bitaxe]], Sparrow is a good place to generate the fresh
+receiving address the miner pays to, since the miner needs only the address, never the keys.
+
+## Three ways to connect
+
+A wallet has to ask the blockchain which coins are yours, and whoever it asks learns your addresses. Sparrow offers
+three answers:
+
+| Server | How it works | Privacy |
+|---|---|---|
+| A public server | Preconfigured Electrum servers run by others, "for those starting out on their privacy journey" | The server sees every address and your balance |
+| Your own Bitcoin Core | Sparrow connects directly to your node | Nothing leaves your machine, and you validate everything yourself |
+| A private Electrum server | Fulcrum, ElectrumX, Electrs and others, run on your own node | Private, and faster for large wallets |
+
+Electrum servers work over SSL and over Sparrow's built-in Tor. Sparrow's warning about the first option is blunt:
+"sharing your balance with public servers may be making you a target." The [[bitcoin#running-a-node|running a node]] section shows
+what a node of your own takes.
+
+## A sensible setup
+
+Sparrow's own best practices grow with how much you hold:
+
+1. **Get the keys off the exchange.** "Take your coins off the exchange and use a hardware wallet or dedicated computer
+   to store your private keys," with "a backup of the seed words (the latter ideally in a different location)."
+2. **Run a node.** "Consider running a Bitcoin Core node (or using one run by a person that you trust)," and connect
+   Sparrow to it.
+3. **Go multisig for larger amounts.** "Employ at least a 2-of-3 multisig setup" and "require hardware wallets from
+   different vendors for a quorum," so that one lost device, one compromised vendor or one stolen backup is not enough
+   to lose or steal the coins.
+
+For a multisig wallet, back up the wallet's output descriptor too (Sparrow exports it). The seeds alone do not say
+how they combine into the wallet, and you need that to recover it.
+
+## Verify what you install
+
+Wallet software is a target, so check the download before you run it. Sparrow publishes a signed manifest of hashes
+for every release. If you already have Sparrow 1.8.3 or later, drag the installer, the manifest and its signature
+onto Sparrow and the Verify Download dialog checks all three; the same dialog verifies Bitcoin Core downloads and
+hardware wallet firmware. For a first install, verify with `gpg` against the developer's published key, the same way
+any signed release is checked (see [[pgp]]).
+
+## Gotchas
+
+- **Old guides mention Whirlpool.** Sparrow removed its Whirlpool CoinJoin client in version 1.9.0 (April 2024),
+  after the Samourai Wallet service it depended on was shut down. Guides that walk through "mixing in Sparrow" are out
+  of date.
+- **A hot wallet is a choice.** Sparrow can keep keys on the computer itself, which is fine for small amounts and
+  testing. For savings, let a hardware wallet hold the keys and use Sparrow to build and broadcast.
+- **Coin control is only as good as your labels.** Spending coins together links them forever. Label where each coin
+  came from, especially coins withdrawn from an exchange that knows your name.
+- **The first connection matters.** If Sparrow ever connected to a public server with your wallet loaded, that server
+  has already seen your addresses. Set up the node first, then load the wallet.
+- **Keep it updated.** Sparrow's releases fix hardware wallet quirks and signing edge cases, such as checking silent
+  payment outputs before a device signs (2.5.5).

@@ -1,0 +1,131 @@
+---
+title: POSIX, macOS and Linux
+summary: >-
+  POSIX is the standard behind Unix-like systems: the shell, the core utilities, the system interfaces. macOS and Linux
+  both follow it, which is why one set of habits works on a Mac and an AWS server, and why Windows needs WSL.
+table: shell
+folio: 23
+aliases: [posix standard, unix]
+updated: 2026-10-28
+sources:
+  - title: POSIX.1-2024 (The Open Group Base Specifications Issue 8)
+    url: https://pubs.opengroup.org/onlinepubs/9799919799/
+  - title: UNIX 03 register entry for macOS on Apple silicon (The Open Group)
+    url: https://www.opengroup.org/openbrand/register/brand3678.htm
+  - title: Cole's statusline.sh, portable helpers (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/claude/statusline.sh
+  - title: Comparing WSL versions (Microsoft Learn)
+    url: https://learn.microsoft.com/en-us/windows/wsl/compare-versions
+---
+
+POSIX is the standard that defines what a Unix-like system looks like, both to programs and to the person at the
+shell: the system calls, the shell language, and utilities like `grep`, `sed` and `awk`. macOS and Linux both follow
+it. That shared ground is why the same terminal habits, scripts and tools work on Cole's [[mac-mini|Mac mini]] and on
+an AWS server, and why Windows needs [[wsl|WSL]] to join in.
+
+## What POSIX is
+
+The name stands for Portable Operating System Interface. It is an IEEE standard, IEEE Std 1003.1, published jointly
+with The Open Group. The current edition, POSIX.1-2024, describes itself this way: it "defines a standard operating
+system interface and environment, including a command interpreter (or "shell"), and common utility programs to
+support applications portability at the source code level".
+
+It comes in four volumes:
+
+- **Base Definitions:** terms, concepts, utility conventions, C header files.
+- **System Interfaces:** the C functions a program calls to open files, start processes, handle signals.
+- **Shell and Utilities:** the `sh` language (pipes, redirects, `if`, `for`, `case`) and the standard commands,
+  from `cd` and `ls` to `grep`, `find`, `sort` and `ps`.
+- **Rationale:** why things are the way they are.
+
+Just as telling is what it leaves out: graphics, databases and binary compatibility. POSIX promises that source code
+and scripts carry over, not that a program compiled on one system runs on another.
+
+## Who follows it
+
+| System | Relationship to POSIX | Its command-line tools |
+|---|---|---|
+| macOS | Certified: Apple has registered macOS releases as UNIX 03 with The Open Group, including releases for Apple silicon Macs | BSD versions |
+| Linux | Not certified as a rule, but follows POSIX closely in practice | GNU versions (coreutils, grep, sed, bash) |
+| Windows | Not POSIX; its own shells, paths and process model | PowerShell and cmd, or Linux tools through WSL |
+
+UNIX 03 certification goes beyond POSIX: it covers the larger Single UNIX Specification, and a product has to pass The
+Open Group's test suites to carry the name. Linux distributions are generally not submitted for it, but the kernel and
+the GNU tools implement the same interfaces, and scripts written to the standard run on both.
+
+Windows is the odd one out. Its paths, line endings, process model and shells are different, and tools built for Unix
+need a translation layer or a rewrite. WSL 2 solves that by running a real Linux kernel inside Windows, which is why
+"WSL is the move" on a Windows machine.
+
+## Why macOS and Linux are nice
+
+Cole asked for this page to cover "why macos and linux are nice", and in this setup the answer is practical:
+
+- **One mental model.** Files, permissions, processes, signals, pipes and the shell work the same way on the desk and
+  on the server. Learning them once pays off everywhere.
+- **The tools arrive there first.** [[tmux]], [[ssh|SSH]], git, [[claude-code|Claude Code]], [[codex|Codex]] and
+  nearly every developer CLI are built for Unix first. Coding agents work by running shell commands, so a POSIX shell is
+  where they are at home.
+- **The same commands, locally and remotely.** An SSH session to a Linux server feels like the terminal on the Mac,
+  with the same [[dotfiles]], the same [[starship|prompt]] and the same aliases, because the same files run on both.
+- **A good desktop on top.** macOS adds the apps that make the desk pleasant, and Xcode for building
+  [[ios-development|iOS apps]], with Unix underneath. Linux is what the servers run.
+
+<ColesTake>
+
+It's the same Unix underneath. What works on the Mac works on the server.
+
+</ColesTake>
+
+## Where macOS and Linux differ
+
+The differences live in the tools more than the standard. macOS ships BSD versions of the core utilities, while
+Linux ships GNU versions, and the GNU tools add options BSD never had (and sometimes give a letter a different
+meaning). Cole's scripts run on both, and their comments record the differences that bit:
+
+| Task | GNU, on Linux | BSD, on macOS |
+|---|---|---|
+| A file's modification time | `stat -c %Y file` | `stat -f %m file` |
+| Print the time of a timestamp | `date -u -d @1784980800` | `date -u -r 1784980800` |
+| Edit a file in place | `sed -i 's/a/b/' file` | `sed -i '' 's/a/b/' file` |
+| Folder sizes, one level deep | `du -h --max-depth=1` | `du -h -d 1` |
+| A file's MD5 hash | `md5sum` | `md5` |
+| Process age in seconds | `ps -o etimes` | Not available; parse `ps -o etime` |
+| "No terminal" in `ps` output | `?` | `??` |
+
+The `date -r` row is the nastiest, and the status line's comments call it a false friend rather than a simple GNU
+versus BSD split: on macOS `-r` formats a timestamp, but on GNU it means "use this file's modification time". A script that
+tries the macOS form first on Linux usually fails loudly, but if a file with that name happens to exist in the current
+directory, it prints the wrong time with no error at all.
+
+Two more differences catch people:
+
+- **bash 3.2.** macOS still ships bash 3.2 as `/bin/bash`, without associative arrays or `${var,,}` lowercasing.
+  Cole's scripts that run there stay compatible with it, and say so in a comment.
+- **Case-insensitive file names.** The Mac's default file system treats `README.md` and `readme.md` as the same file;
+  Linux file systems do not. A rename that only changes case can confuse git on a Mac.
+
+## How Cole's scripts cope
+
+The code uses a few patterns again and again, and they are worth borrowing:
+
+1. **Probe, don't guess.** To format a timestamp, the status line asks `date --version` (only GNU answers) and then
+   uses the right flag, instead of trying one and falling back.
+2. **Try both, safely.** For a file's age it runs `stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0`,
+   and treats an unreadable file as very old, so a cache is refreshed rather than trusted.
+3. **Name the system tool.** On macOS, one script calls `/usr/bin/stat` by full path, because a Homebrew GNU `stat`
+   first on the path would read `-f` as "file system status".
+4. **Install GNU tools beside BSD ones.** The [[homebrew|Brewfile]] adds GNU coreutils, sed, find and awk under a `g`
+   prefix (`gdate`, `gsed`), so you can reach for them without replacing what macOS itself relies on.
+
+## Writing portable shell scripts
+
+- Use `#!/bin/sh` and POSIX features when a script must run anywhere. Use `#!/usr/bin/env bash` when you need bash,
+  and remember the Mac's 3.2.
+- Detect tools with `command -v tool`, not by assuming they exist.
+- Prefer the options the standard defines. `grep -E` works everywhere; `grep -P` does not (see
+  [[grep-ripgrep-ugrep]]).
+- Run the script on both systems before you trust it. The bugs in the table above were all found that way.
+
+The [[wsl]] page covers bringing a Windows machine into the same world, and [[bootstrap-script]] covers the installer
+that sets up all of this on a new Mac or Linux box.

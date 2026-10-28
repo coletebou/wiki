@@ -1,0 +1,79 @@
+---
+title: The Mechanical Keyboard
+summary: >-
+  Cole's full-size mechanical keyboard: a numpad, RGB lighting, a switch between macOS and Windows layouts, and
+  tri-mode connections (Bluetooth, a 2.4 GHz receiver or USB) for three devices. What each feature is for.
+table: desk
+folio: 5
+aliases: [keyboard, tri-mode keyboard]
+updated: 2026-10-28
+sources:
+  - title: Keychron K10 Max, an example of a full-size tri-mode board (Keychron)
+    url: https://www.keychron.com/products/keychron-k10-max-qmk-wireless-mechanical-keyboard
+  - title: Ghostty config reference, macos-option-as-alt
+    url: https://ghostty.org/docs/config/reference
+---
+
+Cole types on a full-size mechanical keyboard, in Cole's words "our nice mechanical keyboard that has a macOs/windows
+switch, 3 device BT/wifi/usb RGB with numpad and RGB". Unpacked, that is a board with a number pad, RGB lighting, a
+switch that flips it between Mac and Windows layouts, and three ways to connect, which together let one keyboard drive
+the [[mac-mini|Mac mini]], a Windows PC and a third device without unplugging anything.
+
+<ColesTake>
+
+It's a nice board: one keyboard, three machines, a switch for Mac or Windows, and the numpad stays.
+
+</ColesTake>
+
+## What the features are for
+
+**Mechanical switches.** Each key sits on its own switch with a spring, instead of a rubber dome under a membrane.
+Switches come in three broad feels: linear (smooth all the way down), tactile (a bump where the key registers) and
+clicky (a bump and a click). They last for tens of millions of presses, and on many boards they are hot-swappable,
+pulled out and replaced without soldering.
+
+**A full-size layout.** "Full-size" or 100 percent means every key, including the function row, the arrow and
+navigation cluster, and the number pad on the right. The numpad is the reason to choose it: numbers, spreadsheets and
+calculations go much faster. The cost is width, which pushes the mouse further out.
+
+**Tri-mode connections.** The "BT/wifi/usb" in Cole's description are three separate links:
+
+| Mode | How it connects | Good for |
+|---|---|---|
+| Bluetooth | Pairs directly, usually with up to three devices, switched with a key combination | Moving between the Mac, a laptop and a tablet |
+| 2.4 GHz wireless | A small USB receiver, a radio link that is not Wi-Fi despite the nickname | Lower latency and a steadier link than Bluetooth |
+| USB cable | Plugged in, which also charges it | Zero lag, and a fallback when wireless acts up |
+
+**A macOS and Windows switch.** Mac and Windows put their modifier keys in different places and give them different
+names: Control, Option and Command on a Mac; Ctrl, the Windows key and Alt on a PC. A hardware switch remaps the bottom
+row (and usually the media keys) so the same physical keys do the right thing on either system, with keycaps for both.
+
+**RGB lighting.** Per-key colored backlighting, with effects and brightness levels. Beyond looks, it makes the keys
+readable in a dark room. On battery it costs runtime, so dim it on wireless.
+
+## Why it fits this setup
+
+The setup this wiki describes spans a Mac and Windows: the Mac mini on the desk, and a Windows PC that does its Unix
+work in [[wsl|WSL]]. One board with a layout switch and multiple connections covers both without a second keyboard.
+
+The modifier keys matter more than usual here, because Cole's [[tmux-keymap|tmux keymap]] leans on Alt:
+<kbd>Alt</kbd>+<kbd>h</kbd> and <kbd>Alt</kbd>+<kbd>l</kbd> to change windows, <kbd>Alt</kbd>+<kbd>a</kbd> for a new
+agent window, <kbd>Alt</kbd>+<kbd>s</kbd> for sessions. On a PC, Alt is simply Alt. On a Mac, the Option key types
+accented characters by default, so the terminal has to be told to treat it as Alt: Cole's [[ghostty|Ghostty]] config
+sets `macos-option-as-alt = left`, which turns the left Option key into Alt and keeps the right one for accents.
+
+## Choosing one
+
+Boards like this are common from makers such as Keychron. Keychron's full-size
+[K10 Max](https://www.keychron.com/products/keychron-k10-max-qmk-wireless-mechanical-keyboard), for example, lists
+2.4 GHz wireless, Bluetooth 5.1 to three devices and a wired mode, with a toggle between Windows and macOS. When
+comparing boards, the features worth checking are:
+
+- **Programmable firmware.** Boards that run QMK or VIA let you remap any key and add layers, so you can, say, put
+  the tmux prefix on a single key.
+- **Hot-swap sockets.** Try different switches without buying a new keyboard.
+- **The connection switch.** A physical switch for Bluetooth, 2.4 GHz and cable is quicker than a key combination.
+- **Layout.** If the numpad is not something you use, a 96 percent or 75 percent board keeps most keys and gives the
+  mouse room.
+
+The [[mice]] page covers the other half of the desk.

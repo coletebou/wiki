@@ -1,0 +1,146 @@
+---
+title: caffeinate, htop and Friends
+summary: >-
+  The small tools that keep a machine healthy while agents run on it: caffeinate keeps a Mac awake, htop shows what is
+  using the CPU and memory, ncdu finds what fills the disk, and a few helpers answer "what is this machine doing?".
+table: shell
+folio: 22
+aliases: [caffeinate, htop, ncdu]
+updated: 2026-10-28
+sources:
+  - title: caffeinate(8) manual
+    url: https://keith.github.io/xcode-man-pages/caffeinate.8.html
+  - title: htop
+    url: https://htop.dev/
+  - title: Cole's macOS role file, with caf (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/roles/local/macos.sh
+  - title: resources and resources-deep in Cole's aliases.sh
+    url: https://github.com/coletebou/dx/blob/master/base/aliases.sh
+  - title: porchlight, a fleet-aware login dashboard
+    url: https://github.com/coletebou/porchlight
+---
+
+A machine that runs agents all day needs a few small tools around it. `caffeinate` keeps a Mac from sleeping in the
+middle of a long run, `htop` shows what is using the processor and memory right now, `ncdu` finds what is filling the
+disk, and a handful of helpers in Cole's [[dotfiles]] answer "what is this machine doing?" in one command. None of
+them is exotic, and all of them earn their place.
+
+## caffeinate: keep the Mac awake
+
+`caffeinate` ships with macOS. It holds "assertions", requests to the power manager not to sleep, for as long as it
+runs. The flags say which kind of sleep to block:
+
+| Flag | Prevents |
+|---|---|
+| `-d` | The display from sleeping |
+| `-i` | The system from idle sleeping |
+| `-m` | The disk from idle sleeping |
+| `-s` | The system from sleeping at all, only while on AC power |
+| `-u` | Declares the user active, which turns the display on |
+| `-t 3600` | Drops the assertions after this many seconds |
+| `-w 1234` | Holds them until process 1234 exits |
+
+It can also wrap a command and hold the assertion exactly as long as the command runs: `caffeinate -i make` keeps the
+Mac awake for the build and no longer.
+
+Cole's macOS role file adds three shortcuts on top:
+
+```zsh
+caf() {
+    local hours="${1:-12}"
+    local secs=$(( hours * 3600 ))
+    nohup caffeinate -dimsu -t "$secs" >/dev/null 2>&1 &
+    disown
+```
+
+`caf` takes a number of hours (12 if you give none), blocks every kind of sleep for that long, and prints when it will
+end. `nohup` and `disown` detach it from the shell, so closing the terminal or the SSH session that started it does
+not end it. `caf12` is twelve hours, and `caf-stop` ends any running `caffeinate`.
+
+This matters on the [[mac-mini|Mac mini]], which runs agents in [[tmux]] and gets reached from elsewhere, over
+[[ssh|SSH]] or with [[screens-5|Screens 5]]. A sleeping Mac pauses every agent on it and stops answering the phone.
+
+<ColesTake>
+
+`caf12` before a long agent run, so the Mac doesn't nap halfway through.
+
+</ColesTake>
+
+To see what is currently holding a Mac awake (or failing to), `pmset -g assertions` lists every active assertion and
+the process that took it.
+
+## htop: what is running
+
+[htop](https://htop.dev/) is an interactive process viewer for the terminal, a friendlier `top`. It runs on Linux,
+macOS and the BSDs, and Cole's [[homebrew|Brewfile]] and [[bootstrap-script|Linux installer]] both install it. The keys
+worth learning:
+
+| Key | Does |
+|---|---|
+| <kbd>F5</kbd> or <kbd>t</kbd> | Tree view: every process under its parent |
+| <kbd>M</kbd> / <kbd>P</kbd> / <kbd>T</kbd> | Sort by memory, by CPU, by running time |
+| <kbd>F4</kbd> or <kbd>\\</kbd> | Filter the list by name |
+| <kbd>F3</kbd> or <kbd>/</kbd> | Search for a process |
+| <kbd>u</kbd> | Show one user's processes |
+| <kbd>Space</kbd> / <kbd>c</kbd> | Tag a process, or a process and its children |
+| <kbd>F9</kbd> or <kbd>k</kbd> | Send a signal (kill) to the selected or tagged processes |
+| <kbd>F10</kbd> or <kbd>q</kbd> | Quit |
+
+Tree view is the one for agents. A coding agent is rarely one process: each Claude Code session brings its MCP
+servers, language servers and sometimes a headless browser. In tree view they hang under their session, so you can see
+which session a memory-hungry browser belongs to, and tag the whole branch with <kbd>c</kbd> before killing it.
+
+One caution on a Mac: the memory column htop and `ps` show is resident memory (RSS), which leaves out pages macOS has
+compressed or swapped out. Under memory pressure that undercounts what a long-running session really holds, so treat
+it as a lower bound.
+
+## ncdu: what is filling the disk
+
+`ncdu` scans a directory and shows the biggest folders first, with arrow keys to drill in and <kbd>d</kbd> to delete.
+`ncdu ~` is the fastest way to find the forgotten `node_modules`, build caches and old transcripts that fill a disk.
+Agents generate a lot of files (worktrees, dependencies, logs, screenshots), so a full disk shows up sooner than you
+would expect. Cole's shell also has `duh`, a one-level, size-sorted `du` of the current directory, which uses GNU
+`du`'s options.
+
+## One-command health checks
+
+Two helpers in [base/aliases.sh](https://github.com/coletebou/dx/blob/master/base/aliases.sh) print a machine's state
+without opening anything interactive, which also makes them easy for an agent to run:
+
+- **`resources`** prints the processor, its load and the top processes by CPU; memory in use, compressed and free with
+  the top processes by memory; and disk use with the biggest folders in your home directory. It reads `/proc` on Linux
+  and `vm_stat` and `sysctl` on a Mac, so the same command works on both.
+- **`resources-deep`** adds pressure detection: swap use, how fast the macOS memory compressor is growing over two
+  seconds, how low free memory has fallen, and five one-second samples of one process you name (by default the macOS
+  contacts daemon, or the Linux swap daemon), for when you suspect thrashing or a system process stuck spinning.
+
+Both note a common trap: the `%CPU` that `ps` reports is an average over the process's whole life, not what it is doing
+this second. For a live view, use htop or `top`.
+
+For agents specifically, two more tools do the cleanup. `claude-orphans` and `cko` find and stop Claude Code sessions
+whose terminal went away (see [[yu#cleaning-up-orphans|cleaning up orphans]]), and [[cc-park]] parks idle sessions to
+free their memory without losing them.
+
+## A dashboard at login
+
+All of this can be summarized before your prompt even appears. Cole wrote [porchlight](https://github.com/coletebou/porchlight),
+a login dashboard for the terminal, released as open source: vitals, services, AI agents and their plan limits, Docker,
+pull requests, cloud status and ranked alerts, "rendered from cache in milliseconds". A background collector refreshes
+each source on its own schedule, so a login never waits on the network, even over SSH from a phone, and one machine can
+act as a hub that gathers the others' status over SSH. Its predecessor,
+[fleet-motd](https://github.com/coletebou/fleet-motd), is archived, and development continues in porchlight.
+
+## The rest of the everyday kit
+
+| Tool | What it is for |
+|---|---|
+| `jq` | Reading and reshaping JSON on the command line; many of Cole's scripts depend on it |
+| `bat` | `cat` with syntax highlighting and line numbers |
+| `eza` | A modern `ls`; Cole's `ls`, `ll` and `lt` use it when it is installed |
+| `zoxide` | `z part-of-a-name` jumps to a directory you visit often |
+| `fd` | Finding files by name, the companion to [[grep-ripgrep-ugrep|ripgrep]] |
+| `tree` | A directory as a tree |
+| `mtr` | `traceroute` and `ping` combined, for "where is the network slow?" |
+
+They all come from the same two places: the Brewfile on a Mac, and the installer's package list on Linux. The
+[[posix]] page explains why the same commands behave a little differently on each.

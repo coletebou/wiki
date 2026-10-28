@@ -1,0 +1,125 @@
+---
+title: Bitaxe
+summary: >-
+  An open-source Bitcoin miner on one small board: a mining chip, an ESP32 brain and the AxeOS web interface, solo
+  mining for a whole block on under 20 watts. What it is, how to set one up, its API, and the honest odds.
+table: mint
+folio: 78
+aliases: [Bitaxe miner, AxeOS, ESP-Miner, solo mining, home mining]
+updated: 2026-10-28
+sources:
+  - title: Bitaxe (bitaxe.org)
+    url: https://bitaxe.org/
+  - title: About the Bitaxe (OSMU wiki)
+    url: https://osmu.wiki/bitaxe/about/
+  - title: Bitaxe 600 "Gamma" (OSMU wiki)
+    url: https://osmu.wiki/bitaxe/600/
+  - title: ESP-Miner, the Bitaxe firmware (AxeOS)
+    url: https://github.com/bitaxeorg/ESP-Miner
+  - title: About Public Pool (OSMU wiki)
+    url: https://osmu.wiki/public-pool/about/
+  - title: Mining hashrate (mempool.space API)
+    url: https://mempool.space/docs/api/rest
+  - title: Porchlight (Cole's public repo)
+    url: https://github.com/coletebou/porchlight
+---
+
+The Bitaxe is an open-source Bitcoin miner: a small circuit board with one modern mining chip, an ESP32-S3
+microcontroller that runs it, a fan and a tiny screen. It describes itself as "a Bitcoin miner based on an open-source
+design and a modern mining ASIC," and it does something warehouse miners never do: it mines *solo*, trying to find a
+whole block on its own, from a desk, on under 20 watts. Cole runs one at home. It
+is the hands-on half of the [[bitcoin]] page, and like that page, this is not financial advice.
+
+## What it is
+
+Every Bitaxe pairs an ASIC (a chip that does nothing but Bitcoin's SHA-256 hashing) taken from Bitmain's commercial
+miners with an open board design and open firmware, so anyone can build, modify or sell one. ([[monero#mining|Monero]]
+went the other way and designed its mining so that ordinary computers stay competitive.) The name and logo belong
+to the bitaxeorg project, the firmware is maintained by Open Source Miners United (OSMU), and there is no official
+store: bitaxe.org links to vetted resellers. The current base model starts at <Price id="bitaxe" />.
+
+The model numbers track the chip:
+
+| Model | Chip | Notes |
+|---|---|---|
+| 100 "Max" | BM1397 | The first design |
+| 200 "Ultra" | BM1366 | |
+| 400 "Supra" | BM1368 | |
+| 600 "Gamma" | BM1370 | The chip from the Antminer S21 Pro, which Bitmain rates at 15 J/TH |
+| 650 "Gamma Duo" | BM1370 | Reuses lower-binned S21 chips instead of discarding them |
+| 801 "Gamma Turbo" | Two BM1370 | Twice the chips |
+
+A current Gamma (the 602 revision) hashes at about 1.2 terahashes per second and draws 18 to 20 watts, per the
+reseller listing behind the price above. Running all year, 20 watts is about 175 kWh of electricity.
+
+## Setting one up
+
+1. **Power it and join its network.** On first start the firmware brings up its own setup Wi-Fi network. Join it from
+   a phone or laptop and open the AxeOS page.
+2. **Give it your home Wi-Fi.** It restarts on your network, and from then on you reach AxeOS by its address on your
+   network.
+3. **Point it at a pool.** For solo mining the pool is only a coordinator, and the "user" field is the Bitcoin
+   address that would receive a block reward (a fresh receiving address from a wallet like
+   [[sparrow-wallet|Sparrow]] or [[cake-wallet|Cake Wallet]]), plus an optional worker name after a dot. Public Pool is a fully open
+   source solo pool with an official instance and the option to host your own; CKPool's solo server is another common
+   choice. Current firmware also speaks Stratum V2.
+4. **Watch the dashboard.** AxeOS shows hashrate, chip temperature, power, fan speed, uptime and the *best
+   difficulty*: the hardest share your miner has found so far, which is how solo miners track how close they came.
+
+Only an address goes into the miner. Never a seed, never a private key.
+
+## The AxeOS API
+
+AxeOS has a small HTTP API, documented in the firmware's
+[README](https://github.com/bitaxeorg/ESP-Miner) and its OpenAPI file, so a script can read or change everything the
+web page can:
+
+```sh
+curl http://YOUR-BITAXE-IP/api/system/info                  # hashrate, temperature, power, pool, uptime
+curl http://YOUR-BITAXE-IP/api/system/statistics/dashboard  # the dashboard's history
+curl -X POST http://YOUR-BITAXE-IP/api/system/restart       # restart the miner
+curl -X PATCH http://YOUR-BITAXE-IP/api/system \
+     -H "Content-Type: application/json" -d '{"fanspeed": 80}'
+```
+
+The JSON from `/api/system/info` is all a status panel needs. Cole's login dashboard,
+[Porchlight](https://github.com/coletebou/porchlight), turns any command that prints JSON into a panel, which is the
+easy way to see at a glance whether a miner on the home network is up. The same firmware also flashes over USB with
+`bitaxetool`, a Python tool, when you need a factory reset.
+
+## The odds, honestly
+
+Solo mining is a lottery where every hash is a ticket. Each block goes to whoever finds it, and your chance of finding
+any given block is your share of the network's total hashrate.
+
+At the end of October 2026 the network runs at about 1,075 exahashes per second (mempool.space). A Gamma's 1.2 TH/s
+is about one billionth of that. With about 52,560 blocks a year, a single Gamma at today's difficulty expects about
+0.00006 blocks a year: roughly a one in 17,000 chance in any given year. Difficulty tends to rise as the network
+grows, so the odds tend to shrink over time.
+
+Pool mining (sharing rewards with many miners) would pay a Bitaxe a tiny, steady trickle instead, which is why most
+owners choose the lottery. Either way, don't expect it to earn back what it costs. What it buys is participation: a
+real miner, on the real network, with open hardware you can read top to bottom.
+
+## Living with it
+
+- **Heat and air.** All of its power turns into heat at the chip. Give it airflow and keep an eye on the chip
+  temperature in AxeOS.
+- **Tuning.** AxeOS exposes the chip's frequency and core voltage. Raising either raises heat and power with it, so
+  change them in small steps and watch the temperature.
+- **Firmware updates.** ESP-Miner ships often (version 2.15.4 came out on October 21, 2026), and AxeOS can update
+  itself over the air from a downloaded release file.
+- **Keep it at home.** The web interface and API are meant for your local network. Do not forward them to the
+  internet; to check on the miner from elsewhere, reach your home network over [[tailscale|Tailscale]] instead.
+
+## Gotchas
+
+- **Your address is visible to the pool.** The address you mine to identifies you to the pool, and on many solo pools
+  its statistics page is public. Use an address meant for this, not one that ties back to everything else you own
+  (see [[bitcoin#what-the-public-ledger-reveals|what the public ledger reveals]]).
+- **Flash the right image.** Factory images are built per board revision; flashing the wrong one can leave the miner
+  misbehaving until you flash the right one.
+- **`bitaxetool` and `esptool` versions.** The README notes `bitaxetool` does not work properly with `esptool` 5.x;
+  version 0.6.1 of `bitaxetool` pins a compatible `esptool`.
+- **Shares are not blocks.** A high best difficulty is a fun number, not a near miss you can bank. Only a share that
+  beats the network difficulty is a block.

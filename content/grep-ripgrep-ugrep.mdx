@@ -1,0 +1,128 @@
+---
+title: grep, ripgrep and ugrep
+summary: >-
+  Three ways to search files for text. grep is the standard on every Unix machine, ripgrep is the fast, gitignore-aware
+  one Cole installs everywhere, and ugrep is a grep-compatible alternative with an interactive search screen.
+table: shell
+folio: 21
+aliases: [ripgrep, rg, ugrep, grep]
+updated: 2026-10-28
+sources:
+  - title: grep (POSIX.1-2024, Shell and Utilities)
+    url: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html
+  - title: GNU grep manual
+    url: https://www.gnu.org/software/grep/manual/grep.html
+  - title: ripgrep README
+    url: https://github.com/BurntSushi/ripgrep
+  - title: ugrep README
+    url: https://github.com/Genivia/ugrep
+  - title: Tools reference, Grep (Claude Code docs)
+    url: https://code.claude.com/docs/en/tools-reference
+---
+
+grep, ripgrep and ugrep all do one job: search files for lines that match a pattern. grep is the original and the
+standard, present on every macOS and Linux machine. ripgrep (`rg`) is the fast, code-aware one that Cole installs on
+every machine. ugrep (`ug`) is a grep-compatible alternative with an interactive search screen. Knowing which to reach
+for, and why, saves time every day, and it matters for agents too, because [[claude-code|Claude Code]]'s own search
+tool is ripgrep underneath.
+
+## grep: the standard
+
+grep has been part of Unix since the 1970s, and it is defined by the [[posix|POSIX]] standard, which is why it behaves
+the same way on every system that claims to be Unix-like. You give it a pattern and some files:
+
+```sh
+grep -rn "TODO" src/        # recursive, with line numbers
+grep -i "error" app.log     # ignore case
+grep -E "fail(ed|ure)" log  # extended regular expressions
+grep -F "a.b*c" notes.txt   # a fixed string, no regex at all
+grep -l "api_key" -r .      # just the names of matching files
+```
+
+Two versions are common. Linux ships GNU grep; macOS ships a BSD grep. They agree on the POSIX options and differ on
+some extras: GNU grep's `-P` for Perl-style patterns, for example, is missing from the grep macOS ships. Cole's shell
+setup aliases `grep` to `grep --color=auto` on both, so matches are highlighted.
+
+grep's strength is that it is everywhere. ripgrep's own README says so: if you need "a portable and ubiquitous tool",
+"the best tool for this job is good old grep". Shell scripts that must run on any machine should use grep and its
+standard options.
+
+## ripgrep: fast, and it knows about code
+
+[ripgrep](https://github.com/BurntSushi/ripgrep) is a line-oriented search tool written in Rust. Its defaults are built
+for searching code:
+
+- **Recursive by default.** `rg TODO` searches the current directory and everything under it.
+- **It respects your ignore files.** Anything your `.gitignore`, `.ignore` or `.rgignore` excludes is skipped, so
+  `node_modules`, build output and vendored code stay out of the results.
+- **It skips hidden and binary files.** `rg -uuu` turns all automatic filtering off when you need it.
+- **File types.** `rg -tpy foo` searches only Python files, and `rg -Tjs foo` excludes JavaScript.
+- **Unicode, fast.** Unicode support is always on, and unlike GNU grep, ripgrep stays fast with it.
+- **More when you need it.** `-P` switches to the PCRE2 engine for look-around and backreferences, `-z` searches
+  compressed files, and `--json` gives machine-readable output.
+
+```sh
+rg "fn main"                 # every Rust main in the repo
+rg -t ts "useEffect" -l      # TypeScript files using useEffect
+rg -w "Cole" -C 2            # whole words, two lines of context
+```
+
+The README is honest about the trade-off: ripgrep "does not conform to any standard such as POSIX", and it is not
+installed by default anywhere, so it is a tool for people, not for portable scripts.
+
+Cole installs it on every machine: `brew "ripgrep"` in the [[homebrew|Brewfile]] on a Mac, and `ripgrep` in the
+[[bootstrap-script|installer]]'s apt list on Linux.
+
+### ripgrep and agents
+
+Claude Code's built-in Grep tool "is built on ripgrep and uses ripgrep's regex syntax, not POSIX grep", in the words of
+its docs, so a pattern with special characters needs escaping the ripgrep way: finding `interface{}` in Go code takes
+the pattern `interface\{\}`. Cole's global agent rules tell agents to use that built-in tool for content searches
+rather than running `rg` or `grep` in a shell. The built-in tool returns structured results the agent can act on, and
+it goes through the same permission rules and [[hooks]] as every other tool.
+
+## ugrep: grep-compatible, with a search screen
+
+[ugrep](https://github.com/Genivia/ugrep) takes a different approach: it is a drop-in replacement for GNU and BSD grep,
+accepting their options and regular expression modes, and adds a long list of features on top. It comes as two
+commands: `ugrep` for scripts, behaving like grep, and `ug` for interactive use, which reads a `.ugrep` configuration
+file with your preferred options.
+
+The headline features:
+
+- **An interactive search screen.** `ug -Q` opens a text interface where results update as you type, with options
+  you toggle with Alt and a letter.
+- **Fuzzy search.** `ug -Z` finds approximate matches, within a set number of extra, missing or changed characters.
+- **Boolean queries.** `ug -% 'error -timeout'` finds lines with "error" but not "timeout", with AND, OR and NOT.
+- **Archives and documents.** `ug -z` looks inside zip, tar and 7z archives and compressed files, and `ug+` searches
+  PDFs and office documents through filters.
+- **Ignore files on request.** `--ignore-files` makes it skip what `.gitignore` excludes, the way ripgrep does by
+  default.
+
+Both projects publish benchmarks in which they come out ahead, on different tests. For everyday code search, either
+is faster than you will notice. ugrep is not part of Cole's setup today: ripgrep is what is installed everywhere.
+
+## Side by side
+
+| | grep | ripgrep | ugrep |
+|---|---|---|---|
+| Command | `grep` | `rg` | `ug`, `ugrep` |
+| Installed by default | Everywhere | Nowhere | Nowhere |
+| Follows a standard | POSIX | No | grep-compatible options |
+| Recursive by default | No (`-r`) | Yes | Yes, when given no files |
+| Skips gitignored files | No | Yes | With `--ignore-files` |
+| Skips hidden and binary files | No | Yes | With options |
+| Interactive mode | No | No | `ug -Q` |
+| Fuzzy matching | No | No | `ug -Z` |
+| Inside archives | No | Compressed files with `-z` | Archives and compressed files with `-z` |
+
+## Which one to use
+
+- **In a script that must run anywhere:** grep, with POSIX options only.
+- **Searching a codebase by hand:** ripgrep. It skips what you do not care about without being told.
+- **Exploring, fuzzy matching, or digging through archives and PDFs:** ugrep's `ug -Q` and `ug -z`.
+- **In an agent:** Claude Code's built-in Grep tool, which is ripgrep with structured results.
+
+Finding files by name is a different job. Cole's setup uses `fd` for that (Debian and Ubuntu call it `fdfind`, and the
+shell adds an `fd` alias), and fzf to pick from the results, as in [[tm]]. The [[system-utilities]] page covers the
+rest of the everyday command-line kit, and [[clis]] covers why command-line tools matter so much to agents.

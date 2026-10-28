@@ -1,0 +1,215 @@
+---
+title: Capacitor vs Expo vs Swift
+summary: >-
+  Three ways to put an app on an iPhone: wrap a web app with Capacitor, write React Native with Expo, or go native in
+  Swift. What each one really runs, what it costs you, and why Cole's apps ended up native.
+table: atelier
+folio: 67
+aliases: [Capacitor, Expo, React Native, native Swift, SwiftUI, EAS, EAS Build]
+updated: 2026-10-28
+sources:
+  - title: Capacitor documentation (v8)
+    url: https://capacitorjs.com/docs
+  - title: Capacitor iOS documentation
+    url: https://capacitorjs.com/docs/ios
+  - title: Capacitor and Swift Package Manager
+    url: https://capacitorjs.com/docs/ios/spm
+  - title: Expo SDK versions
+    url: https://docs.expo.dev/versions/latest/
+  - title: EAS Build
+    url: https://docs.expo.dev/build/introduction/
+  - title: EAS Submit for iOS
+    url: https://docs.expo.dev/submit/ios/
+  - title: EAS Update
+    url: https://docs.expo.dev/eas-update/introduction/
+  - title: React Native
+    url: https://reactnative.dev/
+  - title: SwiftUI
+    url: https://developer.apple.com/documentation/swiftui
+  - title: Liquid Glass
+    url: https://developer.apple.com/documentation/TechnologyOverviews/liquid-glass
+  - title: App Review Guidelines
+    url: https://developer.apple.com/app-store/review/guidelines/
+  - title: Trusted Web Activities
+    url: https://developer.chrome.com/docs/android/trusted-web-activity
+---
+
+There are three serious ways to get your own app onto an iPhone: wrap a web app you already have with Capacitor,
+write it once in React Native with Expo for both iOS and Android, or build it natively in Swift. Cole's words for
+this page were "capacitor vs expo vs native swift," and Cole's apps have tried more than one of them. Each choice
+decides what actually runs on the phone, how fast you can ship a fix, and which Apple features you can reach at
+all. This page explains all three and how to choose; [[ios-development]] covers what every route needs either way.
+
+## The three in one table
+
+| | Capacitor | Expo (React Native) | Native Swift |
+|---|---|---|---|
+| You write | A web app: HTML, CSS, JavaScript, any framework | React components in TypeScript | Swift, with SwiftUI or UIKit |
+| What runs on the phone | A native shell showing your web bundle in a `WKWebView` | JavaScript driving real native views | Your compiled app |
+| How the UI looks | Like your website | Native controls | Native controls, newest APIs first |
+| Device features | Plugins, written in Swift when none exists | Expo modules and React Native libraries | Everything, the day Apple ships it |
+| Android from the same code | Yes | Yes | No |
+| Builds iOS without your own Mac | No: Xcode builds it | Yes: EAS Build uses Expo's Macs | No |
+| Fix without a new build | Not built in | EAS Update, for JavaScript and assets | No |
+| Best fit | A good website that needs to be in the store | One app on iOS and Android with native feel | Apple-first apps, widgets, the watch, extensions |
+
+Other options exist (Flutter and Kotlin Multiplatform among them), but these three cover most decisions, and they
+are the three on Cole's list.
+
+## Capacitor: your web app in a native shell
+
+Capacitor, from the Ionic team, describes itself as "a cross-platform native runtime" that runs web apps "natively
+on iOS, Android, and more using modern web tooling." In practice it generates a real Xcode project whose app is a
+full-screen web view. Your built website ships inside the app bundle, and JavaScript calls native features through
+plugins: the camera, files, haptics, push notifications, and anything else someone has wrapped. When nobody has, you
+write the plugin yourself, in Swift on iOS. Capacitor's own rule of thumb is "If it works in the browser, it probably
+works in a mobile app."
+
+The current major version is Capacitor 8 (8.5.3 as of early October 2026; 9 is in alpha). It supports iOS 15 and
+later and needs Xcode 26 or newer. Since Capacitor 6 the iOS project can use either CocoaPods or Swift Package
+Manager.
+
+```sh
+npm init @capacitor/app@latest          # or add Capacitor to the web app you have
+npm install @capacitor/ios
+npm run build                           # your normal web build
+npx cap add ios --packagemanager SPM    # generate the Xcode project, using Swift Package Manager
+npx cap sync                            # copy the web build in and update native dependencies
+npx cap open ios                        # then build, sign and run from Xcode
+```
+
+`npx cap sync` is the step people forget: the app on the phone runs the last web build you synced, not the code in
+your editor. The `npm` commands work the same with the other [[package-managers|package managers]], and from there
+it is an ordinary [[xcode|Xcode]] project: sign it, [[push-to-your-phone|run it on your phone]] (`npx cap run ios`
+does that from the terminal) and upload it through [[app-store-connect|App Store Connect]].
+
+Capacitor is the right call when the website already exists, works well on a phone, and mostly needs an icon on the
+home screen, push notifications and a store listing. A responsive web app like Cole's
+[Airspace Lab](https://github.com/coletebou/airspace-lab), a dependency-light Vite and Three.js trainer with a mobile
+layout, is the kind of project it wraps well.
+
+The risk is App Review. Guideline 4.2 says an app "should include features, content, and UI that elevate it beyond a
+repackaged website," and 4.2.2 rules out apps that are mainly "web clippings, content aggregators, or a collection of
+links." A wrapper that adds real native value (offline use, notifications, widgets, sharing, the camera) passes; a
+browser with your logo on it often doesn't.
+
+## Expo: React Native, with the hard parts hosted
+
+React Native lets you write React and render native UI: in its own words, "React primitives render to native platform
+UI, meaning your app uses the same native platform APIs other apps do." There is no web view; a `<View>` becomes a
+real iOS view. React Native itself recommends starting a new app with a framework, and names Expo.
+
+Expo is that framework plus a set of hosted services called EAS:
+
+- **The SDK.** Expo SDK 58, released October 15, 2026, targets React Native 0.88 and React 19.3, supports iOS 16.4
+  and later, and needs Xcode 26.4 or newer. A new SDK comes out three times a year, and each one targets a single
+  React Native version.
+- **Expo Go and development builds.** Expo Go is an app from the App Store that runs your project instantly, but only
+  with the native code Expo Go already contains. As soon as you add a library with custom native code, you make a
+  *development build*: your own app binary with the developer tools built in.
+- **EAS Build** compiles the app in the cloud. "iOS builds run on macOS runners hosted in Expo's macOS cloud," and
+  EAS can create and manage your distribution certificate and provisioning profiles. This is the only one of the
+  three routes that can produce an iPhone build without a Mac of your own.
+- **EAS Submit** uploads the build to App Store Connect, and Expo says it "works on macOS, Linux, and Windows, so you
+  don't need a Mac to ship iOS builds." You still need the paid Apple Developer Program. The build shows up in
+  [[testflight|TestFlight]] after Apple processes it, usually 10 to 15 minutes later.
+- **EAS Update** sends new JavaScript, styles and images to installed apps without a new build. It cannot change
+  native code, permissions or the SDK version; for those, you build and submit again. Runtime versions keep an update
+  from landing on a binary whose native code it doesn't match.
+
+```sh
+npx create-expo-app@latest my-app
+npm install --global eas-cli
+eas build --platform ios --profile development        # a build you can install on your own phone
+eas build --platform ios --auto-submit                # a store build, uploaded to App Store Connect
+eas update --channel preview --message "Fix the sign-in button"
+```
+
+The free EAS plan includes 15 iOS and 15 Android builds a month on a low-priority queue with a 45-minute timeout,
+and updates for up to 1,000 monthly active users. Paid plans raise those limits.
+
+Over-the-air updates come with a rule. Apple's guideline 2.5.2 says apps may not "download, install, or execute code
+which introduces or changes features or functionality of the app." Expo's own docs say your updates "need to follow
+the App Store and Play Store guidelines," which in practice means fixes over the air and new features through
+review.
+
+## Native Swift: Apple's own stack
+
+A native app is written in Swift against Apple's frameworks: SwiftUI for most interfaces, UIKit where you need finer
+control, and everything else Apple ships (widgets, Live Activities, App Intents, HealthKit, the Apple Watch, Safari
+extensions). Xcode 27 ships Swift 6.4. New APIs and new designs, like the Liquid Glass material Apple introduced with
+iOS 26, arrive in Swift first, and sometimes only there.
+
+```swift
+import SwiftUI
+
+@main
+struct HelloApp: App {
+    var body: some Scene {
+        WindowGroup {
+            Text("Hello, iPhone")
+        }
+    }
+}
+```
+
+The costs are real: Swift runs only on Apple platforms, so Android is a separate project, and every change goes
+through a build and, for the public, a review. What you get back is native speed, direct access to every platform
+feature, and no layer between you and Apple to wait on when iOS changes.
+
+Cole's public native apps show what that looks like in practice:
+
+- **[Drover's Apple clients](https://github.com/coletebou/drover/tree/master/native).** An iPhone app, an Apple Watch
+  app, a Mac app, a menu bar app, widgets for all three platforms, and a Safari extension, all SwiftUI, all generated
+  from one XcodeGen spec, sharing a Swift package (DroverKit) and an App Group. See [[apple-watch-apps]] and
+  [[mac-apps]].
+- **[Tide](https://github.com/coletebou/tide).** A code editor for iPad and iPhone that recreates VS Code's workbench
+  natively: SwiftUI for the workbench, UIKit and TextKit for the editor, and a core package with no UI dependencies so
+  its tests run on a Mac in seconds.
+
+## How to choose
+
+Answer these in order:
+
+1. **Do you need things only native can do?** A watch app, widgets, a Safari extension, heavy camera or audio work,
+   or the newest Apple APIs: choose Swift.
+2. **Do you need Android too, with native UI, and does your team think in React?** Choose Expo. It is also the only
+   route that can build and ship iPhone apps without a Mac.
+3. **Do you already have a good mobile website, and is the store listing the main goal?** Choose Capacitor, and add
+   enough native value to clear guideline 4.2.
+4. **Still unsure?** Prototype the hardest screen in Swift. If it is easy, the rest will be.
+
+Android deserves its own sentence. One of Cole's apps is native Swift on the iPhone and a Trusted Web Activity on
+Android: a thin Android app that opens the site's progressive web app full screen, with the link between app and site
+"verified using Digital Asset Links." Every improvement to the website reaches Android without a separate build.
+
+## What Cole runs
+
+<ColesTake>
+
+Everything I ship on Apple hardware is native Swift: the Drover apps, Tide, and the iPhone apps in TestFlight. One of
+them started life as a Capacitor wrapper around its website. Native is where it ended up. With agents writing most
+of the code, a second codebase costs a lot less than it used to.
+
+</ColesTake>
+
+The agents are a big part of why native works for one person. Swift is a language [[claude-code|Claude Code]] and
+[[codex|Codex]] write well, the compiler catches whole classes of mistakes before anything runs, and a core package
+with plain `swift test` gives an agent a fast loop without a simulator. What agents cannot do on their own is the
+slow clock around it: signing, device testing, and review (see
+[[ios-development#two-release-clocks|two release clocks]]).
+
+## Gotchas
+
+- **Every route ends in the same place.** All three need the paid Apple Developer Program to ship, all three go
+  through App Store Connect and App Review, and none of them gets around Apple's rules.
+- **Capacitor plugins run out.** The day you need a native feature nobody wrapped, you write Swift anyway, so pick
+  Capacitor knowing that.
+- **Expo Go is not your app.** It only contains the native modules Expo put in it. Switch to a development build as
+  soon as you add native code, or your app and Expo Go will disagree.
+- **Over-the-air is for fixes.** A feature shipped through EAS Update that changes what the app does is the kind of
+  change guideline 2.5.2 forbids.
+- **The web bundle is a snapshot.** A Capacitor app runs what you last synced, so deploying the website (to
+  [[vercel|Vercel]], say) does not change the app on anyone's phone. Make `npm run build && npx cap sync` part of every
+  native build.
+- **Native means one platform.** A Swift app is Apple only. Decide on Android before you start, not after.

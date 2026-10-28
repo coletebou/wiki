@@ -1,0 +1,215 @@
+---
+title: What It Costs
+summary: >-
+  The whole bill, line by line, with every price read from the vendor's own page: three setups from free to Cole's
+  own, which plans are worth paying for, and where Cole's guesses about prices were right or wrong.
+table: ledger
+folio: 65
+aliases: [costs, pricing, the bill, cost calculator, budget]
+updated: 2026-10-28
+sources:
+  - title: Cloudflare plans
+    url: https://www.cloudflare.com/plans/
+  - title: Vercel pricing
+    url: https://vercel.com/pricing
+  - title: Tailscale pricing
+    url: https://tailscale.com/pricing
+  - title: GitHub Actions billing (GitHub docs)
+    url: https://docs.github.com/en/billing/concepts/product-billing/github-actions
+  - title: Apple Developer Program
+    url: https://developer.apple.com/programs/
+  - title: Amazon S3 pricing
+    url: https://aws.amazon.com/s3/pricing/
+  - title: Amazon EC2 On-Demand pricing
+    url: https://aws.amazon.com/ec2/pricing/on-demand/
+  - title: Claude plans
+    url: https://claude.com/pricing
+  - title: ChatGPT plans with Codex (OpenAI)
+    url: https://learn.chatgpt.com/docs/pricing
+  - title: Sentry pricing
+    url: https://sentry.io/pricing/
+  - title: Langfuse pricing
+    url: https://langfuse.com/pricing
+  - title: Datadog pricing
+    url: https://www.datadoghq.com/pricing/
+---
+
+Most of this setup is free. The bill comes from two places: the AI subscriptions that run the agents, and a short list
+of plans paid for because a free tier stopped being enough. This page lists every line item with its price as read from
+the vendor's own page on October 28, 2026, in three setups, from a first project to Cole's own.
+
+<Diagram name="cost-calculator" />
+
+The calculator starts from the same three setups as the tables below. Pick one, change the quantities (seats, domains,
+gigabytes, servers), switch items on or off, and it adds up a monthly and a yearly total from the same price list that
+every page of this wiki uses. Yearly prices are spread over twelve months, usage prices are multiplied out, and one-time
+purchases are kept apart from the monthly figure.
+
+## How prices work on this wiki
+
+Every price on every page is a tag, not typed text. It prints the amount, the day it was read and a link to the page it
+was read on, and all of them come from one data file. When a vendor changes a price, that file changes and every page
+follows. A price that could not be confirmed on the vendor's own page says *unverified* next to it. Agents that edit
+this wiki ([[wiki-mcp]]) follow the same rule: a price is a tag or it is not on the page.
+
+Read the unit and the billing period in each one. Several prices here hold only when paid a year at a time (Cloudflare
+Pro, Datadog Pro, Sentry Team, Termius Pro), some are per seat or per user, some per zone or per host, and storage is
+per gigabyte per month. Taxes are not included.
+
+## Just starting
+
+Everything free except the name and one AI plan:
+
+| Item | Choice | Price |
+|---|---|---|
+| A domain | One .com at Cloudflare's registrar ([[domains]]) | <Price id="domain-com" format="bare" /> |
+| DNS, CDN, firewall | Cloudflare Free ([[cloudflare]]) | <Price id="cloudflare-free" format="bare" /> |
+| Frontend hosting | Vercel Hobby ([[vercel]]) | <Price id="vercel-hobby" format="bare" /> |
+| Code and CI | GitHub Free, with <Price id="github-actions-free-minutes" format="bare" /> of Actions for private repositories ([[github-actions]]) | <Price id="github-free" format="bare" /> |
+| Private network | Tailscale Personal ([[tailscale]]) | <Price id="tailscale-personal" format="bare" /> |
+| Error monitoring | Sentry Developer ([[sentry]]) | <Price id="sentry-developer" format="bare" /> |
+| Model traces | Langfuse Cloud Hobby ([[langfuse]]) | <Price id="langfuse-hobby" format="bare" /> |
+| Infrastructure as code | OpenTofu ([[opentofu]]) | <Price id="opentofu" format="bare" /> |
+| An AI coding plan | Claude Pro ([[claude-code]]) | <Price id="claude-pro" format="bare" /> |
+
+The whole thing costs the AI plan plus a dollar or so a month for the domain.
+
+## Most people
+
+What Cole means by "the free plan is probably good for most people": someone building and shipping real projects alone,
+with agents doing a lot of the work.
+
+| Item | Choice | Price |
+|---|---|---|
+| Domains | Two .coms | 2 × <Price id="domain-com" format="bare" /> |
+| DNS, CDN, firewall | Cloudflare Free | <Price id="cloudflare-free" format="bare" /> |
+| Frontend hosting | Vercel Hobby (Pro if the project makes money) | <Price id="vercel-hobby" format="bare" /> |
+| Code and CI | GitHub Free | <Price id="github-free" format="bare" /> |
+| Private network | Tailscale Personal | <Price id="tailscale-personal" format="bare" /> |
+| One small server | An EC2 t3.small for agents and bots ([[servers]]) | <Price id="aws-ec2-small" format="bare" /> |
+| Storage | 50 GB in S3 Standard ([[s3-and-glacier]]) | 50 × <Price id="aws-s3-standard" format="bare" /> |
+| Error monitoring | Sentry Developer | <Price id="sentry-developer" format="bare" /> |
+| Model traces | Langfuse Cloud Hobby | <Price id="langfuse-hobby" format="bare" /> |
+| Host monitoring | Datadog's free tier ([[datadog]]) | <Price id="datadog-free" format="bare" /> |
+| App Store | Apple Developer Program, if you ship iPhone apps ([[app-store-connect]]) | <Price id="apple-developer-program" format="bare" /> |
+| An AI plan for daily agent work | Claude Max 5x | <Price id="claude-max-5x" format="bare" /> |
+
+The AI plan is about four fifths of the monthly total; the server is most of the rest.
+
+## Cole's setup
+
+The services in Cole's setup, as of this month, free ones included:
+
+| Item | Choice | Price |
+|---|---|---|
+| Frontend hosting | Vercel Pro, one developer seat | <Price id="vercel-pro" format="bare" /> |
+| DNS, firewall | Cloudflare Pro on the one production zone, Free on every other | <Price id="cloudflare-pro" format="bare" /> |
+| Private network | Tailscale's paid tier above Personal, one user | <Price id="tailscale-standard" format="bare" /> |
+| App Store | Apple Developer Program ([[testflight]], [[app-store-connect]]) | <Price id="apple-developer-program" format="bare" /> |
+| Domains | Eight .coms, two .ai, one .org, plus about a dozen novelty endings not priced here | 8 × <Price id="domain-com" format="bare" />, 2 × <Price id="domain-ai" format="bare" />, 1 × <Price id="domain-org" format="bare" /> |
+| Claude | Max 20x, for a fleet of parallel sessions ([[agent-fleet]]) | <Price id="claude-max-20x" format="bare" /> |
+| ChatGPT | Pro, for [[codex\|Codex]] (three tiers; the lowest is shown) | <Price id="chatgpt-pro" format="bare" /> |
+| Code and CI | GitHub Pro; private CI runs on Cole's own machines | <Price id="github-pro" format="bare" /> |
+| Storage | S3 Standard, assumed 100 GB | 100 × <Price id="aws-s3-standard" format="bare" /> |
+| Archives | Glacier Deep Archive, assumed 1 TB | 1,000 × <Price id="aws-s3-glacier-deep-archive" format="bare" /> |
+| Model traces | Langfuse, self-hosted: open source, no license fee (Cloud Core would be <Price id="langfuse-core" format="bare" />) | none |
+| Error monitoring | Sentry Team, for the Vercel and GitHub integrations | <Price id="sentry-team" format="bare" /> |
+| Host monitoring | Datadog's free tier | <Price id="datadog-free" format="bare" /> |
+| Infrastructure as code | OpenTofu | <Price id="opentofu" format="bare" /> |
+
+Servers are left out of this table, because their number and size change with the work; a small one is
+<Price id="aws-ec2-small" /> each. The storage amounts are assumptions for the calculator, not a measurement.
+
+The two AI plans are about three quarters of the monthly total, and everything else together costs less than the Claude
+plan alone. The plans that are not AI exist because a specific limit was hit: more firewall rules and real rate limits
+on the production zone, deployment volume and commercial use on Vercel, team features and integrations on Sentry.
+
+## Checking Cole's numbers
+
+Cole gave several prices from memory. Here they are next to what the vendors' own pages say today:
+
+| Cole said | The vendor says | Verdict |
+|---|---|---|
+| ".ai ... $100 a year maybe and you have to do 2 years" | <Price id="domain-ai" /> | The two-year minimum is right, and it is the registry's rule. At cost it is cheaper than the guess; registrars with a markup charge more. |
+| A domain is "anywhere from $5 to $50 ... most commonly $5 to $30" | .com <Price id="domain-com" />, .io <Price id="domain-io" /> | Right. Most common endings cost about what a .com does. |
+| "we pay for the Vercel Pro plan only because of the amount of stuff we're building ... the free plan, honestly, is probably good for most people" | Hobby <Price id="vercel-hobby" />, Pro <Price id="vercel-pro" /> | Right for personal projects. Hobby is non-commercial only, and only the owner's commits deploy on it. |
+| Tailscale: "the free plan is good for most people. I think we're paying $8 a month for the next level one ... maybe the ACL rules" | Personal <Price id="tailscale-personal" />, Standard <Price id="tailscale-standard" /> | The price matches Standard for one user. Access rules work on every plan; what Personal limits is the groups in those rules (3, against 10 on Standard) and business use, which Personal does not allow. Personal Plus, the old step between them, was retired in April 2026: <Price id="tailscale-personal-plus" />. |
+| Cloudflare: "the $20/month Pro plan just so you can do more WAF rules" | <Price id="cloudflare-pro" /> | Right on annual billing. Custom rules go from 5 to 20 and rate limiting rules from 1 to 2. |
+| GitHub: "public repos actions are free but private pays over certain amounts of minutes" | <Price id="github-actions-free-minutes" /> free on GitHub Free, then <Price id="github-actions-linux-minute" /> for Linux, <Price id="github-actions-macos-minute" /> for macOS | Exactly right. |
+| Apple: "$99 dev fee" | <Price id="apple-developer-program" /> | Right, and it renews every year. |
+
+## What is worth paying for
+
+**Free tiers that are genuinely enough** for one person: Cloudflare Free for nearly every domain, Tailscale Personal
+for personal use, Vercel Hobby for personal and non-commercial projects, GitHub Free (and free Actions on public
+repositories), Sentry Developer, Langfuse Hobby or self-hosted Langfuse, Datadog's free tier for up to five hosts, and
+OpenTofu.
+
+**Plans to pay for when you hit the limit, not before:**
+
+- Cloudflare Pro, on the zone that takes production traffic, when five firewall rules and one ten-second rate limit are
+  not enough, or when bot protection has to make exceptions for your own clients.
+- Vercel Pro, when a project makes money, when more than one person commits, or when the deployment volume outgrows
+  Hobby.
+- Tailscale's paid plans, for business use or for more groups in the access rules.
+- Sentry Team, for more than one user or for third-party integrations.
+
+**Costs that look free and are not:**
+
+- **macOS minutes in CI.** Free on public repositories, about ten times a Linux minute on private ones. An automated
+  commit that triggers macOS jobs on every push can cost more than every plan on this page; see
+  [[github-actions#how-a-ci-bill-runs-away|how a CI bill runs away]].
+- **Renewals after a first-year discount.** Compare domain renewals, not first years.
+- **Logs.** Datadog bills logs per gigabyte ingested and per million events indexed, separately from hosts.
+- **Requests and retrievals on S3.** Storage is cheap; requests, retrievals and the Glacier minimum durations are where
+  surprises come from.
+
+## Guardrails
+
+A bill is easier to keep than to fix. Cole's are all set up once and then left alone:
+
+- **AWS Budgets** emails at 85% and 100% of the month's budget and when the forecast passes 100%, and **Cost Anomaly
+  Detection** flags any service whose spend jumps. Both are part of the AWS organization in [[opentofu|OpenTofu]].
+- **A GitHub Actions budget** stops hosted jobs in private repositories when it is reached.
+- **Short-lived machines** carry a hard instance cap and their own monthly budget (see
+  [[servers#burst-capacity|burst capacity]]).
+- **Langfuse** prices every model call, including those on flat subscriptions, at API rates, which is how Cole checks
+  whether a plan is still worth more than it costs (see [[langfuse#cost-analysis|cost analysis]]).
+
+## Reading your own bill
+
+The tables above are list prices. Your real numbers are in each vendor's own usage page, and it is worth reading them
+once a month:
+
+- **AWS**: Cost Explorer, grouped by service, shows what S3, EC2 and the rest really cost, including the requests and
+  data transfer that list prices leave out.
+- **GitHub**: the billing usage report breaks Actions down by repository and runner type, which is where a runaway
+  workflow shows up first.
+- **Vercel**: the usage tab shows how close each resource is to the plan's included amounts.
+- **Cloudflare**: billing lists each zone's plan and any add-ons, so a forgotten Pro zone does not hide.
+- **Langfuse**: its cost dashboards show what the model calls would cost at API prices, per project, model and session,
+  which is the fair way to compare a subscription with paying per token.
+
+## The desk
+
+Not part of the three setups, but part of the setup:
+
+| Item | Price |
+|---|---|
+| [[mac-mini\|Mac mini]], base model | <Price id="mac-mini" format="bare" /> |
+| [[mice\|Logitech MX Master]] | <Price id="mx-master" format="bare" /> |
+| [[mice\|Apple Magic Mouse]] | <Price id="magic-mouse" format="bare" /> |
+| [[screens-5\|Screens 5]] | <Price id="screens-5" format="bare" /> |
+| [[termius\|Termius]] Pro | <Price id="termius-pro" format="bare" /> |
+| [[wispr-flow\|Wispr Flow]] Pro | <Price id="wispr-flow-pro" format="bare" /> |
+| [[ghostty\|Ghostty]] | <Price id="ghostty" format="bare" /> |
+| [[bitaxe\|Bitaxe]] | <Price id="bitaxe" format="bare" /> |
+
+(As of October 28, 2026, from each maker's or seller's own page.)
+
+<ColesTake>
+
+Most of this is free. We pay for the Pro plans only because of the amount of stuff we're building. The free plans,
+honestly, are probably good for most people.
+
+</ColesTake>

@@ -1,0 +1,156 @@
+---
+title: The Cloudflare Front Door
+summary: >-
+  The path every public request takes to one of Cole's services: Cloudflare DNS and the proxy, the security rules in
+  order, an Access login for private names, then a tunnel to a loopback port on an AWS server with no open ports.
+table: works
+folio: 54
+aliases: [front door, Cloudflare Tunnel, cloudflared, Cloudflare Access]
+updated: 2026-10-28
+sources:
+  - title: Cloudflare Tunnel (Cloudflare docs)
+    url: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/
+  - title: Self-hosted applications in Access (Cloudflare docs)
+    url: https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/
+  - title: Service tokens (Cloudflare docs)
+    url: https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/
+  - title: Security features interoperability (Cloudflare docs)
+    url: https://developers.cloudflare.com/waf/feature-interoperability/
+  - title: Cloudflare in front of self-hosted services (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/infra/cloudflare.md
+---
+
+Every public request to one of Cole's services comes in the same way: a DNS lookup that lands on Cloudflare,
+Cloudflare's edge and its security rules, an Access login if the name is private, and a tunnel down to a port on the
+server's loopback interface. The servers themselves accept no connections from the internet at all, so there is
+nothing on them for a scanner to find.
+
+<Diagram name="cloudflare-front-door" />
+
+The diagram follows one request from the visitor to the service, one stop at a time:
+
+1. **DNS.** The name is a proxied record at [[cloudflare|Cloudflare]], so it resolves to Cloudflare's addresses, not
+   the server's.
+2. **The edge.** TLS ends here, with a certificate Cloudflare issues and renews. DDoS protection is always on.
+3. **The rules, in order.** Custom rules, then rate limiting, then the managed rules, then Super Bot Fight Mode on a
+   Pro zone. A block or a challenge at any stop ends the request there; a skip rule lets known traffic, such as a
+   provider's webhook, past the stops it names.
+4. **Access**, for a private hostname: a login (GitHub, Google, or a one-time PIN sent by email) before any request
+   reaches the server. Machines present a service token instead.
+5. **The tunnel.** `cloudflared` on the server keeps outbound connections open to Cloudflare, and the request rides
+   back down one of them. The tunnel's ingress rules map the hostname to a port on `127.0.0.1`.
+6. **The origin.** nginx or the service itself, listening on loopback only. Cole administers the box over
+   [[tailscale|Tailscale]] and [[ssh|SSH]], never over the public internet.
+
+Frontends hosted on [[vercel|Vercel]] take a shorter path: a DNS-only record points straight at Vercel, which serves
+the site and manages its own certificates.
+
+## Why tunnels
+
+A tunnel turns the usual setup inside out. Instead of opening ports 80 and 443 on a server and hoping the firewall is
+right, the server makes outbound connections to Cloudflare and serves requests over them. That has several effects at
+once:
+
+- **No inbound ports.** The server's firewall denies everything incoming. If the cloud provider has a network
+  firewall (a security group), it denies everything incoming too.
+- **The origin's address stays private.** Nobody can bypass the WAF by connecting to the server directly, because
+  there is nothing to connect to.
+- **Certificates live at the edge.** The server needs no public certificate; Cloudflare checks the tunnel itself.
+- **It works from anywhere**, including behind a home router's NAT, which is how a development server on the
+  [[mac-mini|Mac mini]] can have a public name.
+
+The cost is a dependency: if the tunnel or `cloudflared` is down, the site is down. It fails closed, which is the right
+way round.
+
+## A tunnel, step by step
+
+Cole runs one tunnel per box, **locally managed**: the config file on the box is the source of truth for its routes,
+and `cloudflared` runs as a system service. The tunnel *object* is in [[opentofu|OpenTofu]]; its routing is not,
+because moving a tunnel's routes to Cloudflare's remote config is a one-way migration.
+
+```sh
+cloudflared tunnel login                           # once: authorizes this machine for a zone
+cloudflared tunnel create box-a                    # writes the tunnel's credentials file
+sudo cloudflared --config /etc/cloudflared/config.yml service install
+cloudflared tunnel route dns box-a api.example.com # a proxied CNAME to the tunnel
+```
+
+```yaml
+# /etc/cloudflared/config.yml
+tunnel: <TUNNEL-UUID>
+credentials-file: /etc/cloudflared/<TUNNEL-UUID>.json
+
+ingress:
+  - hostname: api.example.com
+    service: http://127.0.0.1:3100
+  # A private name: the tunnel itself refuses a request without a valid Access token.
+  - hostname: staging.example.com
+    service: http://127.0.0.1:3101
+    originRequest:
+      access:
+        required: true
+        teamName: <your-team>
+        audTag:
+          - <ACCESS-APP-AUD-TAG>
+  # Required last rule: anything that matched nothing.
+  - service: http_status:404
+```
+
+Changing the ingress follows the same steps every time: back up the file, add the rule above the catch-all, validate
+the file and the rule a URL will hit, create the DNS record, restart once, and check from outside:
+
+```sh
+sudo cp -p /etc/cloudflared/config.yml /etc/cloudflared/config.yml.bak-$(date -u +%Y%m%dT%H%M%SZ)
+cloudflared tunnel --config /etc/cloudflared/config.yml ingress validate
+cloudflared tunnel --config /etc/cloudflared/config.yml ingress rule https://new.example.com/
+sudo systemctl restart cloudflared
+curl -sSI https://new.example.com/ && curl -sSI https://api.example.com/   # the new name, and one old one
+```
+
+A locally managed tunnel does not reload its ingress on its own, hence the restart. The full version of this
+procedure, with the update timer that keeps `cloudflared` current, is in Cole's public
+[Cloudflare guide](https://github.com/coletebou/dx/blob/master/docs/infra/cloudflare.md#tunnels).
+
+## Access for private names
+
+Anything that is not meant for the public (staging sites, admin panels, dashboards, a web terminal) sits behind a
+Cloudflare Access application. Cole's rules for them:
+
+- **One application per hostname, one policy per audience**: the owner, a named collaborator, a machine.
+- **People log in; machines use service tokens.** A service token is a client id and secret that a script sends as
+  the `CF-Access-Client-Id` and `CF-Access-Client-Secret` headers, matched by a policy whose decision is
+  *non-identity*. Nobody shares a login with a cron job.
+- **A web terminal is a shell.** It gets its own application and a short session, never the policy of the dashboard
+  next to it.
+- **Enforce it twice.** Access at the edge plus `originRequest.access.required` in the tunnel means a deleted Access
+  application or a DNS slip still cannot expose the name.
+- **Mind certificate renewals.** If a private name is served by a host that renews its certificate over HTTP, its
+  `/.well-known/acme-challenge/` path needs a bypass policy, or the renewal quietly fails weeks later.
+- **Test a login on every application after any Access change.** A policy that looks right in a diff can still lock
+  you out or let everyone in.
+
+## Webhooks and other machines
+
+A payment provider or a telephony service cannot log in. Its webhook gets its own public path, the app verifies the
+provider's signature on every request, and if the managed WAF rules flag the provider's payloads, one custom rule skips
+them for that path and that user agent only, never for the whole API. The rule and its pitfalls are on
+[[cloudflare#rules-run-in-a-fixed-order|the Cloudflare page]].
+
+## Gotchas
+
+- **A record pointing at a deleted tunnel** answers error 1033 (HTTP 530), and a wildcard pointing at one breaks every
+  name under it. Delete the records in the same change as the tunnel.
+- **A published container port bypasses all of this.** Docker's own firewall rules run ahead of UFW's. Publish
+  container ports on `127.0.0.1` only, and check from outside that nothing else answers.
+- **Super Bot Fight Mode can break a tunnel.** On a zone that uses one, keep *definitely automated* on *Allow*.
+- **Redirect rules need a proxied record.** Keep a proxied record for an old name you redirect, even though nothing
+  serves it.
+- **Native apps may not follow redirects.** When an API moves to a new name, keep the old path serving until the
+  shipped app versions are gone.
+
+<ColesTake>
+
+None of our servers has an open port. Everything public comes in through a tunnel, and anything private sits behind an
+Access login.
+
+</ColesTake>

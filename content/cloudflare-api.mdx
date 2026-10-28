@@ -1,0 +1,173 @@
+---
+title: The Cloudflare API and cf
+summary: >-
+  How Cole drives Cloudflare from the terminal and from agents: the REST API with scoped tokens, and cf, Cloudflare's
+  new CLI for the entire API, with command search, request previews and dry runs.
+table: works
+folio: 56
+aliases: [Cloudflare API, cf CLI, cf, Cloudflare CLI, Wrangler]
+updated: 2026-10-28
+sources:
+  - title: "Introducing cf: the agentic CLI for the entire Cloudflare API (Cloudflare blog)"
+    url: https://blog.cloudflare.com/cloudflare-cf-cli-launch/
+  - title: Cloudflare CLI (Cloudflare docs)
+    url: https://developers.cloudflare.com/cf/
+  - title: Use cf with coding agents (Cloudflare docs)
+    url: https://developers.cloudflare.com/cf/agents/
+  - title: Use cf in CI (Cloudflare docs)
+    url: https://developers.cloudflare.com/cf/ci/
+  - title: cloudflare/cf on GitHub
+    url: https://github.com/cloudflare/cf
+  - title: Cloudflare in front of self-hosted services (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/infra/cloudflare.md
+---
+
+Everything in Cole's [[cloudflare|Cloudflare]] account can be done through its API, and most of it is: DNS records,
+firewall rules, tunnels, Access, email routing, buckets. For years that meant `curl` against the REST API. Now it means
+**`cf`**, the brand-new Cloudflare CLI, which covers the entire API in one tool built for people and agents alike. That
+is the one Cole uses.
+
+## The API underneath
+
+The Cloudflare API is a REST API at `https://api.cloudflare.com/client/v4/`, with JSON in and out. Every request
+carries a credential, and there are two kinds:
+
+- **API tokens**, scoped to exactly what one job needs: *DNS Edit* on one zone, *Cloudflare Tunnel Write* on one
+  account, read-only everything for an [[opentofu|OpenTofu]] plan. Sent as `Authorization: Bearer <token>`.
+- **The Global API Key**, which can do anything to every zone in the account. Cole's early scripts called the API with
+  `curl` and that key. The rule now is scoped tokens everywhere, and the global key nowhere near a script, an agent or
+  OpenTofu. OpenTofu in particular never gets a token that can create other tokens.
+
+A raw call still works and is worth knowing:
+
+```sh
+curl -s "https://api.cloudflare.com/client/v4/zones?name=example.com" \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | jq '.result[0].id'
+```
+
+Tokens live in the environment, loaded from an env file, never on a command line or in a committed file (see
+[[env-files]]).
+
+## What is new: cf
+
+Cloudflare released `cf` on September 28, 2026, as an open beta. Its pitch is coverage. Wrangler, Cloudflare's older
+CLI, had commands for about 280 operations, mostly Workers; the API has more than 3,000. `cf` has commands for nearly
+all of them, because they are generated from the same OpenAPI schemas that produce Cloudflare's API reference and
+SDKs. The generator, Forge, is open source. What that gives you:
+
+- **One tool for the whole platform.** Zones, DNS, rulesets, bot settings, Tunnels, Access, Email Routing, R2, D1, KV,
+  Workers projects: more than 2,900 commands, with the same flags and the same output everywhere.
+- **JSON by default.** Results go to standard output as JSON, pretty-printed for a person and plain for a pipe;
+  messages and errors go to standard error. An agent can parse every command the same way.
+- **Command search.** `cf cli search "<what you want to do>"` returns the best five matching commands. It runs
+  locally and needs no login.
+- **The request behind each command.** `cf schema <command>` prints the API operation: method, path, parameters and
+  body fields.
+- **Dry runs.** Most commands that change something take `--dry-run`, which prints the exact request without sending
+  it and needs no credentials. Ruleset updates also take `--validate-only`, which asks the API to check the request
+  without saving it.
+- **Documentation search.** `cf docs search "<question>"` searches Cloudflare's live docs and returns links, and every
+  docs page can be fetched as Markdown.
+- **Typed project config.** Workers projects move from `wrangler.jsonc` to `cloudflare.config.ts`, with `cf migrate`
+  to convert one. Wrangler gets a final major version that points to `cf`, and maintenance for 18 months after the
+  beta ends.
+
+## Finding the right command
+
+The workflow Cloudflare recommends, and the one Cole's agents follow: describe the task, inspect the match, preview,
+then run.
+
+```sh
+cf cli search "export a zone's DNS records"
+```
+
+```json
+[
+  {
+    "command": "cf dns records export",
+    "summary": "Export DNS Records"
+  },
+  {
+    "command": "cf dns records import",
+    "summary": "Import DNS Records"
+  }
+]
+```
+
+Keep searches generic: describe the action and the kind of resource, never a domain, an id, an email address or a
+token. `cf` itself reminds agents of that at the top of its help. Then:
+
+```sh
+cf schema email-routing rules create        # the API request it sends
+cf email-routing rules create --help        # its flags
+cf dns records create -z example.com --dry-run \
+  --body '{"type": "CNAME", "name": "new.example.com", "content": "target.example.net", "proxied": true, "ttl": 1}'
+```
+
+The dry run prints the method, the full URL and the body that would be sent, which is the cheapest code review there is.
+
+## How Cole uses it
+
+- **Day to day:** DNS records, ruleset exports and updates, bot settings, Access applications and email routing all go
+  through `cf`. The [[cloudflare-email-routing]] and [[cloudflare]] pages have real examples.
+- **Agents use it the same way.** Cole's instructions to every agent include the rule Cloudflare's own docs suggest:
+  use `cf` for anything Cloudflare unless the project has a Wrangler configuration file. Because `cf` describes itself
+  in JSON, an agent can find and run the right command without knowing the product in advance.
+- **It is installed everywhere.** `cf` is pinned in the npm tools every machine installs, and each machine signs in
+  once with `cf auth login --no-browser`. For a project that belongs to another account, `cf auth activate <profile>
+  <dir>` binds that account's profile to the project directory.
+- **Changes that matter still go through OpenTofu.** `cf` is how Cole and the agents look, export and try; the
+  durable state of zones and rules is code, reviewed as pull requests (see [[opentofu]]).
+
+A typical edit to a zone's firewall rules, from the terminal:
+
+```sh
+cf rulesets entrypoint get http_request_firewall_custom -z example.com > waf/live.json
+diff <(jq -S .rules waf/live.json) <(jq -S .rules waf/custom.json)
+cf rulesets entrypoint update http_request_firewall_custom -z example.com \
+  --body "$(cat waf/custom.json)" --validate-only
+```
+
+An update replaces the whole phase, which is why the export and the diff come first: a rule added in the dashboard and
+never written down would be gone.
+
+## cf or Wrangler
+
+| Task | Tool |
+|---|---|
+| DNS, zones, rulesets, Tunnels, Access, R2, D1, KV, everything in the API | `cf` |
+| A new Worker | `cf` (`cf init`, `cf dev`, `cf build`, `cf deploy`) |
+| An existing project with `wrangler.jsonc` or `wrangler.toml` and no `cloudflare.config.ts` | that project's own Wrangler scripts for dev, build and deploy, until it is migrated. `cf` resource commands are still fine there. |
+| Live Worker logs, Worker secrets | `npx wrangler tail`, `npx wrangler secret put`, until `cf` has them |
+
+The rule exists because `cf dev`, `cf build` and `cf deploy` in an unmigrated Wrangler project can generate a new
+configuration that ignores the Wrangler file.
+
+## Tokens for automation
+
+In CI and anywhere without a person present, `cf auth login` is not possible: set `CLOUDFLARE_API_TOKEN`, which takes
+priority over any stored login. Give each job its own token with only the permissions it needs, and an expiry. For
+[[opentofu|OpenTofu]] that means two tokens per area: a read-only one for plans (no permission group with *Write*,
+*Edit* or *Revoke* in its name) and a scoped write token for applies.
+
+Cloudflare also offers its whole API to agents over [[mcp|MCP]], through the official Cloudflare plugin for Claude
+Code, which Cole has installed on every machine. It needs a one-time OAuth sign-in per machine. For scripted work Cole
+prefers `cf`: its output is the same JSON whether a person or an agent reads it.
+
+## Gotchas
+
+- **It is a beta.** Commands, configuration and build output can change before the stable release. Pin a version and
+  read the release notes when you move it.
+- **An aborted delete exits 0.** In a non-interactive session, a destructive command without `--force` prints
+  `Aborted.` to standard error and exits successfully. A zero exit does not mean the thing was deleted.
+- **`--force` can mean more than "do not ask".** On some commands it is also an API parameter: `cf workers delete
+  --force` also deletes a Worker that other Workers still reference.
+- **Name clashes.** The npm package installs the CLI as both `cf` and `cloudflare`; use `cloudflare` if another `cf`
+  is already on your `PATH`.
+
+<ColesTake>
+
+We've been using the Cloudflare API for a while, but now there's a whole brand-new one, and that's the one we use. An
+agent can find any command it needs with `cf cli search`, and every change can be previewed with `--dry-run` first.
+
+</ColesTake>

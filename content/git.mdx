@@ -1,0 +1,164 @@
+---
+title: Git Habits
+summary: >-
+  The git rules, config and hooks that let dozens of agents share Cole's repositories safely: switch and restore,
+  Conventional Commits, secret scanning on every commit and push, shared-tree discipline and a review gate on merges.
+table: workshop
+folio: 42
+aliases: [git habits, gitleaks hooks]
+updated: 2026-10-28
+sources:
+  - title: git-config(1)
+    url: https://git-scm.com/docs/git-config
+  - title: git-switch(1)
+    url: https://git-scm.com/docs/git-switch
+  - title: Conventional Commits 1.0.0
+    url: https://www.conventionalcommits.org/en/v1.0.0/
+  - title: gitleaks
+    url: https://github.com/gitleaks/gitleaks
+  - title: Cole's git config (gitconfig.base in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/gitconfig.base
+  - title: Parallel work, shared trees (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/workflow/parallel.md
+---
+
+Git is the ground everything in Cole's setup stands on. [[git-worktrees|Worktrees]] isolate the agents, the
+[[dotfiles]] sync between machines is git, and Drover's truth file and the [[reflection-store|reflection logs]] merge
+through git. With dozens of agents committing at once, a few habits matter more than any clever trick, so Cole
+enforces them three ways: in the global git config, in hooks that run in every repository, and in the rules every
+agent reads.
+
+## The rules agents follow
+
+From Cole's universal agent rules:
+
+| Task | Use | Avoid |
+|---|---|---|
+| Switch branches | `git switch <branch>` | `git checkout <branch>` |
+| Create and switch | `git switch -c <branch>` | `git checkout -b <branch>` |
+| Restore a file | `git restore <file>` | `git checkout -- <file>` |
+| Unstage a file | `git restore --staged <file>` | `git checkout HEAD -- <file>` |
+
+<ColesTake>
+
+No `git checkout`. It switches branches and restores files, and one wrong argument throws away uncommitted work.
+`git switch` and `git restore` say what they mean.
+
+</ColesTake>
+
+The rest of the rules:
+
+- **Conventional Commits.** `<type>(<scope>): <summary>`, with types like `feat`, `fix`, `docs`, `test`, `refactor`,
+  `perf`, `build`, `ci` and `chore`. Personal repositories use `master` as their default branch.
+- **No destructive operations** (hard resets, force pushes, branch deletions) unless someone explicitly asked.
+- **Small commits.** Ship them often instead of one large batch.
+- **Look before editing.** Check `git status` and `git diff` first; another agent may have changed the files. Changes
+  you do not recognize belong to another agent: keep going, and stop to ask only if they get in the way.
+- **No tooling names in repository text.** Commit messages, pull request descriptions and comments never name the
+  review tools, models or settings behind them; review is summarized as "Extensive multi-model review" plus what it
+  found and what changed.
+
+## Shared trees
+
+Some trees are shared by design: the dotfiles checkout every session writes to, a memory directory. Cole's rules for
+those are stricter, because a peer may commit between any two of your commands:
+
+- **Never amend, rebase or reset.** An amend could rewrite a peer's commit. Commit only your own files
+  (`git add <files> && git commit`), and when a step depends on `HEAD` being yours, check `git log -1` in the same
+  command.
+- **Re-read a file in the same step that edits it,** and treat an edit whose anchor is gone as "someone else moved
+  it", not as a bug to force through.
+- **Judge each step by its effect.** A `git commit` can exit non-zero on a stale lock after the commit landed. Check
+  that `HEAD` moved.
+- **Validate before you overwrite.** `jq … > out && mv out config.json` replaces a config with an empty file the day
+  jq succeeds with no output. Check the result before the move.
+
+Data that many machines append to is laid out so git never has to merge it: each machine writes its own file of
+reflections, and the truth file is marked `merge=union` in `.gitattributes`, so two appends at once keep both lines.
+
+## The global config
+
+Cole's [`gitconfig.base`](https://github.com/coletebou/dx/blob/master/base/gitconfig.base) applies to every
+repository on every machine. Some highlights, copied from it:
+
+```ini
+[push]
+	autoSetupRemote = true
+[pull]
+	rebase = true
+	autoStash = true
+[fetch]
+	prune = true
+	pruneTags = true
+[merge]
+	conflictStyle = zdiff3
+```
+
+| Setting | What it buys |
+|---|---|
+| `push.autoSetupRemote` | The first `git push` of a new branch sets its upstream; no `-u` dance |
+| `pull.rebase`, `pull.autoStash` | Pulls replay your commits on top instead of making merge commits, even with a dirty tree |
+| `fetch.prune`, `fetch.pruneTags` | Branches and tags deleted on the remote disappear locally |
+| `rebase.autoSquash`, `rebase.updateRefs` | `fixup!` commits fold in automatically; stacked branches move together |
+| `rerere.enabled` | Git remembers how you resolved a conflict and reuses it |
+| `diff.algorithm = histogram`, `diff.colorMoved = zebra` | Cleaner diffs, with moved lines shown as moved |
+| `merge.conflictStyle = zdiff3` | Conflict markers that include the common ancestor |
+| `branch.sort = -committerdate` | `git branch` lists the most recent work first |
+| `gc.worktreePruneExpire = never` | Garbage collection never reaps a worktree whose storage is briefly missing |
+| `init.defaultBranch = master` | New repositories start on `master` |
+
+Identity follows the remote: an `includeIf "hasconfig:remote.*.url:…"` block picks the right name and email for
+repositories on another forge, so no repository needs its own `user.email`. GitHub credentials come from the `gh`
+CLI's login. A few aliases ride along: `git s` (short status plus a diff stat), `git lg` (a compact graph log), and
+`git please` for `push --force-with-lease`, which refuses to overwrite a remote that moved.
+
+## Hooks in every repository
+
+`core.hooksPath` points at one shared hooks directory, so the same hooks guard every repository on the machine:
+
+- **pre-commit** scans the staged diff with [gitleaks](https://github.com/gitleaks/gitleaks), then runs the repository's
+  own pre-commit hook (or its `.pre-commit-config.yaml` suite).
+- **pre-push** scans every outgoing commit with gitleaks and **fails closed**: no gitleaks, no push. A history rewrite,
+  where the old remote tip is not available locally, gets a scan of the whole new tip.
+- Because a hooks path replaces `.git/hooks`, a small runner calls each repository's own hook of the same name (and
+  Git LFS's, in an LFS repository), so nothing that used to run stops running.
+
+One trap is worth knowing: git silently skips a `core.hooksPath` that does not exist. A path that is right on one
+machine and missing on another turns a fail-closed push scan into nothing. Cole's config keeps the path relative to
+`~`, and `git config --path core.hooksPath` must print a directory that exists.
+
+The commit template is a reminder, not a form:
+
+```text
+# Conventional Commits: <type>(<scope>): <summary>, e.g. "fix(tmux): keep the session row on reload".
+# Types: feat fix docs test refactor perf build ci chore. Lines starting with # are dropped.
+```
+
+The global ignore file lists what agents leave behind in any repository: per-machine Claude settings
+(`.claude/settings.local.json`), subagent memory directories, `.scratch/` folders, macOS Finder metadata, and
+`node_modules` without a trailing slash, so a symlinked one in a worktree is ignored too.
+
+## Pull requests
+
+Cole's personal repositories use GitHub pull requests, reviewed by bots as well as people. The CI side is on
+[[github-actions]], and the frontends hosted on [[vercel|Vercel]] also get a preview deployment per pull request.
+Two habits matter:
+
+- **A passing check is not a silent review.** Reviewer bots post findings in three different places (conversation
+  comments, inline review threads and formal reviews), and sometimes edit an old comment instead of posting a new one.
+  Read all three, and compare each comment's updated time with its created time.
+- **A gate on merging.** A `PreToolUse` [[hooks|hook]] intercepts `gh pr merge`, looks up reviewer findings anchored to
+  the commit being merged, and blocks the merge while any are unanswered. A finding stops blocking once it has a reply,
+  and one fixed in a later commit does not block at all. The gate fails open on any error, because a gate that blocks
+  on its own bug teaches everyone to bypass it.
+
+Before review, the scope is frozen: reviewers read an exact commit in a detached worktree, never a tree someone is
+still editing.
+
+```sh
+git worktree add --detach ../review-<sha> <sha>
+git -C ../review-<sha> rev-parse HEAD     # must print <sha>
+```
+
+The same trick proves a regression test is real: check out the commit before the fix, restore only the new test, and
+make sure it fails there. See [[testing]].

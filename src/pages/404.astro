@@ -1,0 +1,17 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="A lost scroll" description="No folio lives at this address." notFound>
+  <main class="leaf" id="text">
+    <div class="running-head"><span>Codex Tebou</span><span class="folio-no">f. —</span></div>
+    <div class="folio">
+      <div class="text-block" style="grid-column: 1 / -1; text-align: center; padding: 2rem 0 3rem">
+        <p class="kicker">Not in the catalogue</p>
+        <h1 class="title">A lost scroll</h1>
+        <p class="summary" style="margin-top: 1rem">No folio lives at this address. It may have been renamed, or it burned with the rest of Alexandria.</p>
+        <button type="button" class="seek-large" data-seek style="margin-inline:auto">Seek it in the library <kbd>/</kbd></button>
+        <p style="margin-top: 1.6rem"><a href="/pinakes/">Browse the Pinakes</a> · <a href="/">Return to the frontispiece</a></p>
+      </div>
+    </div>
+  </main>
+</Base>

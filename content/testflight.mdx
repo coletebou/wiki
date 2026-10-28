@@ -1,0 +1,117 @@
+---
+title: TestFlight
+summary: >-
+  Apple's beta testing service, and the answer to private versus public betas on iOS: up to 100 internal testers
+  with no review, up to 10,000 external ones by invite or public link, each build good for 90 days.
+table: atelier
+folio: 70
+aliases: [beta testing, public beta, private beta, Beta App Review, public link]
+updated: 2026-10-28
+sources:
+  - title: TestFlight (Apple Developer)
+    url: https://developer.apple.com/testflight/
+  - title: TestFlight overview (App Store Connect Help)
+    url: https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview
+  - title: Add internal testers
+    url: https://developer.apple.com/help/app-store-connect/test-a-beta-version/add-internal-testers
+  - title: Invite external testers
+    url: https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers
+  - title: Drover's signed workflow, which uploads to TestFlight (Cole's public repo)
+    url: https://github.com/coletebou/drover/blob/master/.github/workflows/signed.yml
+---
+
+TestFlight is Apple's beta testing service. You upload a build to [[app-store-connect|App Store Connect]], put it in
+a group, and testers install it through the free TestFlight app, from an email invitation or a public link. It is how
+an iPhone app reaches anyone who is not plugged into your Mac, and it is Apple's answer to what Cole called "private
+vs public beta": a private group of your own team that gets builds within minutes, and an external group, up to
+10,000 people, that gets them after Apple's Beta App Review. It needs the paid Apple Developer Program
+(<Price id="apple-developer-program" />); see [[ios-development]] for the rest of the path.
+
+## Private and public betas
+
+| | Internal testing (the private beta) | External testing (the public beta) |
+|---|---|---|
+| Who | Up to 100 members of your App Store Connect team with the Account Holder, Admin, App Manager, Developer or Marketing role | Up to 10,000 people, invited by email or through a public link |
+| Review | None | Beta App Review for the first build; later builds of the same version may not need a full review |
+| How fast | As soon as the build finishes processing | After the build is approved |
+| Delivery | Automatic distribution to the group can be switched on | You add builds to the group |
+| Who sees whom | Testers are named team members | Public-link testers appear as anonymous |
+
+A build can also be marked internal-only when you upload it, and such builds can go only to internal groups. That is
+the right setting for anything with debug menus or unfinished features.
+
+## What testers get
+
+Testers install TestFlight from the App Store, accept the invitation, and then:
+
+- Install every build you share with them, on up to 30 devices each.
+- See your "What to Test" notes for each build.
+- Send feedback by taking a screenshot inside your app and marking it up, or through the TestFlight app. If the app
+  crashes, you get the crash report and the tester can add what they were doing.
+- Keep each build for up to 90 days, after which it expires and stops launching.
+
+TestFlight covers iPhone and iPad, Mac, Apple Watch, Apple TV and Vision Pro apps. One catch for companies: Managed
+Apple Accounts created in reserved domains cannot test builds.
+
+## Setting it up
+
+1. **Upload a build** from [[xcode|Xcode]], a script, or Expo's EAS Submit (see
+   [[app-store-connect#getting-a-build-in|getting a build in]] and [[capacitor-expo-swift]]). Apple emails when it has
+   finished processing.
+2. **Fill in the test information**: a beta description, what to test, a feedback email, and, for external testing,
+   sign-in details for the reviewer if your app needs an account.
+3. **Create an internal group** in the TestFlight tab, add team members (they must accept the App Store Connect
+   invitation first), and turn on "Enable automatic distribution" if every build should reach them. Builds made by
+   Xcode Cloud always have to be added by hand.
+4. **Create an external group**, add a build, and choose Submit Review. You can submit up to six builds for TestFlight
+   review in 24 hours.
+5. **Invite testers** by email or CSV import, or choose Create Public Link. A public link can be "Open to Anyone" or
+   "Filter by Criteria" (device type and OS version), and can carry a tester limit anywhere from 1 to 10,000.
+
+## How Cole runs betas
+
+One of Cole's apps has run both kinds of beta, in that order. A private internal group of a handful of people tested
+early builds, with testers invited into App Store Connect under the narrow Marketing role. When the app opened its
+sign-up to the public, an external group with a public link joined it. From then on the release script did the
+TestFlight work too: after each upload it waits for the build to become valid, adds it
+to the public group and submits it for Beta App Review, so a merged fix turns into a reviewed public beta without
+anyone opening a browser. The builds are numbered past one hundred by now.
+
+Two lessons from that app shape how Cole treats a TestFlight build:
+
+- **Uploaded is not tested.** A build that reached "Testing" in App Store Connect proves it compiled and installed,
+  not that the new feature works. Features that depend on hardware, like a camera control on the volume buttons,
+  only got tested at all on a physical iPhone through TestFlight, because the simulator cannot press those buttons.
+- **The notes are a promise.** External release notes claim only what was verified on a device, because testers read
+  them as what changed.
+
+[[drover|Drover]] uses TestFlight for its own clients. Its manual `signed` workflow in
+[[github-actions|GitHub Actions]] archives the iPhone app (with the [[apple-watch-apps|Apple Watch app]], the widgets
+and the [[safari-extensions|Safari extension]] embedded inside it) and uploads it to TestFlight with an App Store
+Connect API key; each app needed its App Store Connect record before the first upload worked.
+
+For your own phone, internal TestFlight is the cable-free alternative to running from Xcode; the trade-offs are on
+[[push-to-your-phone#testflight-the-cable-free-route|pushing straight to your phone]].
+
+<ColesTake>
+
+Private group first, public link second. Internal builds skip review and land in minutes, so that is where the dumb
+stuff gets caught. The public link is for when it's ready for strangers.
+
+</ColesTake>
+
+## Gotchas
+
+- **Builds expire after 90 days.** A beta that goes quiet for three months stops launching on testers' phones. Ship
+  a fresh build before then, even an unchanged one.
+- **Public links travel.** Anyone can forward the link, so testers can join without being invited. Use criteria, a
+  tester limit, or disable the link once the group is full.
+- **Public-link testers are anonymous.** You see their installs, sessions and crashes, but not their names or emails.
+- **Friends need App Store Connect accounts for the private beta.** Internal testers are team members with roles. If
+  that is too much, put them in an external group instead and accept the review.
+- **Plan a day for the first external build.** Beta App Review is usually quick, but the first build of a new version
+  gets the full review, and a rejection shows up under App Review in the sidebar.
+- **Stop testing deliberately.** If you never expire a build, testers keep it even after that version goes live on
+  the App Store.
+- **A tester stuck on "No Builds Available"** with the right role, group and build was fixed, in Cole's case, by
+  deleting and recreating the tester rather than by changing permissions.

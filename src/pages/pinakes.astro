@@ -1,0 +1,51 @@
+---
+import { folioLabel } from '../../lib/schema.mjs';
+import Base from '../layouts/Base.astro';
+import { href, incipit, stichoi, wiki } from '../lib/wiki';
+
+const { pages, tables } = await wiki();
+const total = pages.reduce((n, p) => n + stichoi(p.body ?? ''), 0);
+---
+<Base title="The Pinakes" description="The catalogue of the wiki: every folio, table by table, with its opening words and its length." current="pinakes">
+  <main class="leaf" id="text">
+    <div class="running-head"><span>Bibliotheca · Catalogus</span><span class="folio-no">Πίνακες</span></div>
+    <div class="folio">
+      <div class="text-block" style="grid-column: 1 / -1; max-width: 56rem; margin-inline: auto; width: 100%">
+        <p class="kicker">The catalogue</p>
+        <h1 class="title">The Pinakes</h1>
+        <p class="summary" style="margin-top: 1rem">
+          Callimachus of Cyrene catalogued the Library of Alexandria in the <i>Pinakes</i>, “tables of those eminent in every
+          branch of learning, and what they wrote”: each work under its subject, with its first words (the incipit) and its
+          length in lines (stichoi), so a reader could know a scroll without unrolling it. This is that catalogue for this
+          library: {pages.length} folios, {total.toLocaleString('en-US')} stichoi.
+        </p>
+        <nav aria-label="Tables" style="display:flex; flex-wrap:wrap; gap: 0.3rem 1rem; margin: 0 0 1rem">
+          {tables.map((t) => <a href={`#table-${t.id}`} style="color: var(--sanguine)">{t.numeral}. {t.title}</a>)}
+        </nav>
+        {tables.map((t) => (
+          <section class="pinax" id={`table-${t.id}`} aria-labelledby={`h-${t.id}`}>
+            <div class="pinax-head">
+              <span class="numeral">{t.numeral}</span>
+              <h2 id={`h-${t.id}`}>{t.title}</h2>
+              <p>{t.subtitle}</p>
+            </div>
+            {t.pages.length ? (
+              <ol>
+                {t.pages.map((p) => (
+                  <li>
+                    <span class="entry-folio">{folioLabel(p.data.folio)}</span>
+                    <span>
+                      <a class="entry-title" href={href(p.id)}>{p.data.title}</a>
+                      <span class="incipit"><i>{incipit(p.body ?? '')}</i></span>
+                    </span>
+                    <span class="stichoi">{stichoi(p.body ?? '').toLocaleString('en-US')} stichoi</span>
+                  </li>
+                ))}
+              </ol>
+            ) : <p class="empty" style="font-style: italic; color: var(--ink-3)">No folio in this table yet.</p>}
+          </section>
+        ))}
+      </div>
+    </div>
+  </main>
+</Base>

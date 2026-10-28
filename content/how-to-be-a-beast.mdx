@@ -1,0 +1,56 @@
+---
+title: How to Be a Beast
+summary: The tour of Cole Tebou's whole setup, from the phone in a pocket to agents running on AWS servers, and the handful of habits that make one person work like a team.
+table: library
+folio: 1
+aliases: [start here, beast, the tour, overview]
+updated: 2026-10-28
+---
+
+Being a beast, in Cole's sense, is not about typing faster. It is a setup in which one person directs a team of agents across several machines, from a desk or from a phone, with every repetitive step automated, every result checked, and nothing important kept only in someone's head. This page is the tour. Every stop has its own folio, and the [Pinakes](/pinakes/) lists them all.
+
+## The shape of it
+
+Picture one long working day. Cole sits at the [[mac-mini|Mac mini]] with a [[mechanical-keyboard|mechanical keyboard]] and an [[mice|MX Master]], in [[ghostty|Ghostty]]. Everything lives in [[tmux]], one session per project, so nothing dies when a window closes, and `tm`, a [[tm|fuzzy session picker]], jumps back to whatever was touched last. In the tmux windows run agents: [[claude-code|Claude Code]], started with [[yu|yu]], and [[codex|Codex]] beside it. Some of them run on AWS [[servers]] for hours, where a closed laptop lid cannot stop them.
+
+When Cole steps away, the work does not. From the phone, [[termius|Termius]] opens the same tmux sessions over [[ssh|SSH]] on a [[tailscale|Tailscale]] network, and the [[tmux-keymap|Alt bindings]] were chosen so they work from a phone keyboard. [[drover|Drover]] shows which agents are working, which are idle, and which are waiting on a decision. [[wispr-flow|Dictation]] turns a walk into a brief.
+
+<Diagram name="agent-fleet" />
+
+## Seven habits
+
+These are the ideas the rest of the wiki keeps coming back to.
+
+1. **Everything in tmux, everywhere the same.** One set of [[dotfiles]] on every machine, installed by one [[bootstrap-script|bootstrap script]] with a [[homebrew|Brewfile]], so a shell, a key binding or a hook behaves identically on the Mac and on a server. The [[tmux-status-line|status line]], the [[starship|prompt]] and the [[claude-code-status-line|Claude Code status line]] say where you are and what is running at a glance.
+2. **Agents are the workforce; you are the owner.** Cole decides and approves; coordinators split work into briefs; workers own one slice each. The [[agent-fleet]] page has the roles and the rules that keep a dozen agents from stepping on each other.
+3. **Parallel by default, isolated by design.** Independent work runs side by side: subagents for research and review, and [[parallel-worktrees|parallel worktrees]] when writers would touch the same files. Each [[git-worktrees|worktree]] gets the [[env-files|env files]] it needs and its own Docker Compose project.
+4. **Write it down where the next agent will look.** [[hooks|Hooks]] capture the [[message-ids|exact words]] of every request, file [[reflection-store|reflections]] before [[context-and-compaction|compaction]], and hand long sessions to fresh successors through [[handoff-chains|handoff chains]]. [[agent-messaging|Messages between agents]] are recorded. The [[shared-brain|shared brain]] holds what every agent on every machine should know. Idle sessions are [[cc-park|parked]], not left to eat memory.
+5. **Every change is checked by a machine first.** [[testing|Tests]], [[oxlint]] and type checks run locally and in [[github-actions|GitHub Actions]]; the [[package-managers|package manager]] is chosen on purpose; two different engines review the same commit. This wiki follows the same rule: every edit is a pull request with four required checks.
+6. **Infrastructure is code, and the front door is locked.** [[opentofu|OpenTofu]] describes the [[cloudflare|Cloudflare]] zones, [[vercel|Vercel]] projects, GitHub settings and the Tailscale policy; changes are planned on a pull request and applied on merge. Requests reach servers through the [[cloudflare-front-door|Cloudflare front door]] and a tunnel, never an open port. The [[cloudflare-api|new Cloudflare CLI]] and [[cloudflare-email-routing|email routing]] cover the rest of the edge.
+7. **Watch everything, pay for what matters.** Traces and their cost go to [[langfuse|Langfuse]], errors to [[sentry|Sentry]], host health to [[datadog|Datadog]], and the long-term record to [[s3-and-glacier|S3 and Glacier]], all along one [[observability|observability path]]. Free tiers carry most of it; the paid plans are the ones that earn their keep, and [[what-it-costs]] adds them up.
+
+## Building things
+
+The work itself is mostly software: web apps on Vercel, bots and services on AWS, and apps for Apple's platforms. [[ios-development|iOS development]] starts with a choice between [[capacitor-expo-swift|Capacitor, Expo and native Swift]], runs through [[xcode|Xcode]] and [[app-store-connect|App Store Connect]], ships betas through [[testflight|TestFlight]], and can [[push-to-your-phone|push a build straight to your phone]]. The same toolkit makes [[mac-apps|Mac and menu bar apps]], [[apple-watch-apps|Apple Watch apps]], [[safari-extensions|Safari extensions]] and [[chrome-extensions|Chrome extensions]], and Windows has its own path in [[windows-apps]] and [[wsl|WSL]].
+
+Underneath it all are a few plain tools worth knowing well: [[git|git habits]] that keep history clean, [[grep-ripgrep-ugrep|ripgrep]] for finding anything, [[system-utilities|caffeinate and htop]], [[posix|POSIX]] as the reason macOS and Linux feel alike, [[pgp|PGP]] for signing and encrypting, [[lsp|language servers]], [[clis|CLIs]], [[mcp|MCP]] servers and [[skills-and-plugins|skills]] that give agents their tools, and [[screens-5|Screens]] for reaching the Mac's own screen from anywhere.
+
+## Money and privacy
+
+Cole also keeps a table on money that is not a bank's: what [[bitcoin|Bitcoin]] does and does not keep private, small home miners like the [[bitaxe|Bitaxe]], wallets such as [[sparrow-wallet|Sparrow]] and [[cake-wallet|Cake Wallet]], and why [[monero|Monero]] is the one Cole calls really private.
+
+<ColesTake>
+
+I wanted a better site that describes my whole workflow setup, with interactive diagrams, showing how it all works. Basically a guide on how to be a beast. Or a wiki, because we're going to need to go into detail.
+
+</ColesTake>
+
+## Where to start
+
+- **New to the terminal?** Read [[ghostty]], [[tmux]], [[tm]] and [[ssh]], in that order, then [[dotfiles]].
+- **Running agents already?** Start at [[agent-fleet]], then [[hooks]], [[handoff-chains]] and [[parallel-worktrees]].
+- **Deploying things?** [[servers]], [[opentofu]], [[cloudflare]], [[vercel]], then [[observability]].
+- **Deciding what to pay for?** [[what-it-costs]], with the [[domains]] page if you are about to buy a name.
+- **An agent reading this?** The wiki has [[wiki-mcp|its own MCP server]]: search it, and propose an edit when something here is wrong.
+
+[[about-this-wiki|About this wiki]] explains how the site is built and why it looks like a page from Leonardo's notebooks filed in the Library of Alexandria.

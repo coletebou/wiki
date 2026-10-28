@@ -1,0 +1,84 @@
+/* Design tokens. Two themes: "vellum" (parchment by daylight) and "lucerna" (the same leaves by candlelight).
+   Body text holds at least 10:1 contrast and every accent used for text at least 4.5:1, in both themes. */
+
+:root {
+  --font-text: 'EB Garamond Variable', 'EB Garamond', Garamond, 'Times New Roman', serif;
+  --font-display: 'Cinzel', 'Trajan Pro', 'EB Garamond Variable', serif;
+  --font-hand: 'Italianno', 'EB Garamond Variable', cursive;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --step--1: clamp(0.92rem, 0.89rem + 0.15vw, 1rem);
+  --step-0: clamp(1.125rem, 1.07rem + 0.28vw, 1.3rem);
+  --step-1: clamp(1.3rem, 1.2rem + 0.5vw, 1.55rem);
+  --step-2: clamp(1.55rem, 1.38rem + 0.85vw, 2rem);
+  --step-3: clamp(1.9rem, 1.6rem + 1.5vw, 2.75rem);
+  --step-4: clamp(2.3rem, 1.8rem + 2.6vw, 3.9rem);
+
+  --measure: 40rem;
+  --radius: 3px;
+  --gap: clamp(1rem, 0.6rem + 1.6vw, 2rem);
+
+  color-scheme: light;
+  --desk: #e2cfa4;
+  --paper: #f4ead2;
+  --paper-2: #ecdfc0;
+  --paper-3: #e3d2aa;
+  --ink: #2a1c12;
+  --ink-2: #4e3b2a;
+  --ink-3: #634e3a;
+  --rule: #b49a74;
+  --sanguine: #93361c;
+  --sanguine-2: #b8552f;
+  --sanguine-wash: rgb(184 85 47 / 0.12);
+  --verdigris: #2b5d4c;
+  --verdigris-wash: rgb(43 93 76 / 0.1);
+  --shadow: 0 1px 0 rgb(255 250 235 / 0.6) inset, 0 18px 48px -18px rgb(70 45 20 / 0.45), 0 2px 6px rgb(70 45 20 / 0.18);
+  --code-bg: #eadcbb;
+  --focus: #93361c;
+  --grain-opacity: 0.55;
+
+  /* Shiki css-variables theme, tuned to iron-gall ink and red chalk. */
+  --astro-code-foreground: #2a1c12;
+  --astro-code-background: transparent;
+  --astro-code-token-constant: #7a3d14;
+  --astro-code-token-string: #2b5d4c;
+  --astro-code-token-comment: #665139;
+  --astro-code-token-keyword: #93361c;
+  --astro-code-token-parameter: #4e3b2a;
+  --astro-code-token-function: #5b3a7a;
+  --astro-code-token-string-expression: #2b5d4c;
+  --astro-code-token-punctuation: #6e5842;
+  --astro-code-token-link: #93361c;
+}
+
+:root[data-theme='lucerna'] {
+  color-scheme: dark;
+  --desk: #120c07;
+  --paper: #1f160e;
+  --paper-2: #2a1f14;
+  --paper-3: #35281a;
+  --ink: #f0e2c2;
+  --ink-2: #d9c6a1;
+  --ink-3: #b9a37f;
+  --rule: #6b5638;
+  --sanguine: #ee9a72;
+  --sanguine-2: #f2b08e;
+  --sanguine-wash: rgb(238 154 114 / 0.14);
+  --verdigris: #8cc7b2;
+  --verdigris-wash: rgb(140 199 178 / 0.12);
+  --shadow: 0 0 0 1px rgb(255 220 160 / 0.05) inset, 0 24px 60px -20px rgb(0 0 0 / 0.8), 0 0 90px -30px rgb(255 170 80 / 0.12);
+  --code-bg: #2b2016;
+  --focus: #f2b08e;
+  --grain-opacity: 0.35;
+
+  --astro-code-foreground: #f0e2c2;
+  --astro-code-token-constant: #f0b67f;
+  --astro-code-token-string: #9fd3bf;
+  --astro-code-token-comment: #a8916f;
+  --astro-code-token-keyword: #ee9a72;
+  --astro-code-token-parameter: #d9c6a1;
+  --astro-code-token-function: #d7b8f2;
+  --astro-code-token-string-expression: #9fd3bf;
+  --astro-code-token-punctuation: #b9a37f;
+  --astro-code-token-link: #ee9a72;
+}

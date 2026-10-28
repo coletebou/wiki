@@ -1,0 +1,187 @@
+---
+title: The tmux Status Line
+summary: >-
+  Cole's two-row tmux bar: the machine and session, every window colored by how recently it did something, a clickable
+  row of sessions, a live count of busy windows, machine vitals and the time in UTC.
+table: shell
+folio: 14
+aliases: [tmux status bar]
+updated: 2026-10-28
+sources:
+  - title: Cole's tmux.conf (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/base/tmux.conf
+  - title: tmux-agent-activity.sh
+    url: https://github.com/coletebou/dx/blob/master/base/tmux-agent-activity.sh
+  - title: tmux-windows-active.sh
+    url: https://github.com/coletebou/dx/blob/master/base/tmux-windows-active.sh
+  - title: tmux-vitals.sh
+    url: https://github.com/coletebou/dx/blob/master/base/tmux-vitals.sh
+  - title: tmux(1) manual, STATUS LINE and FORMATS
+    url: https://man.openbsd.org/tmux.1
+---
+
+Cole's [[tmux]] status bar has two rows. The first answers "where am I": which machine, which session, and every window
+colored by how recently it did something. The second answers "what else is running": every session on the server, one
+click away. On the right sit a live count of busy windows, the machine's vitals and the time in UTC. It is the tmux
+half of a pair; the other half is the [[claude-code-status-line|Claude Code status line]] inside each agent.
+
+## The layout
+
+```text
+desk:site  1:zsh 2:yolo 3:api* 4:notes                        3/38 L:0.4 21:14Z
+sessions agents  notes  site
+```
+
+| Part | What it shows |
+|---|---|
+| `desk` | The machine's short label, green for personal machines, orange for a machine marked as work |
+| `site` | The current session, in gold |
+| `SYNC` | A red badge, only while synchronized panes are on (typing goes to every pane) |
+| `1:zsh 2:yolo ...` | Every window, each in its activity color; the current one is bold |
+| A red `⤳` | Leads a window whose Claude Code session handed off to a successor |
+| `3/38` | Windows that printed something in the last five seconds, out of all windows |
+| `L:0.4` | Load average on Linux, or battery level on a Mac laptop when it matters |
+| `21:14Z` | The time in UTC |
+| Second row | Every session in creation order, the current one in bold gold; click a name to switch |
+
+The bar refreshes every five seconds. Prefix <kbd>b</kbd> hides it or brings it back, and prefix
+<kbd>Shift</kbd>+<kbd>b</kbd> switches between one row and two (see the [[tmux-keymap]]).
+
+## Windows colored by activity
+
+Each window name takes one of four colors, the same idea as the transcript-freshness segment in the Claude Code status
+line:
+
+| Color | Meaning |
+|---|---|
+| Green | Did something in the last minute |
+| Yellow | Within the last 15 minutes |
+| Blue | Within the last hour |
+| Grey | Dormant |
+
+With a dozen agents and a few servers open, that turns the window list into a dashboard: green windows are working,
+yellow ones went quiet recently (often because they finished or are waiting on you), grey ones can be parked or
+closed.
+
+<ColesTake>
+
+One glance at the bar tells me which of fifty windows are alive.
+
+</ColesTake>
+
+### What counts as activity
+
+For an ordinary window, a shell, an editor, an SSH session, activity means its last output: tmux records that as
+`#{window_activity}`.
+
+That signal lies for Claude Code. Its full-screen interface redraws itself while doing nothing: switching to its window
+makes it repaint, so just looking at an idle agent turned it green, and attaching a client or resizing the terminal
+repaints every Claude window at once. So for a Claude window, activity means the newest write to the session's own
+files: its transcript, its subagents' transcripts and its background shells' output.
+
+To know which files belong to which pane, each Claude Code pane registers itself. Its status line script sets a pane
+option, `@claude_reg`, to the Claude process ID and the transcript path, once per session. The color script counts a
+pane while that process is alive and drops the registration when it dies; a window left with no live Claude pane falls
+back to plain output activity.
+
+### Why a script computes the colors
+
+The colors used to be computed inside tmux's format language, one age comparison per threshold per window. That cost
+about a millisecond per window. tmux 3.7 stops expanding a status line after 100 milliseconds and draws whatever is
+left as empty, so a 75-window session ran out of time partway through its window list: the current window and the
+whole right side vanished, the list snapped back to window 1, and the row flashed about once a second.
+
+Now a script,
+[tmux-agent-activity.sh](https://github.com/coletebou/dx/blob/master/base/tmux-agent-activity.sh), runs on the status
+interval, works out each window's color, and publishes it as a window option. The format only looks it up:
+
+```tmux
+set -g window-status-format         '#{E:@handoff-badge}#[fg=#{@recency_fg}]#I:#W#{?window_flags,#{window_flags}, }#[default]'
+```
+
+A lookup is about twelve times cheaper. The script is careful in two more ways:
+
+- **It writes only when a color changes.** Any `set-option`, even of a user option, makes tmux redraw every client in
+  full, and the redraw re-runs the status jobs as soon as a new second starts. An earlier version published a raw
+  timestamp that changed nearly every second, so the job kept re-running itself about once a second.
+- **It batches its writes.** tmux rejects a command line over 1,000 arguments, or 16 KB, with "command too long". A
+  first pass over a big server queues one write per window, so the batch goes out in chunks.
+
+## The second row: every session
+
+```tmux
+set -g status-format[1] '#[align=left]#[fg=colour240]sessions #[default]#{S/i:#[range=session|#{session_id}]#[fg=colour245]#{s|[#]|?|:session_name}#[default]#[norange]  ,#[range=session|#{session_id}]#[fg=colour148#,bold]#{s|[#]|?|:session_name}#[default]#[norange]  }'
+```
+
+This row lists every session in session-number order, so a session never moves around, and styles the current one in
+bold gold to match the left side. Each name is a clickable range: tmux resolves the click to the session itself, so
+the stock click binding switches to it. Session names are user-controlled, so a `#` in a name is replaced before
+printing; otherwise a name like `a#[bg=red]` could inject a style into the row.
+
+The row needs tmux 3.7, the first release with both the sorted loop and the chooser option the config also uses. The
+config probes for that option before turning the second row on, so an older server keeps a plain one-row bar.
+
+## The right side
+
+### Busy windows
+
+[tmux-windows-active.sh](https://github.com/coletebou/dx/blob/master/base/tmux-windows-active.sh) prints
+`active/total`: windows that produced output in the last five seconds, over all windows on the server. The active count
+turns green when it is above zero, and it is padded to the width of the total, because the window list is centered on
+the current window and one extra character here slid the whole list sideways.
+
+It replaced a counter that asked each agent tool separately how many sessions it had. That needed one query per tool,
+could only report busy or idle for Claude, and missed everything else that was working. Output activity is
+tool-agnostic: a build, a test run, an SSH session and an agent all count the same, for one tmux call. The result is
+cached for three seconds so a fast refresh cannot pile up calls.
+
+### Vitals
+
+[tmux-vitals.sh](https://github.com/coletebou/dx/blob/master/base/tmux-vitals.sh) shows one number. On a Mac it is the
+battery, shown only below 100 percent: green while charging, and on battery grey, then orange under 50 percent and red
+under 20. A [[mac-mini|Mac mini]]
+has no battery, so the segment stays empty there. On Linux it is the one-minute load average, grey normally, orange
+from 70 percent of the core count and red at or above it. The value is rounded to one decimal, but the color is graded
+on the full value, so a server right at the threshold is judged on the real number.
+
+### One clock, in UTC
+
+```tmux
+set -g status-right '#(~/.dotfiles/base/tmux-agent-activity.sh)#(~/.dotfiles/base/tmux-windows-active.sh)#(~/.dotfiles/base/tmux-vitals.sh)#[fg=colour109]#(date -u +%%H:%%MZ)'
+```
+
+There used to be a second, local-time clock. It went away because the machines are a mix of servers on UTC, where both
+clocks printed the same minute twice, and laptops on local time, where two different clocks side by side invite
+misreading one for the other. UTC is the shared frame for logs, deploys and the Zulu-stamped notes agents leave in
+[[handoff-chains|handoffs]], so it is the one that stays.
+
+## The left side
+
+The machine label comes from the same hosts file the [[starship|Starship]] prompt and the Claude Code status line read,
+so a machine has one short name everywhere. Each line of that file maps a hostname pattern to a label, optionally
+marked `work`:
+
+```text
+#   <hostname glob>  <label>  [work]
+# my-desktop       desk
+# build-box-*      build
+```
+
+The label never changes while the server runs, so the config computes it once, at load, instead of running a command
+on every refresh. As a command it used to come back empty on each client's first draw, and the whole bar jumped right
+when the output arrived.
+
+## The choosers match the bar
+
+Prefix <kbd>s</kbd> and prefix <kbd>w</kbd> open tmux's session and window choosers, recolored the same way: sessions
+in grey with the current one in bold gold, windows in their activity colors with the handoff badge, panes in their
+window's color. The preview header adds the session, window and directory, so a row of generic `claude` windows can be
+told apart.
+
+## Copy it
+
+Take [base/tmux.conf](https://github.com/coletebou/dx/blob/master/base/tmux.conf) and the four scripts beside it
+(`tmux-hostname.sh`, `tmux-agent-activity.sh`, `tmux-windows-active.sh`, `tmux-vitals.sh`), with a hosts file for your
+own machines. The Claude-aware colors need the registration from Cole's Claude Code status line; without it, Claude
+windows simply fall back to output activity. The [[dotfiles]] page shows how the pieces get installed, and the
+[[agent-fleet]] page shows what all those green windows are doing.

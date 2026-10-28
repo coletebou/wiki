@@ -1,0 +1,129 @@
+---
+import { folioLabel } from '../../lib/schema.mjs';
+import Base from '../layouts/Base.astro';
+import { href, incipit, tableOf, wiki } from '../lib/wiki';
+
+const { pages, tables, graph, bySlug } = await wiki();
+const start = bySlug.get('how-to-be-a-beast');
+const studies = [
+  { slug: 'tmux-keymap', name: 'The tmux keymap', note: 'Every binding on a drawn keyboard, prefix and Alt layers.' },
+  { slug: 'agent-fleet', name: 'The agent fleet', note: 'Hooks, messages, handoffs, parking and the shared brain.' },
+  { slug: 'parallel-worktrees', name: 'Worktree fan-out', note: 'One repository, many branches, an agent in each.' },
+  { slug: 'observability', name: 'The observability path', note: 'Where every trace, error, log and archive flows.' },
+  { slug: 'cloudflare-front-door', name: 'The Cloudflare front door', note: 'A request’s passage from DNS to origin.' },
+  { slug: 'what-it-costs', name: 'What it costs', note: 'A calculator over every price, each with its date.' },
+].filter((s) => bySlug.has(s.slug));
+const recent = [...pages].sort((a, b) => b.data.updated.valueOf() - a.data.updated.valueOf() || a.data.folio - b.data.folio).slice(0, 8);
+const cited = [...pages]
+  .map((p) => ({ p, n: (graph.backlinks.get(p.id) ?? []).length }))
+  .sort((a, b) => b.n - a.n || a.p.data.folio - b.p.data.folio)
+  .slice(0, 8);
+---
+<Base title="How to Be a Beast" description="Cole Tebou’s wiki of the whole workflow: terminals, tmux, agents and their hooks, worktrees, Cloudflare, Vercel, Langfuse, apps, desk gear and what it all costs." current="home">
+  <main class="leaf" id="text">
+    <div class="running-head"><span>Bibliotheca · Frontispiece</span><span class="folio-no">f. i r</span></div>
+    <div class="folio">
+      <div class="text-block" style="grid-column: 1 / -1">
+        <section class="frontispiece">
+          <p class="greek" lang="grc" title="“The house of healing for the soul”, the inscription said to stand over the library">ΨΥΧΗΣ · ΙΑΤΡΕΙΟΝ</p>
+          <h1>CODEX TEBOU</h1>
+          <p class="beast">How to Be a Beast</p>
+          <svg class="vitruvian" viewBox="0 0 240 240" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true">
+            <g class="draw" stroke-width="1.1">
+              <circle cx="120" cy="128" r="96" />
+              <rect x="44" y="52" width="152" height="152" />
+              <path d="M120 32v192M24 128h192" stroke-width="0.6" opacity="0.5" />
+              <path d="M44 204 196 52M44 52l152 152" stroke-width="0.5" opacity="0.35" />
+            </g>
+            <g stroke-width="1.3" class="draw">
+              <rect x="86" y="96" width="68" height="44" rx="4" />
+              <path d="M94 108l10 6-10 6M110 124h14" />
+              <path d="M120 140v20M104 178h32M98 160h44l-6 18h-32Z" />
+              <path d="M154 104c18-8 32-24 40-44M86 104c-18-8-32-24-40-44" opacity="0.8" />
+              <path d="M154 132c22 4 40 18 50 36M86 132c-22 4-40 18-50 36" opacity="0.8" />
+              <circle cx="120" cy="72" r="13" />
+            </g>
+            <g stroke-width="0.5" opacity="0.5">
+              {Array.from({ length: 22 }, (_, i) => <path d={`M${56 + i * 6.4} 210l6-8`} />)}
+            </g>
+          </svg>
+          <p class="being">
+            being a commonplace book of the machines, the agents and the works by which Cole Tebou builds things, set down
+            leaf by leaf and catalogued after the manner of Callimachus
+          </p>
+          <button type="button" class="seek-large" data-seek>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" /><path d="m15 15 5.5 5.5" /></svg>
+            Seek in the library <kbd>/</kbd>
+          </button>
+        </section>
+
+        {start && (
+          <section style="max-width: var(--measure); margin: 2.6rem auto 0">
+            <p class="summary" style="font-style: normal; text-align: center">{start.data.summary}</p>
+            <p style="text-align: center; margin: 0"><a href={href(start.id)} class="table-card" style="display:inline-block; padding: 0.6rem 1.2rem"><span class="numeral" style="font-size: 1rem">{folioLabel(start.data.folio)}</span> &nbsp;Begin with “{start.data.title}”</a></p>
+          </section>
+        )}
+
+        <h2 class="section-title">The Ten Tables</h2>
+        <p class="section-sub">Callimachus sorted the half-million scrolls of Alexandria into the <i>Pinakes</i>, tables by subject. This library keeps ten.</p>
+        <div class="tables-grid">
+          {tables.map((t) => (
+            <a class="table-card" href={`/pinakes/#table-${t.id}`}>
+              <span class="numeral">{t.numeral}</span>
+              <span class="count">{t.pages.length} folio{t.pages.length === 1 ? '' : 's'}</span>
+              <h3>{t.title}</h3>
+              <p>{t.subtitle}</p>
+            </a>
+          ))}
+        </div>
+
+        {studies.length > 0 && (
+          <>
+            <h2 class="section-title">Studies in Ink</h2>
+            <p class="section-sub">Drawings you can work: press the keys, follow the flows, run the numbers.</p>
+            <div class="tables-grid">
+              {studies.map((s) => {
+                const p = bySlug.get(s.slug)!;
+                return (
+                  <a class="table-card" href={href(s.slug)}>
+                    <span class="count">{folioLabel(p.data.folio)}</span>
+                    <h3>{s.name}</h3>
+                    <p>{s.note}</p>
+                  </a>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        <div class="verso" style="border-top: 1px solid var(--rule)">
+          <section>
+            <h3>Most cited</h3>
+            <ul>
+              {cited.map(({ p, n }) => (
+                <li><a href={href(p.id)}>{p.data.title}</a><small>{folioLabel(p.data.folio)} · cited by {n}</small></li>
+              ))}
+            </ul>
+          </section>
+          <section>
+            <h3>Lately emended</h3>
+            <ul>
+              {recent.map((p) => (
+                <li><a href={href(p.id)}>{p.data.title}</a><small>{folioLabel(p.data.folio)} · {tableOf(p.data.table).title}</small></li>
+              ))}
+            </ul>
+          </section>
+          <section>
+            <h3>The library in numbers</h3>
+            <ul>
+              <li>{pages.length} folios in {tables.filter((t) => t.pages.length).length} tables<small>every one in the <a href="/pinakes/">Pinakes</a></small></li>
+              <li>{[...graph.outlinks.values()].reduce((n: number, l: unknown[]) => n + l.length, 0)} cross-references<small>each answered on the back of its leaf</small></li>
+              <li>Kept by people and agents<small>through <a href="/wiki-mcp/">the wiki’s MCP</a>, by pull request</small></li>
+            </ul>
+            {pages[0] && <p style="margin-top: 1rem; font-style: italic; color: var(--ink-2)">inc. “{incipit(pages[0].body ?? '', 9)}”</p>}
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+</Base>

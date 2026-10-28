@@ -1,0 +1,145 @@
+---
+title: Chrome Extensions
+summary: >-
+  Small bundles of HTML, CSS and JavaScript that add popups, side panels and notifications to Chrome, built on
+  Manifest V3. Cole's worked example is Drover for Chrome, with no dependencies and no build step.
+table: atelier
+folio: 72
+aliases: [Manifest V3, MV3, Chrome Web Store, browser extensions]
+updated: 2026-10-28
+sources:
+  - title: What is Manifest V3? (Chrome for Developers)
+    url: https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3
+  - title: Manifest V2 deprecation timeline
+    url: https://developer.chrome.com/docs/extensions/develop/migrate/mv2-deprecation-timeline
+  - title: The extension service worker lifecycle
+    url: https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle
+  - title: chrome.sidePanel
+    url: https://developer.chrome.com/docs/extensions/reference/api/sidePanel
+  - title: Register your Chrome Web Store developer account
+    url: https://developer.chrome.com/docs/webstore/register
+  - title: Chrome Web Store review process
+    url: https://developer.chrome.com/docs/webstore/review-process
+  - title: Drover for Chrome (Cole's public repo)
+    url: https://github.com/coletebou/drover/tree/master/native/Extensions/chrome
+---
+
+A Chrome extension is a small bundle of HTML, CSS and JavaScript, described by a `manifest.json`, that adds features
+to the browser: a toolbar popup, a side panel, notifications, context menu items, a keyword in the address bar. For
+Cole, an extension is the cheapest way to put a tool where the work already is. The worked example is Drover for
+Chrome, the browser front end of [[drover|Drover]], which shows which of the [[agent-fleet|fleet's]]
+[[claude-code|Claude Code]] and [[codex|Codex]] sessions are waiting and answers them from the toolbar. It is plain JavaScript with no dependencies and no build step, and the same folder becomes the
+[[safari-extensions|Safari extension]].
+
+## How an extension is put together
+
+Every current Chrome extension uses Manifest V3. Its parts:
+
+| Part | What it is |
+|---|---|
+| `manifest.json` | Name, version, permissions, and which files do what |
+| Service worker | The background script. It wakes for events and is shut down when idle |
+| Popup | The page that opens from the toolbar button |
+| Side panel | A page that stays open beside the website (Chrome 114 and later, `sidePanel` permission) |
+| Options page | Settings |
+| Content scripts | Scripts injected into web pages, only if you need them |
+
+Manifest V3 changed four big things, in Google's words: the background context moved "to service workers, which run
+only when needed"; "an extension can only execute JavaScript that is included within its package and subject to
+review," so no remotely hosted code; the `declarativeNetRequest` API replaced most blocking `webRequest` use; and the
+APIs gained promises. Manifest V2 is gone: as of Chrome 138, MV2 extensions are disabled on every channel, the
+enterprise policy that kept them alive was removed in Chrome 139, and all remaining MV2 extensions have been taken
+out of the Chrome Web Store.
+
+The service worker rule shapes everything else. Chrome stops an extension's worker "after 30 seconds of inactivity,"
+and receiving an event or calling an extension API resets that timer. Anything kept in a global variable disappears
+when the worker sleeps, so state goes in `chrome.storage`, and periodic work hangs off `chrome.alarms`, whose minimum
+period is now 30 seconds.
+
+## The worked example: Drover for Chrome
+
+[Drover for Chrome](https://github.com/coletebou/drover/tree/master/native/Extensions/chrome) talks to the Drover
+daemon on Cole's machines and does five things:
+
+- **Popup.** The fleet manager first (ask it anything, the reply streams in), then the sessions waiting on Cole, with
+  the dialog's own options as buttons: "1 Yes," "2 Yes, don't ask again," "3 No," Enter, Esc. Each press carries a hash
+  of the screen the popup showed, so an answer never lands on a dialog that changed in the meantime.
+- **Badge.** The toolbar icon shows how many sessions are waiting.
+- **Notifications** when a session needs a decision, with Approve and Deny right on the notification.
+- **Side panel chat** that follows one session's transcript, with tool calls grouped and expandable.
+- **Context menus and the omnibox.** Send the selected text or the page URL to a session, or type
+  `drover <session> <text>` in the address bar.
+
+Here is the part of its [manifest](https://github.com/coletebou/drover/blob/master/native/Extensions/chrome/manifest.json)
+that says what it is allowed to do:
+
+```json
+  "background": { "service_worker": "background.js", "type": "module" },
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "omnibox": { "keyword": "drover" },
+  "permissions": ["storage", "alarms", "notifications", "contextMenus", "sidePanel"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+```
+
+A few design choices are worth copying:
+
+- **Ask for hosts at runtime.** Every host permission is optional. The extension asks for access to exactly one
+  origin, the daemon's address you configured, when you connect, and nothing else. There are no content scripts and
+  no web-accessible resources, so it never touches the pages you visit.
+- **Alarms keep it honest.** The `alarms` permission exists to wake the sleeping service worker and poll the daemon;
+  while the popup or panel is open, a live event stream does the work instead.
+- **Pair, don't paste.** On the options page you choose Pair with Drover, the page shows a six-digit code, and you
+  approve it on the Mac (`drover pair approve 123456`), the same pairing Drover's [[mac-apps|Mac]] and
+  [[ios-development|iPhone]] apps use. The daemon hands over a token once. Pasting a token still works as a fallback.
+- **Keep secrets local.** The token lives in `chrome.storage.local`, never synced, never in a URL, never logged. No
+  analytics, no remote code; the only network traffic goes to the server you configured.
+- **A stable identity.** The manifest pins a public key, so the extension keeps the same ID wherever it is loaded
+  unpacked, and the daemon can trust that one origin without configuration.
+
+<ColesTake>
+
+No build step, no dependencies. Plain Manifest V3 JavaScript is plenty for a tool like this, and there is nothing to
+break when Chrome or npm changes underneath it.
+
+</ColesTake>
+
+## Loading, testing, shipping
+
+To run an extension you are working on:
+
+1. Open `chrome://extensions`.
+2. Turn on Developer mode.
+3. Choose Load unpacked and pick the folder with the manifest.
+
+After a change, press the reload button on the extension's card. Its service worker gets its own DevTools window
+from the same card.
+
+For tests, Drover's extension keeps the logic in pure modules with no `chrome.*` calls (the pairing protocol, the
+answer buttons, the chat rendering), so `node --test` runs them in plain Node, and a fake daemon serves fixtures for
+the rest. For end-to-end runs its harness loads the real popup and side panel in headless Chrome for Testing,
+because, as its README notes, branded Chrome no longer loads unpacked extensions from the command line. See
+[[testing]] for how that fits Cole's wider testing habits.
+
+Publishing goes through the Chrome Web Store. You register a developer account from the developer dashboard,
+accept the developer agreement and pay a one-time registration fee; the account's email address cannot be changed
+afterward. Then you upload a ZIP, fill in the listing and the privacy practices, and wait for review. Google says
+"for most extensions, review is completed within a few days, but it can take up to a few weeks," and that reviews
+take longer for "extensions that request broad host permissions or sensitive execution permissions." Obfuscated code
+is not allowed.
+
+## Gotchas
+
+- **The worker sleeps.** Code that works while DevTools is open (which keeps the worker awake) can fail the moment you
+  close it. Test with DevTools closed, and keep state in storage.
+- **Broad permissions cost you.** `<all_urls>` or a content script on every page means a slower review and a scarier
+  install prompt. Optional host permissions, requested when needed, avoid both.
+- **No remote code means no remote code.** You cannot fetch a script from your server and run it. Ship the code in
+  the package and fetch only data.
+- **Synced storage is not for secrets.** `chrome.storage.sync` follows the user's Google account to every machine;
+  tokens belong in `chrome.storage.local`.
+- **Branded Chrome is not your test browser.** For automated runs, use Chrome for Testing or Chromium, and keep the
+  daily browser for daily use.
+- **Your own server decides who it answers.** Drover's daemon answers browser requests only from origins it knows,
+  and an unpacked extension's `chrome-extension://` origin changes unless the manifest pins a key. That is why Drover
+  pins one.

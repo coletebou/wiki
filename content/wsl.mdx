@@ -1,0 +1,151 @@
+---
+title: WSL
+summary: >-
+  The Windows Subsystem for Linux runs a real Linux kernel inside Windows, so a Windows PC gets the same shell, tmux,
+  dotfiles and agents as a Mac or a server. How to install it, where to keep code, and the gotchas.
+table: shell
+folio: 24
+aliases: [windows subsystem for linux, wsl 2]
+updated: 2026-10-28
+sources:
+  - title: Install WSL (Microsoft Learn)
+    url: https://learn.microsoft.com/en-us/windows/wsl/install
+  - title: Comparing WSL versions (Microsoft Learn)
+    url: https://learn.microsoft.com/en-us/windows/wsl/compare-versions
+  - title: Working across file systems (Microsoft Learn)
+    url: https://learn.microsoft.com/en-us/windows/wsl/filesystems
+  - title: Accessing network applications with WSL (Microsoft Learn)
+    url: https://learn.microsoft.com/en-us/windows/wsl/networking
+  - title: Advanced settings configuration in WSL (Microsoft Learn)
+    url: https://learn.microsoft.com/en-us/windows/wsl/wsl-config
+  - title: Use systemd with WSL (Microsoft Learn)
+    url: https://learn.microsoft.com/en-us/windows/wsl/systemd
+  - title: Cole's WSL role file (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/roles/local/wsl.sh
+---
+
+WSL, the Windows Subsystem for Linux, runs a real Linux system inside Windows, with no dual boot and no virtual machine
+to manage. It is Cole's answer to working on a Windows PC: "WSL is the move on Windows". The same
+[[dotfiles]], [[tmux]], agents and [[ssh|SSH]] habits that run on a Mac and on the servers run there unchanged, because
+inside WSL it is simply Linux.
+
+<ColesTake>
+
+WSL is the move on Windows.
+
+</ColesTake>
+
+## What WSL is
+
+Windows is not a [[posix|POSIX]] system: its shells, paths and process model differ from Unix, and most developer
+tooling is built for Unix first. WSL bridges that. There are two versions:
+
+- **WSL 1** translated Linux system calls into Windows ones. Clever, but incomplete.
+- **WSL 2**, the default for new installs, runs an actual Linux kernel, built by Microsoft from the stable kernel
+  branch, inside a lightweight virtual machine that Windows manages for you. Microsoft's comparison lists what that
+  buys: a full Linux kernel, "full system call compatibility", systemd support, and fast boot.
+
+Each Linux distribution (Ubuntu by default) runs as an isolated container inside that managed VM. You never see the VM;
+you open a terminal and get a Linux shell.
+
+## Install it
+
+You need Windows 11, or Windows 10 version 2004 (build 19041) or later. In PowerShell, run as administrator:
+
+```powershell
+wsl --install
+```
+
+That turns on the needed Windows features and installs Ubuntu. Restart, open Ubuntu from the Start menu, and create a
+Linux user name and password. A few more commands cover the rest:
+
+```powershell
+wsl --list --online          # distributions you can install
+wsl --install -d Debian      # install another one
+wsl --list --verbose         # what is installed, and which WSL version each uses
+wsl --update                 # update WSL itself
+wsl --shutdown               # stop every distribution and the VM
+```
+
+Then run your Linux setup as you would on any machine. With Cole's dotfiles that is the
+[[bootstrap-script|bootstrap script]], which treats WSL as Linux with a few extras.
+
+## Keep your code on the Linux side
+
+This is the most important rule, and Microsoft's own guidance is blunt: "For the fastest performance speed, store your
+files in the WSL file system if you are working in a Linux command line". Your Windows drives are mounted under
+`/mnt/c`, `/mnt/d` and so on, and every file operation across that boundary is slow. A `git status`, an `npm install`
+or an agent scanning a repository on `/mnt/c` can take many times longer than the same work in your Linux home folder.
+Claude Code's own docs give its file discovery a longer default timeout on WSL, 60 seconds against 20 elsewhere.
+
+So keep repositories in `~/code` inside Linux. When you want to see them from Windows:
+
+- `explorer.exe .` opens the current Linux folder in File Explorer.
+- `\\wsl$` in File Explorer's address bar lists every distribution's file system.
+
+## Windows and Linux, side by side
+
+WSL's interop means you can run Windows programs from Linux by name, with their `.exe`, and pipe between the two:
+
+```sh
+explorer.exe .                 # open this folder in File Explorer
+ipconfig.exe | grep IPv4       # a Windows tool, filtered by a Linux one
+cmd.exe /c 'echo %LOCALAPPDATA%'
+```
+
+Cole's dotfiles use that in three places:
+
+- **The editor.** The WSL role file defines `code` so typing `code .` opens the Windows install of VS Code on the
+  current folder. It asks Windows where VS Code lives only on first use, because `cmd.exe` takes about 100 milliseconds
+  to answer and the shell should not pay that on every start:
+
+  ```zsh
+  code() {
+      if [[ -z "${_WSL_VSCODE:-}" ]]; then
+          local appdata
+          appdata="$(cmd.exe /c 'echo %LOCALAPPDATA%' 2>/dev/null | tr -d '\r')"
+  ```
+
+- **The clipboard.** The tmux binding that copies a pane's whole history to the clipboard,
+  <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>c</kbd>, uses `clip.exe` under WSL, so the text lands on the Windows clipboard
+  ([[tmux-keymap]]).
+- **Paths.** A PDF-to-Markdown helper converts a pasted Windows path like `C:\...` into a Linux one with `wslpath -u`
+  before using it.
+
+The dotfiles detect WSL simply: if `/mnt/c/Windows` exists, the WSL role file is loaded on top of the Linux one. One
+more line fixes something every WSL user notices: GNU `ls` paints directories on Windows drives with a green
+background, because they appear world-writable, and the shell setup overrides that color (`ow=1;34`) so they read like
+normal directories.
+
+## Services, networking and memory
+
+- **systemd.** WSL 2 supports systemd, the Linux service manager, and it is the default for the current Ubuntu that
+  `wsl --install` sets up. For other distributions, add `systemd=true` under `[boot]` in `/etc/wsl.conf`, then run
+  `wsl --shutdown`. With systemd, the user timers in Cole's dotfiles, like the one that saves tmux layouts every 15
+  minutes, work the same as on a server. One caution from the docs: "systemd services will NOT keep your WSL instance
+  alive", so check that a long agent run keeps going after you close the last terminal before you rely on it.
+- **Networking.** By default WSL uses NAT: a Linux server listening on a port is reachable from Windows at
+  `localhost`. On Windows 11 22H2 and newer, setting `networkingMode=mirrored` under `[wsl2]` in `.wslconfig` (in your
+  Windows home folder) mirrors Windows' network interfaces into Linux, which adds IPv6, lets Linux reach Windows
+  services at `localhost` too, improves VPN compatibility and makes WSL reachable from your local network.
+- **Memory.** The WSL 2 VM takes up to half of Windows' memory by default. The `memory` setting in `.wslconfig` caps
+  it, and `wsl --shutdown` gives everything back.
+
+Settings in `.wslconfig` apply to the whole WSL VM; `/etc/wsl.conf` applies to one distribution. Changes take effect
+after the distribution fully stops, which Microsoft says typically takes about eight seconds after you close every
+shell, or immediately after `wsl --shutdown`.
+
+## Agents and tools in WSL
+
+Inside WSL, everything on the Linux pages applies. [[claude-code|Claude Code]] and [[codex|Codex]] install and run as
+they do on any Linux machine, tmux gives them sessions you can detach from and come back to, and
+[[tailscale|Tailscale]] puts the PC on the same private network as the Mac and the servers. The rules that matter most:
+
+1. Keep repositories and worktrees in the Linux file system.
+2. Run agents from a Linux shell, not from PowerShell pointed at a WSL path.
+3. Use a terminal that renders well. Microsoft recommends Windows Terminal for WSL, with tabs for each distribution and
+   PowerShell side by side.
+
+On a board like the [[mechanical-keyboard|mechanical keyboard]], a Mac and Windows switch makes moving between a Mac
+and a Windows PC painless, and the [[posix]] page explains the differences you will still meet between the Mac's BSD
+tools and Linux's GNU ones.

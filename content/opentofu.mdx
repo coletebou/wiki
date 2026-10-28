@@ -1,0 +1,306 @@
+---
+title: OpenTofu
+summary: >-
+  How all of Cole's infrastructure is managed as code: OpenTofu roots per provider with their own state, reviewed
+  plans, read-only plan credentials, a destroy guard, nightly drift checks and zero-diff imports.
+table: works
+folio: 52
+aliases: [Terraform, tofu, infrastructure as code, IaC]
+updated: 2026-10-28
+sources:
+  - title: OpenTofu
+    url: https://opentofu.org/
+  - title: OpenTofu FAQ
+    url: https://opentofu.org/faq/
+  - title: State and plan encryption (OpenTofu docs)
+    url: https://opentofu.org/docs/language/state/encryption/
+  - title: S3 backend (OpenTofu docs)
+    url: https://opentofu.org/docs/language/settings/backends/s3/
+  - title: OpenTofu releases
+    url: https://github.com/opentofu/opentofu/releases
+---
+
+OpenTofu is the open-source infrastructure-as-code tool that manages every piece of Cole's infrastructure: the DNS
+zones and firewall rules at [[cloudflare|Cloudflare]], the AWS accounts and [[servers]], the [[tailscale|Tailscale]]
+policy, the GitHub repositories, the [[sentry|Sentry]] monitors and the [[vercel|Vercel]] projects. All of it lives as
+reviewed code in one private repository, and nothing changes until someone has read the plan.
+
+That matters more in Cole's setup than in most, because a lot of the changes are proposed by agents. An agent that
+wants a new DNS record does not click it into a dashboard. It opens a pull request, the pipeline shows exactly what
+would change, and Cole approves it or does not.
+
+## What OpenTofu is
+
+OpenTofu is a fork of Terraform, started in 2023 after HashiCorp moved Terraform from an open-source license to the
+Business Source License, and now a project of the Linux Foundation. It reads the same HCL language, runs the same
+providers (from its own registry) and works as a drop-in replacement: `tofu init`, `tofu plan`, `tofu apply`. It
+costs nothing: <Price id="opentofu" />.
+
+The model is simple. You describe what should exist as resources in `.tf` files:
+
+```hcl
+resource "cloudflare_dns_record" "www" {
+  zone_id = var.zone_id
+  name    = "www.example.com"
+  type    = "CNAME"
+  content = "example.com"
+  proxied = true
+  ttl     = 1
+}
+```
+
+OpenTofu keeps a **state** file that maps each resource in the code to the real object it manages. `tofu plan`
+compares three things (the code, the state and the live API) and prints what it would create, change or destroy.
+`tofu apply` does exactly that and nothing else. The plan is the point: it turns "I think this change is safe" into a
+diff anyone can read.
+
+Cole chose OpenTofu for features of its own, above all client-side encryption of state **and** plan files, plus
+`for_each` on provider blocks (one block per AWS account instead of copy-paste) and `-exclude` to leave a resource out
+of a run. The CLI version is pinned in one file at the top of the repository, every provider is pinned
+to an exact version (`= 5.28.0`, never `~>`), and each root commits its lock file with hashes for both Linux and
+Apple silicon, so the laptop and CI resolve the same bits. A provider upgrade is its own pull request, and its plan
+has to come back with no changes.
+
+## One root per provider
+
+The repository is split into **roots**: one directory, one state file and one set of credentials per provider or area.
+Small roots mean small plans, a failure in one cannot touch another, and a Cloudflare token never sees the servers.
+
+| Root | What it holds | Who applies it |
+|---|---|---|
+| AWS bootstrap | The state bucket, the encryption keys, GitHub's OIDC trust, and a pair of CI roles per root | Cole, locally |
+| AWS organization | The accounts, service control policies, single sign-on, the org-wide audit trail, a budget and cost anomaly alerts | Cole, locally |
+| Cloudflare account | Tunnels (the objects, not their routes), R2 buckets, Access login methods, Email Routing destination addresses | CI |
+| Cloudflare zones | One root per production zone, plus one shared root that loops over every small zone | CI |
+| Cloudflare Access | The applications and policies that put a login in front of private hostnames | CI |
+| Servers | The AWS instances, their volumes, public IPs and firewalls | CI |
+| Tailscale | The tailnet policy file | CI, on GitHub-hosted runners only |
+| GitHub | Repositories, rulesets, environments and variables | CI |
+| Sentry | Projects, teams, monitors and alerts | CI |
+| Vercel | Projects and their domains | Cole, locally |
+| Database | The hosted cluster's settings, IP access list and backup policy | CI |
+
+Every root has a README that says what it manages, what it leaves out on purpose, which permissions its tokens need
+and how to rehearse it. A small metadata file next to the code gives the root an id. From that id CI derives the state
+key, the names of the root's two IAM roles and its GitHub environment. The same file says whether CI may plan and
+apply the root at all, and maps each provider credential to two AWS Parameter Store paths: a read-only token for plans
+and a scoped write token for applies.
+
+Code that several roots share lives in modules. The Cloudflare zone module, used by every zone root, takes a zone, its
+DNS records, the settings to manage, its rulesets and its [[cloudflare-email-routing|Email Routing]] rules. Records
+are keyed by stable names derived from their content (`"api/A"`, `"@/MX/route1"`, `"@/TXT/spf"`), never by list
+position, so inserting a record never renumbers the others. The module has its own plan-only tests (`tofu test`
+against a mocked provider: no credentials, no API calls), the same idea as the rest of Cole's [[testing|tests]].
+
+## State: encrypted twice, locked natively
+
+All state lives in one S3 bucket in an AWS account that exists only for infrastructure: versioned, encrypted with a
+KMS key, reachable only over TLS, and locked with OpenTofu's native S3 locking (`use_lockfile = true`, which uses
+conditional writes, so there is no DynamoDB lock table to run). See [[s3-and-glacier]] for the rest of Cole's S3 use.
+
+State holds ids, email addresses and any secret a resource happens to carry, and a saved plan holds unredacted
+values. So OpenTofu encrypts both itself, before they leave the machine:
+
+```hcl
+terraform {
+  backend "s3" {} # bucket, key and region come from -backend-config at init
+
+  encryption {
+    key_provider "aws_kms" "state" {
+      kms_key_id = "alias/opentofu-state"
+      region     = "us-east-1"
+      key_spec   = "AES_256"
+    }
+    method "aes_gcm" "state" {
+      keys = key_provider.aws_kms.state
+    }
+    state {
+      method   = method.aes_gcm.state
+      enforced = true
+    }
+    plan {
+      method   = method.aes_gcm.state
+      enforced = true
+    }
+  }
+}
+```
+
+`enforced = true` makes OpenTofu refuse to write plaintext at all. The two AWS roots that create the bucket and the key
+cannot depend on them, so they start on local state encrypted with a passphrase (the `pbkdf2` key provider) kept in
+Cole's password manager, then move into the bucket with `tofu init -migrate-state`. The passphrase doubles as an
+offline break-glass key.
+
+## How a change flows
+
+Four GitHub Actions workflows do the work, all on GitHub-hosted runners, so infrastructure changes never depend on the
+machines they manage (see [[github-actions]]):
+
+1. **checks**, on every pull request, with no credentials at all: `tofu fmt`, `tofu init -backend=false` and
+   `tofu validate`, tflint, Trivy's config scan, actionlint and the tests of the CI scripts themselves.
+2. **plan**, for each root the pull request touches. The job assumes that root's **read-only** role through GitHub's
+   OIDC, plans, posts the plan as a pull-request comment and runs the **destroy guard**: any plan that deletes or
+   replaces a managed resource fails, unless an approver adds the `allow-destroy` label. It also uploads a
+   *fingerprint* of the plan: each change's address, its action, and a digest of the planned values with sensitive
+   paths redacted. The plan file itself is never uploaded, because Actions artifacts stay readable to anyone with read
+   access for 90 days.
+3. **Cole approves.** The approval is the gate.
+4. **apply**, on merge to `master` only. It re-checks the approval through GitHub's API (the merge commit of a pull
+   request, approved on its final commit by an approver who is not its author), plans again, refuses to continue if
+   anything differs from the reviewed fingerprint, runs the destroy guard again and applies.
+5. **drift**, every night: a read-only plan of every root, plus a report of live objects of the managed kinds that are
+   missing from state.
+
+The destroy guard is a few lines of `jq` over the plan's JSON form:
+
+```sh
+tofu show -json tfplan > plan.json
+jq -r '.resource_changes[]
+  | select(.mode == "managed" and (.change.actions | index("delete")))
+  | .address' plan.json
+```
+
+If that prints anything, the job fails. A replacement shows up as a delete plus a create, so it is caught too, and a
+`removed` block with `destroy = false` (OpenTofu stops managing the object without deleting it) passes. The label
+counts only when the most recent person to add it is an approver, so a label added by an agent does nothing.
+
+The drift report exists because of agents. Moving fast, agents had created tunnels, buckets and dozens of development
+hostnames by hand, and a nightly plan only sees what is already in state. Listing what exists but is not managed is
+what keeps the repository honest as the source of truth.
+
+## Read-only plans, scoped writes
+
+Anyone who can open a pull request can run code with a root's plan role: the pull request controls the workflow file.
+That is accepted by design, because the plan side is read-only everywhere:
+
+- **Every provider has two credentials.** Plans use a read-only token; applies use a write token scoped to that root
+  (a Cloudflare token that can edit one zone, for example). Both live in AWS Parameter Store, and CI reaches them
+  through GitHub OIDC: each root's role can read exactly that root's parameters and nothing else. GitHub holds no
+  static secrets.
+- **Write roles trust only the apply environment.** The OIDC subject claim is customized to include the actor and the
+  runner type, and each apply role accepts only that root's environment, deployable from `master` only, pushed by an
+  approved actor on a GitHub-hosted runner. GitHub signs those claims, so a commit cannot forge them.
+- **CI cannot edit its own trust.** The AWS bootstrap and organization roots are never applied from CI: Cole applies
+  them from a laptop. A bad service control policy can lock accounts out, and CI should never be able to grant itself
+  more access.
+- **The repository never manages its own branch protection.** A pull request that loosened it would merge under the
+  old rules, and then the rules would be gone.
+- **Agents never hold write credentials.** On agent machines every provider token is read-only. Agents open pull
+  requests; they do not approve, merge, `tofu apply`, `tofu import` or touch `tofu state`. See [[agent-fleet]].
+
+Even "read-only" needs checking. Cole found that the Cloudflare provider's ruleset resource sends a write request (a
+dry run) during `tofu plan`, so a plan can reach a write endpoint even though it applies nothing. Read-only has to be
+enforced in the token, not assumed from the command.
+
+## Importing what already exists
+
+Most of the estate was built by hand and by agents before it was code, so it is adopted, never recreated. Recreating
+DNS records leaves a gap that resolvers cache as NXDOMAIN; recreating a tunnel gives it a new id and breaks every
+hostname on it; recreating a webhook endpoint gives it a new signing secret. An import block names the existing
+object:
+
+```hcl
+import {
+  to = cloudflare_dns_record.www
+  id = "<zone id>/<record id>"
+}
+```
+
+An import pull request merges only when its plan reads:
+
+```text
+Plan: 12 to import, 0 to add, 0 to change, 0 to destroy.
+```
+
+To get there, Cole's `rehearse` script copies the repository into a scratch directory, swaps the backend for local
+throwaway state with a one-time passphrase, plans with read-only tokens, and succeeds only at zero diff. Its
+`--generate-config` mode writes HCL for import blocks that have no resource yet, to review and merge into the real
+files. For areas that had no read-only token yet, Cole went one step further: record the live `GET` responses once,
+serve them from a local stub that refuses anything but `GET`, point the provider at the stub with a dummy token, and
+plan. Injecting one deliberate drift proves the setup notices.
+
+The rules that make imports safe:
+
+- **Fix the config, never the infrastructure.** Never make a diff go away by applying it.
+- **Every `ignore_changes` carries a `# why:` comment**, for a value the API will not return (a secret) or a computed
+  attribute that cannot be expressed.
+- **Refactors are `moved` blocks**, and their plans must destroy nothing. Stopping management is a `removed` block
+  with `destroy = false`.
+- **Pets keep their pet attributes ignored.** Hand-built servers ignore image, user data and SSH keys, which would
+  otherwise force a replacement.
+- **Take restore points first**, read-only: a BIND export of each zone, JSON dumps of rulesets, Access apps, email
+  routing and tunnels, the raw Tailscale policy. They are stored outside the repository.
+- **Go from least to most risky.** The order was the Tailscale policy first (one resource, security-critical, edited
+  without review until then), then empty zones, then small zones, the Cloudflare account objects, the production
+  zones from least to most important, Access, then GitHub, Sentry, Vercel, the servers and the database.
+
+## What stays out, and why
+
+| Left out | Why |
+|---|---|
+| Host configuration: systemd units, nginx, Docker Compose stacks, the tunnel's local config, cron | It stays as scripts and systemd units next to the code it runs. cloud-init only for new servers. |
+| App deploys and Worker code | Vercel's Git deploys and Wrangler own them. OpenTofu creates the shared resources and outputs their ids. |
+| Data | Database contents, [[langfuse\|Langfuse]] projects, snapshots, payment customers |
+| Integration-owned config | The environment variables Sentry writes into Vercel, the GitHub environments Vercel creates, the DNS records Email Routing, Workers, R2 or Pages own |
+| Anything whose only job is to hold a secret | API tokens (OpenTofu never gets a token that can mint tokens), tunnel secrets, database users |
+| Payments | A recreated webhook endpoint silently gets a new signing secret and breaks billing. The risk outweighs the value. |
+| DNSSEC | Disabling it while the registrar still publishes a DS record makes the whole zone fail to resolve, so it gets its own reviewed change |
+
+Tunnels are a special case: OpenTofu manages the tunnel object only, never its routing. Moving a tunnel's routes from
+the config file on the server to Cloudflare's remote config is one-way, so it is a decision, not a side effect of an
+import.
+
+## Guards that survive mistakes
+
+`prevent_destroy` lives inside the resource block, so deleting the block deletes the guard with it. Cole layers four
+protections, so a mistake in one still leaves the others:
+
+1. `lifecycle { prevent_destroy = true }` on everything stateful or identity-bearing: zones, tunnels, buckets, email
+   destinations, servers and their volumes and IPs, repositories, the state bucket and its keys.
+2. The provider's own protection where it exists: termination protection on servers, `archive_on_destroy` on GitHub
+   repositories.
+3. The CI destroy guard, which does not care what the config says.
+4. `removed` blocks instead of deletions, so stopping management never destroys anything.
+
+Each root's README also lists its blast radius: the worst plausible bad apply (the production site down, a private
+admin page exposed, SSH and backups cut off by a bad tailnet policy, a server rebuilt with a new IP) and the guards
+beyond review that stand in the way.
+
+## Gotchas
+
+- **Plans can write.** The Cloudflare ruleset resource's dry-run write during plan is the reason plan tokens must be
+  read-only at the credential level.
+- **Some vendors have no read-only token.** A Vercel token can change or delete anything in its team, so the Vercel
+  root never runs in CI. Cole plans and applies it locally after review.
+- **`tailscale_acl` replaces the whole policy.** Import it verbatim, comments and tests included, and apply it only
+  from GitHub-hosted runners, so a bad rule cannot cut off the machine that would roll it back.
+- **TXT records keep the API's exact quoting.** `"\"v=spf1 ...\""` and `"v=spf1 ..."` are different values to the
+  provider and plan as an update.
+- **Destroying Email Routing settings turns routing off for the zone.** The provider implements delete as the disable
+  call, which would stop every forward at once. It is under `prevent_destroy`.
+- **Never edit state by hand.** When an apply fails halfway, fix forward: a pull request that brings the config back to
+  zero diff against what exists now.
+
+## Starting your own
+
+You do not need eleven roots to get the benefit. A good first project:
+
+1. Install it: `brew install opentofu` (see [[homebrew]]).
+2. Start with your [[cloudflare|Cloudflare]] DNS, the root with the best ratio of value to risk. Import the records
+   you have, iterate until the plan says zero to change, then commit.
+3. Put state in S3 with `use_lockfile = true` and an `encryption` block, or start with local encrypted state and
+   migrate later.
+4. Add CI: `fmt` and `validate` on every pull request, a plan with a read-only token posted as a comment, and an
+   apply on merge. Add the destroy guard before you trust it.
+5. Keep secrets out of the code entirely. Providers read their tokens from the environment; see [[env-files]] for
+   how Cole keeps those.
+
+Then add a root at a time. The [[cloudflare-api|Cloudflare API]] page covers the token permissions a zone root needs,
+and [[what-it-costs]] shows that all of this costs little more than the state bucket's few cents.
+
+<ColesTake>
+
+All our infrastructure is managed through OpenTofu. If an agent wants a new DNS record or a new firewall rule, it opens
+a pull request like anyone else, and I read the plan before it merges.
+
+</ColesTake>

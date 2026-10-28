@@ -1,0 +1,27 @@
+---
+// A price as the vendor printed it, with the day it was read and a link to the page it was read on.
+// Data: src/data/prices.json. A missing id fails the build once that file exists.
+interface Props {
+  id: string;
+  /** "full" (default) prints the as-of note; "bare" prints only the amount, for tables that state the date once. */
+  format?: 'full' | 'bare';
+}
+const { id, format = 'full' } = Astro.props;
+const found = import.meta.glob('../data/prices.json', { eager: true, import: 'default' });
+const prices = (Object.values(found)[0] ?? null) as Record<string, any> | null;
+const entry = prices?.[id];
+if (prices && !entry) throw new Error(`<Price id="${id}"> is not in src/data/prices.json`);
+const host = entry?.source ? new URL(entry.source).hostname.replace(/^www\./, '') : '';
+const asOf = entry?.asOf
+  ? new Date(`${entry.asOf}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+  : '';
+---
+{entry ? (
+  <span class="price" data-price={id}>
+    <span class="price-amount">{entry.display}</span>{format === 'full' && (
+      <span class="price-asof"> (as of <time datetime={entry.asOf}>{asOf}</time>, <a href={entry.source} rel="noopener">{host}</a>{entry.unverified && <span class="price-unverified">, unverified</span>})</span>
+    )}
+  </span>
+) : (
+  <span class="price price-unverified" data-price={id}>[price pending: {id}]</span>
+)}

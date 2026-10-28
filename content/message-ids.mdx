@@ -1,0 +1,152 @@
+---
+title: Message IDs
+summary: >-
+  Every prompt Cole types gets an exact, permanent record id in its session transcript. Cole's tools carry that id
+  with the words into briefs, handoffs, issues and the truth file, so agents quote Cole verbatim and can prove it.
+table: automata
+folio: 32
+aliases: [record ids, turn ids]
+updated: 2026-10-28
+sources:
+  - title: Claude Code sessions (where transcripts are stored)
+    url: https://code.claude.com/docs/en/sessions
+  - title: Claude Code hooks reference (UserPromptSubmit)
+    url: https://code.claude.com/docs/en/hooks
+  - title: Briefs, decisions and handoffs (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/workflow/briefs.md
+  - title: Drover truth file and message events
+    url: https://github.com/coletebou/drover/blob/master/web/README.md
+---
+
+Every prompt Cole types into an agent gets an exact, permanent id: the record id of that turn in the session's
+transcript. Cole's tooling keeps the id attached to the words wherever they travel, into briefs, handoffs, filed
+issues and [[drover|Drover]]'s truth file. That is what lets an agent quote Cole word for word instead of
+paraphrasing, prove that a person (not another agent) said something, and jump back to the original message to read
+what came before it.
+
+## Where the id comes from
+
+A [[claude-code|Claude Code]] transcript is a JSON Lines file under `~/.claude/projects/<project>/`, one record per
+message, tool call or event. Each record carries a `uuid` (its id), the `parentUuid` it follows, the `sessionId` and a
+`timestamp`. A turn a person typed also says so:
+
+```json
+{
+  "type": "user",
+  "uuid": "3f6b2c1e-8d4a-4f7e-9b1a-5c2d7e9f0a14",
+  "parentUuid": "…",
+  "sessionId": "…",
+  "timestamp": "2026-10-27T18:04:11.502Z",
+  "origin": { "kind": "human" },
+  "promptSource": "typed",
+  "turnOrigin": "human",
+  "message": { "role": "user", "content": "…" }
+}
+```
+
+Not every user record was typed by a user. Tool results are user records too, a message from another session arrives
+with an origin of `peer`, task notifications and scheduled wakeups have origins of their own, and text a harness
+injects is marked `isMeta`. The origin fields are what tell a person's words apart from everything else. (Codex
+rollout files have their own turn records, and its subagent threads are marked as such.)
+
+You can list your own typed prompts, with their ids, from any transcript:
+
+```sh
+jq -c 'select(.type == "user" and .origin.kind == "human")
+       | {ts: .timestamp, id: .uuid, text: (.message.content | if type == "string" then .[0:60] else "[blocks]" end)}' \
+  ~/.claude/projects/<project>/<session>.jsonl
+```
+
+## Capturing every prompt
+
+A `UserPromptSubmit` [[hooks|hook]] on Cole's machines writes each submitted prompt to a local spool: the hook's whole
+payload (session id, prompt, transcript path, working directory) plus the machine, the tmux pane and the entry point.
+It parses nothing and calls nothing; the median cost is about seven milliseconds. Each record is written as a hidden
+file and renamed into place, so a reader never sees half of one. Headless `claude -p` automation and the hooks' own
+model calls are skipped, so only interactive sessions are captured.
+
+The spool does not know who typed the prompt, because the hook payload does not say. A collector answers that later
+by joining each spooled prompt with its record in the transcript on the machine that owns it:
+
+- A turn marked as meta, from the system, from a scheduled task or wakeup, or with an origin of `peer`,
+  `task_notification`, `scheduled` or `system` is not a person's.
+- A prompt whose turn is not in the transcript yet waits up to half an hour; one that never appears is skipped as
+  unverified.
+- Prompts that another tool wrote are filtered out by the marks those tools leave: handoff prompts start with
+  `[cc-handoff]` and say they were written by the handoff tool, launch prompts that hand a session its brief have a
+  fixed shape, and relays carry the sender's tag.
+
+## What the ids are used for
+
+### Every request becomes an issue
+
+Cole asked, in these exact words, for "a github issue for anything i ask an agent to do". A scheduled job takes the
+verified prompts in
+batches, asks a cheap model which are requests worth tracking, and files or updates issues in Cole's private
+repositories. The model may choose the issue, but never the words: every quote is replaced by the record's own text,
+so an issue never contains the model's paraphrase of Cole. A word-for-word repeat becomes a comment, titles and bodies
+go through a secret redactor and a scanner, and every `@` gets a zero-width space so nobody is pinged by accident. A
+typical run costs under a cent.
+
+### Briefs and amendments
+
+When Cole changes a task mid-flight, the coordinator appends the change to the worker's brief as an amendment, never
+rewriting what was there:
+
+```markdown
+### A3, 2026-01-15T14:02Z, turn <turn id>
+Owner, verbatim: "<their exact words, nothing trimmed that changes the meaning>"
+Reading: <what changes in scope or constraints, one line>
+Supersedes: A1 (the line that said to skip the migration)
+```
+
+The turn id is the transcript record id of Cole's message. With it, anyone can open the original and read the
+conversation around it. The same format settles decisions ("D2 decided at this time, in this turn, in these words")
+and relays to workers who never hear Cole directly.
+
+### Handoffs
+
+When a session hands its work to a fresh one ([[handoff-chains]]), the brief's "What happened" section quotes the
+latest unfinished request word for word, and the tool records the session's first prompt. The prompt the successor
+starts with says, in so many words, that the handoff tool wrote it and no person typed it, so a successor never takes
+the summary for Cole's instructions.
+
+### The truth file
+
+Drover records every message it delivers as a `message` event with its own time-ordered id, the sender (`actor`),
+the target and how it was delivered. In the receiving Claude session the message arrives as a peer turn from
+`drover (<actor>)`, so the transcript says who relayed it. When a message reaches a handoff successor instead of the
+session it named, the event records that too. See [[agent-messaging]].
+
+### This wiki
+
+When Cole asked for this wiki, the coordinating session passed the request to its writers verbatim, each message with
+its timestamp and record id, and noted which sends were duplicates. The scope of every page here traces back to those
+records. See [[about-this-wiki]].
+
+## Why it matters
+
+<ColesTake>
+
+If an agent is going to act on something I said, it should quote me, not paraphrase me. A summary turns a preference
+into a rule, or a rule into a preference, and nobody can tell which happened.
+
+</ColesTake>
+
+- **Provenance.** "Cole said" and "an agent said Cole said" are different claims. The origin fields and the actor in
+  the truth file keep them apart, and Cole's rules say the owner's own words beat any relay of them.
+- **Fidelity.** A verbatim quote with an id can be checked; a paraphrase cannot.
+- **Context.** An id is a pointer back to the moment. The words before and after a request often matter as much as the
+  request.
+- **Dedupe.** The same sentence typed into two windows is one request, not two issues.
+
+## Doing it yourself
+
+You do not need Cole's whole pipeline to get most of the value:
+
+1. Keep transcripts. Claude Code deletes old ones after `cleanupPeriodDays`; Cole sets it high enough that they are
+   never deleted.
+2. When you write a brief or a decision log, paste the person's words verbatim with the UTC time and the record id.
+3. When a tool writes a prompt for an agent, have it say so in the prompt, so the agent never mistakes it for yours.
+4. If you want every prompt captured, a `UserPromptSubmit` hook that appends the payload to a file is a dozen lines.
+   Print nothing from it: that hook's standard output goes into the model's context.

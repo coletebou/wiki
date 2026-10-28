@@ -1,0 +1,240 @@
+---
+title: Hooks
+summary: >-
+  The shell commands Claude Code and Codex run at fixed points in a session: how Cole uses them to save what sessions
+  learn, capture every prompt, retry failed turns, report to Drover and steer handoffs.
+table: automata
+folio: 30
+aliases: [Claude Code hooks, Codex hooks]
+updated: 2026-10-28
+sources:
+  - title: Claude Code hooks reference
+    url: https://code.claude.com/docs/en/hooks
+  - title: Codex hooks
+    url: https://learn.chatgpt.com/docs/hooks
+  - title: Claude Code hooks, event by event (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/claude-hooks.md
+  - title: Agent memory (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/memory/README.md
+---
+
+Hooks are commands that [[claude-code|Claude Code]], and [[codex|Codex]], run at fixed points in a session's life:
+when it starts, when you submit a prompt, before and after each tool call, when a turn ends, before compaction, when
+the session closes. They are how Cole's [[agent-fleet|fleet]] does the things a model would forget to do. A hook saves
+what a session learned before compaction squashes it, grabs the exact text and id of every prompt Cole types, tells
+[[drover|Drover]] that a session is waiting for a human, retries a turn that died on an API error, and hands every
+subagent its rules.
+
+The model never has to remember any of it. That is the point.
+
+<Diagram name="agent-fleet" scene="hooks" />
+
+The diagram follows one session through its life. Each lifecycle event lights up with the hooks Cole runs there and
+where their output goes: back into the session's context, into the [[reflection-store|reflection store]], into
+Drover's truth file, or to tmux.
+
+## How hooks work
+
+Hooks live in Claude Code's settings files (user, project, local, managed, or inside a plugin or a skill), in three
+levels: an event, a matcher that filters when it fires, and one or more handlers to run. For example, this runs a
+script after every Bash command:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "bash ~/hooks/track-cwd.sh" }]
+      }
+    ]
+  }
+}
+```
+
+Each handler gets a JSON object on standard input with the common fields `session_id`, `transcript_path`, `cwd` and
+`hook_event_name`, plus whatever that event adds (the prompt for `UserPromptSubmit`, the tool and its input for
+`PreToolUse`, the error for `StopFailure`). What a hook can do depends on the event:
+
+- **Exit code 2 blocks** on events that can be blocked: a `PreToolUse` hook stops a tool call, a `UserPromptSubmit`
+  hook rejects the prompt, a `Stop` hook keeps the agent working. The hook's stderr becomes the reason.
+- **`additionalContext`** inside `hookSpecificOutput` adds text to the model's context as a system reminder: at the
+  start of the conversation for `SessionStart` and `SubagentStart`, next to the prompt for `UserPromptSubmit`.
+- **`systemMessage`** shows a line to the human without telling the model anything.
+- **`async: true`** runs the hook in the background; **`asyncRewake: true`** runs it in the background and wakes the
+  session when it exits with code 2.
+
+The [official reference](https://code.claude.com/docs/en/hooks) lists more than thirty events. Cole's setup uses
+about a dozen of them.
+
+## What runs, event by event
+
+| Event | Hook | What it does |
+|---|---|---|
+| `SessionStart` | load memory | Prints the repo's session handoff, lists its memory files, and shows the open items from the [[reflection-store]]. Runs again after `/compact` and `/clear`. |
+| `SessionStart` (async) | branch reopen | After `/branch`, reopens the original conversation in a new tmux window. |
+| `SessionStart` | Drover brief | A few lines from the local Drover daemon: who is waiting on Cole, who is working, which hosts are unreachable. |
+| `UserPromptSubmit` | window name | Renames the [[tmux]] window to the session's `/rename` title. |
+| `UserPromptSubmit`, `PostToolBatch` | context advisor | Watches the context window; starts background reflections and suggests a fresh session at the right moment. |
+| `UserPromptSubmit` | request capture | Spools the prompt, with where it came from, for later processing. See [[message-ids]]. |
+| `UserPromptSubmit` | issue focus | Remembers which issue the session is about, for the [[claude-code-status-line\|status line]]'s link. |
+| `UserPromptExpansion`, `PreToolUse` | handoff record | When `/handoff` runs, adds one step: record the handoff as an open item (see [[handoff-chains]]). |
+| `PreToolUse` (`Bash`) | merge gate | Blocks `gh pr merge` while reviewer-bot findings on the head commit are unanswered (see [[git]]). |
+| `PostToolUse` (`Bash`) | track cwd | Records a `cd` into another checkout, so the status line shows where work really happens. |
+| `Notification` | event log, Drover notify | Logs permission prompts and idle prompts, and tells Drover the session is waiting, with its question. |
+| `SubagentStart` | leaf-worker contract | Hands every subagent the same rules. |
+| `Stop` | name, timestamp, nudge, streak reset | Keeps the window name current, prints a timestamp, asks a judge whether the agent quit early, clears an API-error streak. |
+| `StopFailure` (asyncRewake) | API error recovery | Waits, then wakes the session to retry a turn that died on a transient error. |
+| `PreCompact` | reflector | Reflects the transcript into the reflection store before compaction. |
+| `SessionEnd` | reflector, Langfuse | A last reflection, and the finished transcript sent to [[langfuse\|Langfuse]] as one trace (see [[observability]]). |
+
+The public versions of most of these are in [dx's `base/claude/`](https://github.com/coletebou/dx/tree/master/base/claude),
+with an [event-by-event map](https://github.com/coletebou/dx/blob/master/docs/claude-hooks.md).
+
+## Auto reflection and compaction
+
+Compaction summarizes a long conversation to keep it going. It is not written to keep what the session learned,
+decided or left open, and a compacted session loses the exact ids it needs next (run ids, PR numbers, background
+task ids). Three hooks work together so that nothing important depends on the summary:
+
+1. **The context advisor** runs on every prompt and before every model call (`PostToolBatch`). It reads the exact
+   token count from a small sensor file the status line writes, so below 100k tokens it exits after one `jq` read and
+   costs nothing. As the window fills it starts staged background reflections: a cheap Haiku pass at 20% of the model
+   window and Sonnet passes at 40, 60 and 80%. At 70% and 85% of an advisory budget it asks a small judge model
+   whether this is a natural stopping point, and if so injects a short recommendation to
+   [[handoff-chains|hand off to a fresh session]].
+2. **The reflector** runs at those stages, at `PreCompact` and at `SessionEnd`. It validates its input, double-forks
+   and returns in about 50 milliseconds, so compaction never waits. In the background it condenses the transcript
+   since its last run (prompts, assistant text, tool calls and errors; tool output dropped), shows a model the
+   repo's related open items with their ids, and applies the reply: close what the excerpt settled, add what is new,
+   and keep one rolling summary note per session.
+3. **The load-memory hook** runs at `SessionStart`, including the start that follows a compaction, and puts the repo's
+   open items back in front of the model.
+
+The details are on [[reflection-store]] and [[context-and-compaction]].
+
+## Grabbing the exact message
+
+Every prompt Cole types passes through a `UserPromptSubmit` hook that writes the whole hook payload (session id,
+prompt, transcript path, working directory) plus the machine, the tmux pane and the entry point to a local spool
+file. It does no parsing, no network call and no model call, and takes a few milliseconds. A dot-file is renamed into
+place, so a reader never sees half a record, and headless `claude -p` runs and the hooks' own model calls are
+skipped.
+
+Later, a collector joins each spooled prompt with its record in the session transcript, where Claude Code labels who
+made the turn: a person typing, another session, a scheduled task or the system. Only what a person typed counts.
+[[message-ids]] explains why that matters and what is built on it.
+
+## Talking to Drover
+
+Two hooks connect every session to the control plane over loopback, each with a one or two second cap and silence
+when the daemon is down:
+
+- At `SessionStart`, a brief from the daemon's warm cache: how many sessions are waiting on Cole (and which), how
+  many are working or idle, across how many hosts, and which tools exist. A new session starts oriented.
+- On `Notification` (a permission prompt, an idle prompt, an elicitation), a `notify` event appended to Drover's truth
+  file, so the board moves the session to "Waiting on you" with its actual question, and the phone and the watch can
+  buzz.
+
+See [[drover]] and [[agent-messaging]].
+
+## API error recovery
+
+Claude Code retries every API request itself. `StopFailure` fires once, after that inner loop gives up, and Claude
+Code ignores what a `StopFailure` hook prints. The one way back in is `asyncRewake`: a background hook that exits
+with code 2 wakes the session, even when it is idle, and its stderr arrives as feedback. Cole's hook uses that to add
+the outer loop:
+
+| Error class | Action |
+|---|---|
+| Transient (overloaded, server errors, plain rate limits) | Back off 15 s, doubling to a 10-minute cap with jitter, then wake and retry; alert at attempt 5, diagnose at 8, stop at 10 |
+| Output too long | Two wakes asking for smaller pieces |
+| Configuration (unknown model, bad request) | No blind retry; start a diagnostic agent at once and alert |
+| Auth, quota, billing, safety flags, context too long | Alert once, with the command a human must run |
+
+The diagnostic agent is Codex when it is installed, because a different provider still works during an Anthropic
+outage. Every failure writes a fresh token to the streak's state file, so a sleeping retry exits quietly if a later
+turn succeeded, a newer failure took over, or Cole typed a new prompt. The `timeout` in the settings is 900 seconds,
+above the backoff cap, so the wait is never killed halfway.
+
+## The nudge and the subagent contract
+
+A common failure is the agent that says "next I'll do X" and then ends its turn. A `Stop` hook sends the turn's final
+state to Jev, a small judge model from TypeSafe trained for calibrated yes or no answers, and asks whether a gentle
+nudge would help the agent finish the request it already has. When the probability clears a threshold, the hook
+blocks the stop with a one-line nudge. It nudges at most three times per prompt, and a high probability that the
+agent is waiting on Cole vetoes it.
+
+The `SubagentStart` hook is the simplest one Cole runs, and one of the most useful. It injects one paragraph into
+every subagent:
+
+```sh
+jq -nc '{hookSpecificOutput: {hookEventName: "SubagentStart", additionalContext: (
+  "This agent runs as a subagent of a coordinating Claude Code session. Complete the assignment " +
+  "directly and return concrete results: file paths with line numbers, commands run with their " +
+  "output, what was verified and what could not be. Start further subagents only when this " +
+  "agent'"'"'s own instructions call for it. When naming code as a cause, state whether it was " +
+  "read or run.")}}'
+```
+
+## How Cole writes hooks
+
+A hook runs inside every session on every machine, so a bad one hurts everything at once. The rules Cole's hooks
+follow:
+
+- **Fail open.** A hook whose own helper is missing or broken exits 0 with no output. The only deliberate exit 2 is
+  the API recovery hook, where exit 2 is the mechanism.
+- **Make the common case free.** `PostToolBatch` runs before every model call. The context advisor's wrapper decides
+  in shell, with one small file read, whether Python needs to start at all.
+- **Detach heavy work.** Anything slow double-forks into its own session and returns in milliseconds. `SessionEnd`
+  in particular has a budget of about a second and a half.
+- **Never recurse.** Every model call a hook makes runs with `AGENT_HOOK_CHILD=1`, and the hooks that could start one
+  check for it, so a reflection never reflects on itself.
+- **Mind what you print.** `UserPromptSubmit` stdout goes into the model's context. Hooks that should be invisible
+  print nothing.
+- **Keep notes out of the keys.** The settings schema enumerates the event names, and one unknown key invalidates the
+  whole file, so the explanations live in a `"//"` array beside the hooks.
+- **Test them hermetically.** The larger hooks have test suites with temporary directories, fake servers and no real
+  agents.
+
+<ColesTake>
+
+Every hook I run fails open. A gate that blocks a session because of its own bug trains you, and the agents, to turn
+it off, and then you have nothing.
+
+</ColesTake>
+
+## Codex runs the same hooks
+
+Codex reads hooks from `~/.codex/hooks.json` (or `[hooks]` tables in `config.toml`) with a similar JSON contract, and
+Cole points it at the same scripts: the window name, the timestamp, the nudge, the reflector at `PreCompact` and
+`SessionEnd`, a Codex mode of the context advisor, and a `SessionStart` hook that hands the session the repo's open
+reflection items as `additionalContext`. Codex asks you to review and trust new or changed hooks in its `/hooks` menu
+before they run, so every machine needs that one visit after a hook changes. See [[codex]].
+
+## Writing your own
+
+Start with something harmless and visible: a `Stop` hook that prints the time, so a long scrollback shows when each
+answer came. Cole's is three lines:
+
+```sh
+now=$(date -u '+%a %m-%d %H:%M:%SZ')
+printf '{"systemMessage": "⏱ %s"}\n' "$now"
+exit 0
+```
+
+Then the gotchas:
+
+- **The transcript lags.** It is written asynchronously, so on `Stop` read `last_assistant_message` from the input
+  instead of the end of the transcript.
+- **Hooks cannot edit history.** There is no API to compact, clear or rewrite a live conversation. A hook can save
+  what matters and put a choice in front of the model and the human; that is all.
+- **Check the variables you read.** One project hook Cole found read an environment variable Claude Code never sets,
+  so it had never run once. Test a hook by making it fire, not by reading it.
+- **A hook in project settings runs for everyone.** Keep personal hooks in user settings and repository hooks in the
+  repository.
+- **`/hooks` shows what loaded.** When a hook seems not to fire, look there first.
+
+Ideas Cole has mapped but not built show where hooks could go next: a `PostToolUseFailure` thrash detector that
+notices the same command failing three times, a `SubagentStop` gate that asks whether the subagent did the work or
+returned a plan, and a `TaskCompleted` gate that asks for evidence of verification before a task closes.

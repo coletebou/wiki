@@ -1,0 +1,143 @@
+// Two more node-and-flow studies drawn by InkMap: the observability path and the Cloudflare front door. Facts follow
+// the pages they illustrate (observability, langfuse, sentry, datadog, s3-and-glacier, cloudflare-front-door).
+import type { FNode, Scene } from './agent-fleet';
+
+const obsNodes: FNode[] = [
+  { id: 'src-agents', kind: 'box', x: 14, y: 40, w: 168, h: 66, label: 'Agent sessions', sub: 'Mac mini and servers', info: 'Claude Code exports OpenTelemetry itself: metrics, events and, in beta, traces, with a span per model call, tool call and hook. Content switches stay off.' },
+  { id: 'src-apps', kind: 'box', x: 14, y: 140, w: 168, h: 66, label: 'Apps and bots', sub: 'production, on AWS', info: 'Model calls, errors and logs from the production apps and bots.' },
+  { id: 'src-front', kind: 'box', x: 14, y: 240, w: 168, h: 66, label: 'Frontends', sub: 'on Vercel', info: 'Browser errors and releases, with source maps uploaded at build time.' },
+  { id: 'src-hosts', kind: 'box', x: 14, y: 340, w: 168, h: 66, label: 'The servers', sub: 'hosts, services, jobs', info: 'Host metrics, logs, systemd services and scheduled jobs.' },
+  { id: 'p-otel', kind: 'box', x: 248, y: 40, w: 196, h: 66, label: 'OTel Collector', sub: 'rename, route, allowlist', info: 'Receives OTLP, renames Claude Code’s token counts to the GenAI names Langfuse prices from, passes each client’s credentials through, and applies a stricter allowlist to production traffic.' },
+  { id: 'p-sdk', kind: 'box', x: 248, y: 140, w: 196, h: 66, label: 'SDKs', sub: 'Langfuse, Sentry', info: 'Each app sets the session and user on its traces, so cost splits per conversation and per customer.' },
+  { id: 'p-int', kind: 'box', x: 248, y: 240, w: 196, h: 66, label: 'Integrations', sub: 'Sentry for Vercel', info: 'Sentry’s Vercel integration wires the DSN and uploads source maps on every build.' },
+  { id: 'p-host', kind: 'box', x: 248, y: 340, w: 196, h: 66, label: 'Host agents, archive jobs', sub: 'metrics, logs, backups', info: 'Each server reports host metrics and logs; daily jobs make encrypted backups and move cold folders to Glacier.' },
+  { id: 's-langfuse', kind: 'store', x: 508, y: 40, w: 190, h: 66, label: 'Langfuse', sub: 'traces and their cost', info: 'What the model saw and said, how long it took, what it cost: a Claude Code project beside each production project.' },
+  { id: 's-sentry', kind: 'store', x: 508, y: 140, w: 190, h: 66, label: 'Sentry', sub: 'errors, uptime, crons', info: 'What broke, for whom, in which release; plus uptime checks from several regions and cron check-ins.' },
+  { id: 's-datadog', kind: 'store', x: 508, y: 240, w: 190, h: 66, label: 'Datadog', sub: 'host metrics and logs', info: 'Is the server healthy, and what did its logs say before it went wrong.' },
+  { id: 's-s3', kind: 'store', x: 508, y: 340, w: 190, h: 66, label: 'S3 and Glacier', sub: 'the record, years on', info: 'Live objects and state in S3; backups and cold archives in Glacier, Deep Archive at about a dollar per terabyte per month.' },
+  { id: 'person', kind: 'box', x: 724, y: 140, w: 66, h: 166, label: 'Cole', sub: 'alerts', info: 'A short list: new or escalating errors, an endpoint down, a missed job, a dead service, a silent backup, spending, an agent waiting.' },
+];
+
+export const OBSERVABILITY: Scene[] = [
+  {
+    id: 'path',
+    name: 'The path',
+    motto: 'de fluminibus',
+    mottoAt: { x: 786, y: 462, anchor: 'end' },
+    intro: 'Sources on the left, pipes in the middle, stores on the right, and the few alerts that reach a person. Follow any one signal: it ends in one place, never two.',
+    nodes: obsNodes,
+    flows: [
+      { id: 'o-otlp', from: 'src-agents', to: 'p-otel', label: 'OTLP' },
+      { id: 'o-lf1', from: 'p-otel', to: 's-langfuse', label: 'Claude Code project' },
+      { id: 'o-calls', from: 'src-apps', to: 'p-sdk', label: 'model calls, errors' },
+      { id: 'o-lf2', from: 'p-sdk', to: 's-langfuse', bend: -12, label: 'app projects' },
+      { id: 'o-err', from: 'p-sdk', to: 's-sentry', label: 'exceptions' },
+      { id: 'o-front', from: 'src-front', to: 'p-int', label: 'errors, releases' },
+      { id: 'o-maps', from: 'p-int', to: 's-sentry', bend: 12, label: 'source maps' },
+      { id: 'o-host', from: 'src-hosts', to: 'p-host', label: 'metrics, logs' },
+      { id: 'o-dd', from: 'p-host', to: 's-datadog', bend: 12, label: 'host data' },
+      { id: 'o-arch', from: 'p-host', to: 's-s3', label: 'backups, cold folders' },
+      { id: 'o-alert1', from: 's-sentry', to: 'person', label: 'issues, uptime' },
+      { id: 'o-alert2', from: 's-datadog', to: 'person', bend: -10, label: 'health' },
+    ],
+    steps: [
+      { title: 'The agents', text: 'Claude Code sends OpenTelemetry to a collector, which renames token counts and routes it to the Claude Code project in Langfuse. The spans carry structure, timing, models and tokens, not the conversation.', on: ['src-agents', 'p-otel', 's-langfuse'], flows: ['o-otlp', 'o-lf1'] },
+      { title: 'Production model calls', text: 'Each app’s model calls go to its own Langfuse project, with the session and user set, so cost splits per conversation.', on: ['src-apps', 'p-sdk', 's-langfuse'], flows: ['o-calls', 'o-lf2'] },
+      { title: 'Errors', text: 'Exceptions go to Sentry from each SDK, with releases; frontends get it through Sentry’s Vercel integration, source maps included.', on: ['src-apps', 'src-front', 'p-sdk', 'p-int', 's-sentry'], flows: ['o-err', 'o-front', 'o-maps'] },
+      { title: 'The servers', text: 'Host metrics and logs go to Datadog; services that die call a human through systemd’s OnFailure hook.', on: ['src-hosts', 'p-host', 's-datadog'], flows: ['o-host', 'o-dd'] },
+      { title: 'The archive', text: 'Daily encrypted backups go offsite, a second copy of the ones that matter to Glacier, and cold folders to Deep Archive.', on: ['src-hosts', 'p-host', 's-s3'], flows: ['o-host', 'o-arch'] },
+      { title: 'A person', text: 'Only a few things page Cole: new or escalating errors, an endpoint down, a missed job, a dead service, a silent backup, spending, an agent waiting. Everything else is a dashboard.', on: ['s-sentry', 's-datadog', 'person'], flows: ['o-alert1', 'o-alert2'] },
+    ],
+  },
+];
+
+const door = (extra: FNode[] = []): FNode[] => [
+  { id: 'visitor', kind: 'box', x: 14, y: 196, w: 112, h: 70, label: 'A visitor', sub: 'a browser, a bot', info: 'Anyone asking for a name Cole runs.' },
+  { id: 'dns', kind: 'box', x: 160, y: 40, w: 150, h: 62, label: 'DNS', sub: 'a record at Cloudflare', info: 'A proxied record resolves to Cloudflare’s addresses, never the server’s.' },
+  { id: 'edge', kind: 'frame', x: 150, y: 128, w: 430, h: 250, label: 'Cloudflare’s edge' },
+  { id: 'tls', kind: 'box', x: 170, y: 170, w: 124, h: 62, label: 'TLS · DDoS', sub: 'always on', info: 'TLS ends here with a certificate Cloudflare issues and renews; DDoS protection is always on.' },
+  { id: 'custom', kind: 'box', x: 310, y: 170, w: 120, h: 62, label: 'Custom rules', sub: 'block, skip', info: 'The zone’s own rules, first: block a path, challenge a country, skip a provider’s webhook past the later stops.' },
+  { id: 'rate', kind: 'box', x: 444, y: 170, w: 120, h: 62, label: 'Rate limits', sub: 'per client', info: 'Too many requests from one client in a window, and it is blocked or challenged.' },
+  { id: 'managed', kind: 'box', x: 310, y: 256, w: 120, h: 62, label: 'Managed rules', sub: 'Cloudflare’s', info: 'Cloudflare’s own rule sets for common attacks.' },
+  { id: 'bots', kind: 'box', x: 444, y: 256, w: 120, h: 62, label: 'Bot Fight Mode', sub: 'Super, on Pro', info: 'On a Pro zone, Super Bot Fight Mode decides per request whether it looks automated, and challenges or blocks it.' },
+  { id: 'access', kind: 'box', x: 170, y: 256, w: 124, h: 62, label: 'Access', sub: 'private names', info: 'A private hostname asks for a login (GitHub, Google or a one-time PIN) before anything reaches the server; machines show a service token.' },
+  { id: 'srv', kind: 'frame', x: 600, y: 128, w: 186, h: 250, label: 'AWS server' },
+  { id: 'tunnel', kind: 'box', x: 614, y: 170, w: 158, h: 62, label: 'cloudflared', sub: 'outbound only', info: 'The server keeps outbound connections to Cloudflare open and requests come back down them: no inbound ports, and the address stays private.' },
+  { id: 'origin', kind: 'box', x: 614, y: 256, w: 158, h: 62, label: 'nginx, the app', sub: 'on 127.0.0.1', info: 'The service listens on loopback only. Cole administers the box over Tailscale and SSH, never the public internet.' },
+  ...extra,
+];
+
+export const FRONT_DOOR: Scene[] = [
+  {
+    id: 'server',
+    name: 'To a server',
+    motto: 'de portis',
+    intro: 'One request from a visitor to a service on a server, one stop at a time. Step through it.',
+    nodes: door(),
+    flows: [
+      { id: 'd-dns', from: 'visitor', to: 'dns', bend: 20, label: 'resolve' },
+      { id: 'd-edge', from: 'visitor', to: 'tls', bend: -10, label: 'connect' },
+      { id: 'd-1', from: 'tls', to: 'custom' },
+      { id: 'd-2', from: 'custom', to: 'rate' },
+      { id: 'd-3', from: 'rate', to: 'managed', bend: 10 },
+      { id: 'd-4', from: 'managed', to: 'bots' },
+      { id: 'd-5', from: 'bots', to: 'access', bend: -46, label: 'private name?' },
+      { id: 'd-6', from: 'bots', to: 'tunnel', bend: -10, label: 'down the tunnel' },
+      { id: 'd-7', from: 'tunnel', to: 'origin', label: 'loopback' },
+    ],
+    steps: [
+      { title: 'DNS', text: 'The name is a proxied record at Cloudflare, so it resolves to Cloudflare’s addresses, not the server’s.', on: ['visitor', 'dns'], flows: ['d-dns'] },
+      { title: 'The edge', text: 'The visitor connects to Cloudflare. TLS ends here, with a certificate Cloudflare issues and renews; DDoS protection is always on.', on: ['visitor', 'tls'], flows: ['d-edge'] },
+      { title: 'The rules, in order', text: 'Custom rules, then rate limiting, then the managed rules, then Super Bot Fight Mode. A block or a challenge at any stop ends the request there.', on: ['custom', 'rate', 'managed', 'bots'], flows: ['d-1', 'd-2', 'd-3', 'd-4'] },
+      { title: 'Access', text: 'For a private hostname only: a login before any request reaches the server. Machines present a service token instead.', on: ['access'], flows: ['d-5'] },
+      { title: 'The tunnel', text: 'The request rides down one of the outbound connections cloudflared keeps open. The server has no inbound ports at all.', on: ['tunnel'], flows: ['d-6'] },
+      { title: 'The origin', text: 'The tunnel maps the hostname to a port on 127.0.0.1, where nginx or the service answers.', on: ['tunnel', 'origin'], flows: ['d-7'] },
+    ],
+  },
+  {
+    id: 'bot',
+    name: 'A bot',
+    motto: 'de custodibus',
+    intro: 'The same front door, met by a scraper or a credential-stuffing script. It never reaches the server.',
+    nodes: door([{ id: 'stop', kind: 'tab', x: 444, y: 404, w: 120, h: 34, label: 'challenged', info: 'A managed challenge or a block: the request ends at the edge.' }]),
+    flows: [
+      { id: 'b-dns', from: 'visitor', to: 'dns', bend: 20, label: 'resolve' },
+      { id: 'b-edge', from: 'visitor', to: 'tls', bend: -10 },
+      { id: 'b-1', from: 'tls', to: 'custom' },
+      { id: 'b-2', from: 'custom', to: 'rate', label: 'many requests' },
+      { id: 'b-3', from: 'rate', to: 'managed', bend: 10 },
+      { id: 'b-4', from: 'managed', to: 'bots' },
+      { id: 'b-stop', from: 'bots', to: 'stop', label: 'looks automated', dashed: true },
+    ],
+    steps: [
+      { title: 'It arrives like anyone', text: 'A bot resolves the same name and reaches the same edge.', on: ['visitor', 'dns', 'tls'], flows: ['b-dns', 'b-edge'] },
+      { title: 'Rate limited', text: 'Hammering one path from one client trips the rate limit, which blocks or challenges it for a while.', on: ['custom', 'rate'], flows: ['b-1', 'b-2'] },
+      { title: 'Seen for what it is', text: 'What gets past the rules meets Super Bot Fight Mode, which scores each request and challenges what looks automated.', on: ['managed', 'bots'], flows: ['b-3', 'b-4'] },
+      { title: 'Stopped at the edge', text: 'The challenge ends it. The server never saw the request, and could not have: it has no public address to try.', on: ['bots', 'stop'], flows: ['b-stop'] },
+    ],
+  },
+  {
+    id: 'vercel',
+    name: 'To Vercel',
+    motto: 'de via brevi',
+    intro: 'Frontends on Vercel take a shorter path: a DNS-only record points straight at Vercel, which serves the site and manages its own certificates.',
+    nodes: [
+      ...door().filter((n) => ['visitor', 'dns'].includes(n.id)),
+      { id: 'vercel', kind: 'frame', x: 420, y: 150, w: 360, h: 220, label: 'Vercel' },
+      { id: 'cdn', kind: 'box', x: 444, y: 196, w: 150, h: 62, label: 'Its edge', sub: 'TLS, cache', info: 'Vercel issues and renews the certificate for a DNS-only name, and serves the built site from its CDN.' },
+      { id: 'deploy', kind: 'box', x: 610, y: 196, w: 150, h: 62, label: 'The deployment', sub: 'production', info: 'The latest production deployment of the project; previews live at their own URLs.' },
+      { id: 'git', kind: 'box', x: 444, y: 286, w: 316, h: 56, label: 'A push to master', sub: 'builds, checks, promotes', info: 'Every push builds; a pull request gets a preview; the production branch becomes production.' },
+    ],
+    flows: [
+      { id: 'v-dns', from: 'visitor', to: 'dns', bend: 20, label: 'DNS only' },
+      { id: 'v-go', from: 'visitor', to: 'cdn', bend: -20, label: 'straight to Vercel' },
+      { id: 'v-serve', from: 'cdn', to: 'deploy' },
+      { id: 'v-build', from: 'git', to: 'deploy', bend: -20, label: 'deploys' },
+    ],
+    steps: [
+      { title: 'DNS only', text: 'The record is a CNAME to Vercel with Cloudflare’s proxy off, a grey cloud, so it resolves to Vercel itself.', on: ['visitor', 'dns'], flows: ['v-dns'] },
+      { title: 'Vercel’s edge', text: 'Vercel terminates TLS with a certificate it issues and renews, and serves the site from its CDN.', on: ['visitor', 'cdn', 'deploy'], flows: ['v-go', 'v-serve'] },
+      { title: 'Where the site comes from', text: 'Each push builds a deployment; pull requests get previews, and the production branch is production. This wiki is one of them.', on: ['git', 'deploy'], flows: ['v-build'] },
+    ],
+  },
+];

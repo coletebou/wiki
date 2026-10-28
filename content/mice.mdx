@@ -1,0 +1,94 @@
+---
+title: "Mice: MX Master and Magic Mouse"
+summary: >-
+  The two mice Mac users usually choose between, and Cole's verdicts: the Logitech MX Master is the all-time GOAT, and
+  Apple's Magic Mouse is kinda sick and kinda sucks. What each does well, and the scroll settings that matter.
+table: desk
+folio: 6
+aliases: [mx master, magic mouse, mouse]
+updated: 2026-10-28
+sources:
+  - title: MX Master 4 (Logitech)
+    url: https://www.logitech.com/en-us/shop/p/mx-master-4
+  - title: Magic Mouse (Apple)
+    url: https://www.apple.com/shop/product/MXK53AM/A/magic-mouse-white-multi-touch-surface
+  - title: New USB-C Magic Mouse still has the charging port on the bottom (9to5Mac)
+    url: https://9to5mac.com/2024/10/28/usb-c-magic-mouse-charging-port-bottom/
+  - title: Mos, smooth scrolling for macOS
+    url: https://github.com/Caldis/Mos
+  - title: Ghostty config reference, mouse-scroll-multiplier
+    url: https://ghostty.org/docs/config/reference
+---
+
+Most Mac users end up choosing between two mice: Logitech's MX Master, built for long days of work, and Apple's Magic
+Mouse, built to look like it belongs next to a Mac. Cole has used both and has a verdict on each. The MX Master is the
+one on the desk.
+
+## The Logitech MX Master
+
+<ColesTake>
+
+The MX Master is the all-time GOAT.
+
+</ColesTake>
+
+The MX Master line is Logitech's flagship productivity mouse, a popular pick for long days at a desk. The current model is the MX Master 4 (<Price id="mx-master" />). What makes the line good:
+
+- **The MagSpeed wheel.** An electromagnetic scroll wheel that switches between a precise, clicky ratchet and a
+  free-spinning mode Logitech rates at 1,000 lines per second. A long log, a transcript or a big file flies by with one
+  flick, then the ratchet comes back for line-by-line work.
+- **A thumb wheel.** A second wheel under your thumb scrolls sideways, through wide tables, timelines and code that
+  runs off the screen.
+- **A shape for a whole day.** A sculpted, right-handed body with a thumb rest, so the hand rests on the mouse instead
+  of gripping it.
+- **A sensor that works anywhere.** 8,000 DPI tracking that works on almost any surface, glass included.
+- **Several computers, one mouse.** It pairs with more than one device and switches between them with a button, the
+  same idea as the tri-mode [[mechanical-keyboard|keyboard]], over Bluetooth or a USB receiver.
+- **Buttons per app.** Logitech's Options+ app remaps the buttons and gestures, differently for each app if you like.
+
+The MX Master 4 adds a haptic panel under the thumb, which taps back on actions like snapping a window into place, and
+an "Actions Ring" of shortcuts that opens at the cursor.
+
+## Apple's Magic Mouse
+
+<ColesTake>
+
+The Magic Mouse is kinda sick and kinda sucks.
+
+</ColesTake>
+
+The Magic Mouse (<Price id="magic-mouse" />) has no wheel and no visible buttons: its whole top is a Multi-Touch
+surface. That is the "sick" side, the reason people love it. You scroll in any direction by sliding a finger, swipe
+between pages with one finger and between full-screen apps with two, and pairing it is as simple as plugging it into
+the Mac once.
+
+The "sucks" side is just as well known:
+
+- **The charging port is on the bottom.** The 2024 model moved to USB-C but kept the port underneath, so you cannot
+  use it while it charges.
+- **It is flat.** The low, smooth shell is beautiful and not built for hours of gripping.
+- **No wheel and no extra buttons.** No middle click, no thumb buttons, no free-spinning scroll for a long file.
+
+For a lot of people the answer is a Magic Trackpad for gestures and a wheel mouse for work.
+
+## Scroll settings that matter
+
+A mouse wheel and a trackpad scroll differently, and Cole's setup tunes for that in three places:
+
+- **Mos.** Cole's [[homebrew|Brewfile]] installs [Mos](https://github.com/Caldis/Mos), a free menu bar app that turns
+  a wheel's notched steps into smooth scrolling on macOS and lets the mouse's scroll direction differ from the
+  trackpad's. macOS ties the two together with a single "natural scrolling" switch.
+- **The terminal.** Cole's [[ghostty|Ghostty]] config sets `mouse-scroll-multiplier = 0.3`, slowing wheel scrolling
+  in the terminal well below Ghostty's default of 3 for a notched wheel.
+- **tmux.** The [[tmux-keymap#the-mouse|tmux keymap]] deliberately inverts the wheel inside tmux, to match how
+  [[termius]] on the phone sends scroll events, and enters scrollback with a flick of the wheel.
+
+## Choosing
+
+- **Long days of code, logs and agents:** an MX Master. The free-spinning wheel alone is worth it for scrolling
+  through agent transcripts.
+- **Gestures and a clean desk:** a Magic Mouse, or better, a Magic Trackpad.
+- **Moving between computers:** a mouse that pairs with several and switches with a button, paired with a keyboard
+  that does the same.
+
+The [[mac-mini]] page covers the machine they are plugged into.

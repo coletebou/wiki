@@ -1,0 +1,235 @@
+---
+title: Tailscale
+summary: >-
+  Tailscale puts every machine on one private network: the Mac mini, the phone, the AWS servers. Stable names, no open
+  ports, SSH that just works. How it works, Cole's policy rules and gotchas, and what the plans really include.
+table: shell
+folio: 26
+aliases: [tailnet, magicdns]
+updated: 2026-10-28
+sources:
+  - title: What is Tailscale? (Tailscale docs)
+    url: https://tailscale.com/kb/1151/what-is-tailscale
+  - title: How Tailscale works (Tailscale blog)
+    url: https://tailscale.com/blog/how-tailscale-works
+  - title: Tailscale pricing
+    url: https://tailscale.com/pricing
+  - title: Tailscale pricing changes, April 2026 (Tailscale blog)
+    url: https://tailscale.com/blog/pricing-v4
+  - title: Tailscale SSH (Tailscale docs)
+    url: https://tailscale.com/kb/1193/tailscale-ssh
+  - title: Tags (Tailscale docs)
+    url: https://tailscale.com/kb/1068/tags
+  - title: Key expiry (Tailscale docs)
+    url: https://tailscale.com/kb/1028/key-expiry
+  - title: Tailscale Serve (Tailscale docs)
+    url: https://tailscale.com/kb/1312/serve
+  - title: A personal fleet over Tailscale (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/infra/tailscale.md
+---
+
+Tailscale puts every machine you own on one private network, wherever each one happens to be: the
+[[mac-mini|Mac mini]] at home, the phone on cellular, the AWS [[servers]]. Every machine gets a stable private address
+and a short name, nothing has to be exposed to the internet, and [[ssh|SSH]] between any two of them just works. Cole
+asked for this page to explain why Tailscale is awesome, and the short version is that it makes a scattered set of
+machines behave like one desk.
+
+<ColesTake>
+
+Tailscale is awesome. The free plan is good for most people.
+
+</ColesTake>
+
+## How it works
+
+Tailscale builds a mesh network, which it calls a **tailnet**, on top of
+[WireGuard](https://www.wireguard.com/), an open source encrypted tunnel protocol. Three parts do the work:
+
+- **A coordination server.** Tailscale's servers act as "a shared drop box for public keys" and hold your access policy.
+  Every device logs in through your identity provider (Google, GitHub, Microsoft and others), and the coordination
+  server tells each device the public keys and addresses of the peers it may talk to. In the words of Tailscale's own
+  explanation, this control plane "carries virtually no traffic".
+- **Direct, encrypted connections.** Traffic flows peer to peer over WireGuard, encrypted end to end, and works through
+  home routers, firewalls and NAT "without requiring port forwarding or complex firewall rules".
+- **Relays as a fallback.** Some networks block the UDP traffic WireGuard needs. Then traffic goes through Tailscale's
+  DERP relays, which only pass along already-encrypted packets: "there is never a way for a DERP server to decrypt your
+  traffic".
+
+Each device also gets a name through **MagicDNS**, on by default for tailnets created since October 2022. You type the
+machine's short name, `box-a`, and it resolves to its tailnet address from anywhere on the tailnet.
+
+## Why it fits this setup
+
+- **No open ports.** Servers accept SSH only on their Tailscale interface, so port 22 is closed to the internet
+  entirely. There is nothing to scan and nothing to brute-force.
+- **One name everywhere.** Every alias in `~/.ssh/config` points at a MagicDNS name, so the same `ssh box-a` works on
+  home Wi-Fi, on a train and from the phone. Machines move between networks; their names do not.
+- **The phone is a peer.** With the Tailscale app on the phone, [[termius]] reaches the Mac mini and every server
+  directly, and [[screens-5|Screens 5]] reaches the Mac's screen.
+- **Everything else rides on it.** [[dotfiles|dotsync]] fans out to every machine, [[handoff-chains|handoffs]] move
+  agent sessions between machines, the login dashboard gathers every machine's status and [[drover]] steers agents
+  across the fleet, all over SSH to tailnet names.
+
+## The pieces
+
+| Piece | What it gives you | Where it lives |
+|---|---|---|
+| The tailnet | A private address for every machine, reachable from every other machine on it | The Tailscale client on each device |
+| MagicDNS | A short name per machine, plus a full name under your tailnet's DNS domain | The admin console's DNS page |
+| The policy file | Who may reach what: groups of people, tags for machines, network and SSH rules, tests | The admin console, or the API from a private repository |
+| `~/.ssh/config` | One alias per machine, the names scripts call | Your private dotfiles, or `~/.ssh/config.local` |
+
+## Joining a machine
+
+Personal devices join by logging in to the app. Servers join with an auth key, made in the admin console with the
+machine's tag already on it: pre-approved if device approval is on, reusable only if you will join several machines
+with it, and ephemeral for [[github-actions|CI runners]] and containers, which are removed once they go offline. On
+the server:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo install -m 600 /dev/null /etc/tailscale-authkey
+sudoedit /etc/tailscale-authkey                           # paste the key, save
+sudo tailscale up --auth-key=file:/etc/tailscale-authkey --advertise-tags=tag:server \
+  --hostname=box-a
+sudo rm /etc/tailscale-authkey
+tailscale status --json | jq '.Self.Tags'                 # must print ["tag:server"]
+```
+
+Passing the key as `file:` keeps it out of the process list and your shell history. The last line matters most. An
+interrupted `tailscale up`, from a dropped SSH session for example, can leave a machine authorized but without its
+tag, and under a policy that grants access by tag, every connection to it then fails with nothing more than "access
+revoked". Check the tag right after joining; the fix, if needed, is one edit in the admin console.
+
+**Key expiry.** Node keys expire, 180 days by default, and a server whose key expires drops off the tailnet until
+someone logs it in again. Tagged devices have key expiry turned off by default; confirm it on the Machines page for
+every server.
+
+**Machines that must not join.** A machine someone else manages, like a company laptop or a client's cloud account,
+belongs on their network, not yours. If an installer of yours turns Tailscale on, make it decide from local evidence
+and refuse when it cannot tell. In the words of Cole's notes, "an unanswered metadata check is a 'no', not a 'probably
+fine'".
+
+## The policy file
+
+The policy says who may reach what. It is HuJSON, JSON with comments and trailing commas. Cole's is managed as code
+with [[opentofu|OpenTofu]], like the rest of the infrastructure: the whole file is a single `tailscale_acl` resource in
+a private repository, so every change is a pull request with a plan to review before anything is applied, and the
+resource is protected against accidental deletion. Devices themselves, their tags and key expiry, stay out of it on
+purpose, because CI runners and agent environments join and leave all day and would keep the state churning.
+
+A trimmed version of the template in Cole's
+[Tailscale notes](https://github.com/coletebou/dx/blob/master/docs/infra/tailscale.md):
+
+```jsonc
+{
+  "groups": {
+    "group:admins": ["you@example.com"],
+  },
+  "tagOwners": {
+    "tag:server": ["group:admins"],   // production and always-on boxes
+    "tag:dev":    ["group:admins"],   // build boxes and agent hosts
+  },
+  "grants": [
+    // You reach everything you own.
+    {"src": ["group:admins"], "dst": ["*"], "ip": ["*"]},
+    // Dev boxes reach servers for ssh and the services they call.
+    {"src": ["tag:dev"], "dst": ["tag:server"], "ip": ["tcp:22", "tcp:8443"]},
+  ],
+  "tests": [
+    {"src": "you@example.com", "accept": ["tag:server:22"]},
+  ],
+}
+```
+
+Nothing flows unless a grant allows it, and the `tests` section runs on every save: a change that breaks one is
+rejected. The rules that keep Cole's tailnet working:
+
+- **Don't tag the machines you type on.** Applying a tag "removes any user-based authentication", in Tailscale's
+  words: a tagged machine belongs to its tag, and its traffic matches tag rules only. Tag the laptop you administer from
+  and its SSH to every server stops with "tailnet policy does not permit you to SSH to this node".
+- **Test both kinds of rules.** `tests` checks network rules and `sshTests` checks Tailscale SSH rules. Write both, and
+  still run one real `ssh <alias> true` from each kind of machine after changing tags.
+- **Grant by tag, never by address.** An address changes when a machine is rebuilt; a tag follows the machine you meant.
+- **Keep collaborators narrow.** One group, one tag, one port, and a deny test proving the rest stays closed.
+
+## Tailscale SSH or OpenSSH
+
+Tailscale can run its own SSH server, which logs you in with your tailnet identity instead of keys.
+
+| | Tailscale SSH | OpenSSH over the tailnet |
+|---|---|---|
+| Who may log in | The policy's `ssh` rules, by tailnet identity | The keys in `authorized_keys` on the machine |
+| Keys to manage | None | Yours, on every machine |
+| Scripts that must not prompt | Only with `accept` rules; `check` mode waits for a browser login | Yes |
+| When Tailscale is down | Unavailable | Reachable through a public jump host, if you keep one |
+| Session recording and central revocation | Available | No |
+
+Cole uses OpenSSH with keys for everything a script drives (handoffs, syncs, deploys), with sshd reachable only on the
+Tailscale interface, and leaves Tailscale SSH off on those machines. Pick one per port: `tailscale up --ssh` makes
+Tailscale answer every tailnet connection to port 22 itself, so an OpenSSH server behind it never sees them. For
+collaborators, Tailscale SSH is often the better default, since there is no key to hand out or take back. Its server
+side runs on Linux and on macOS with the open source `tailscaled`, while clients connect from any platform.
+
+## Sharing services: Serve and Funnel
+
+`tailscale serve` shares a service on one machine with the rest of the tailnet, over HTTPS with a certificate
+Tailscale issues, without opening any firewall port: bind the service to `127.0.0.1`, then
+`tailscale serve --bg 3100`. Every request Serve forwards carries headers saying who sent it (`Tailscale-User-Login`
+and friends), and Serve strips any such headers a caller tries to send, "to avoid header spoofing".
+
+That protection holds only on Serve's own path. A backend that trusts those headers must be reachable through Serve
+and nothing else: a second route to the same port, another reverse proxy or a tunnel, passes whatever headers the
+caller wrote.
+
+Funnel goes further and publishes a service to the public internet. For public traffic Cole uses Cloudflare Tunnels
+instead (see [[cloudflare-front-door]]), so public names, firewall rules and bot protection all live in one place.
+
+Before moving any service to `127.0.0.1` because "only the tunnel uses it", find out who calls it: another machine on
+the tailnet might.
+
+## What it costs
+
+| Plan | Price | What it includes |
+|---|---|---|
+| Personal | <Price id="tailscale-personal" /> | Up to 6 users, unlimited user devices, 3 ACL groups, 50 tagged resources to start, 1,000 minutes a month for ephemeral devices, basic Tailscale SSH on up to 5 hosts |
+| Standard | <Price id="tailscale-standard" /> | Unlimited users, up to 10 ACL groups, user provisioning with SCIM, device management and posture integrations, advanced user roles |
+| Premium | <Price id="tailscale-premium" /> | Up to 300 ACL groups, 10,000 ephemeral minutes a month, just-in-time access, advanced Tailscale SSH, network flow logs, log streaming, regional routing |
+| Enterprise | Custom | Custom limits and terms, invoicing, support SLAs |
+
+Every plan, the free one included, has the essentials: peer-to-peer connections, MagicDNS, subnet routers and exit
+nodes, access control rules, and single sign-on with any identity provider. Tagged resources beyond the included 50
+cost a small monthly fee each.
+
+The lineup changed on April 8, 2026: Starter was renamed Standard, the free Personal plan grew to six users, the same
+limit the paid Personal Plus plan had, and Personal Plus stopped taking new sign-ups. Existing Personal Plus accounts
+keep working at their old price for at least another twelve months.
+
+Cole thinks the bill is for "the next level one", paid "for some reason I don't know, maybe the ACL rules and stuff
+like that", and asked to be checked on it. Checked against the pricing page: the monthly amount Cole remembers is
+exactly Standard's price for a single user (<Price id="tailscale-standard" />). The ACL rules themselves are not the
+reason to pay, since every plan has them; what the paid tiers add is more ACL groups (3, then 10, then 300), unlimited
+users and organization features. For one person with a handful of machines, Personal covers everything on this page.
+
+## Gotchas
+
+- **Tagging removes the owner.** A tagged machine no longer acts as you, so tag servers, not the laptop you type on.
+- **Authorized but untagged.** An interrupted join can leave a server without its tag, and tag-based rules then refuse
+  every connection with a terse "access revoked". Check tags right after joining.
+- **Key expiry takes servers offline.** Make sure it is off for every server.
+- **`--ssh` takes port 22.** Tailscale SSH and OpenSSH cannot share it.
+- **Names, not addresses.** An address written into a config outlives the machine it belonged to; a name follows the
+  machine.
+- **Never publish your tailnet's details.** Your tailnet's DNS name, machine names and addresses are a map of your
+  fleet. Keep the SSH config and the policy in private files.
+
+## Set it up
+
+1. Install Tailscale everywhere: the `tailscale-app` cask on a Mac (it is in Cole's [[homebrew|Brewfile]]), the
+   install script on Linux, the app on the phone and on Windows.
+2. Log in on each personal device with the same identity, and check that MagicDNS is on in the admin console.
+3. Write a policy with tags for servers and tests for what must and must not connect.
+4. Join servers with tagged auth keys, confirm their tags, and confirm key expiry is off.
+5. Point your SSH aliases at MagicDNS names, then close public SSH on the servers ([[ssh#keeping-servers-closed|how]]).
+
+The [[ssh]] page covers what runs over the tailnet once it is up, and [[servers]] covers what the servers are for.

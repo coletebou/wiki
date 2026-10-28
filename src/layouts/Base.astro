@@ -1,0 +1,134 @@
+---
+import '@fontsource-variable/eb-garamond/wght.css';
+import '@fontsource-variable/eb-garamond/wght-italic.css';
+import '@fontsource/cinzel/400.css';
+import '@fontsource/cinzel/700.css';
+import '@fontsource/italianno/400.css';
+import '@fontsource-variable/jetbrains-mono/wght.css';
+import '../styles/tokens.css';
+import '../styles/codex.css';
+import '../styles/diagrams.css';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Which masthead link is the current page. */
+  current?: 'home' | 'pinakes' | 'search' | 'about' | 'agents';
+  ogType?: 'website' | 'article';
+  /** The not-found page: served at every missing address, so it names no address of its own and is not indexed. */
+  notFound?: boolean;
+}
+const { title, description, current, ogType = 'website', notFound = false } = Astro.props;
+const site = Astro.site!;
+const canonical = notFound ? null : new URL(Astro.url.pathname, site).href;
+const fullTitle = current === 'home' ? 'Codex Tebou · How to Be a Beast' : `${title} · Codex Tebou`;
+
+// The other editions of coletebou.com. ?from=wiki tells each one where the reader came from.
+const editions = [
+  { key: 'almanac', name: 'Almanac', href: 'https://coletebou.com/' },
+  { key: 'civil', name: 'Plan Set', href: 'https://plans.coletebou.com/' },
+  { key: 'terminal', name: 'Terminal', href: 'https://term.coletebou.com/' },
+  { key: 'wiki', name: 'Wiki', href: null },
+];
+const withFrom = (h: string) => {
+  const u = new URL(h);
+  u.searchParams.set('from', 'wiki');
+  return u.href;
+};
+---
+<!doctype html>
+<html lang="en" data-theme="vellum">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    {canonical ? <link rel="canonical" href={canonical} /> : <meta name="robots" content="noindex" />}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <meta name="theme-color" content="#f4ead2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1f160e" media="(prefers-color-scheme: dark)" />
+    <meta property="og:site_name" content="Codex Tebou" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content={ogType} />
+    {canonical && <meta property="og:url" content={canonical} />}
+    <meta property="og:image" content={new URL('/og.jpg', site).href} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Codex Tebou, How to Be a Beast: the wiki's frontispiece on parchment" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script is:inline>
+      // Before first paint: the reader's chosen theme, else the system's.
+      (() => {
+        let t = 'vellum';
+        try {
+          t = localStorage.getItem('codex-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'lucerna' : 'vellum');
+        } catch {}
+        document.documentElement.dataset.theme = t;
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#text">Skip to the text</a>
+    <header class="masthead">
+      <a class="wordmark" href="/" aria-label="Codex Tebou, home">
+        <b>CODEX TEBOU</b><i>How to Be a Beast</i>
+      </a>
+      <nav aria-label="Library">
+        <a href="/pinakes/" aria-current={current === 'pinakes' ? 'page' : undefined}>Pinakes</a>
+        <a href="/how-to-be-a-beast/" class="wide-only">Start here</a>
+        <a href="/wiki-mcp/" class="wide-only" aria-current={current === 'agents' ? 'page' : undefined}>For agents</a>
+        <a href="/about-this-wiki/" aria-current={current === 'about' ? 'page' : undefined}>About</a>
+        <button type="button" class="seek-button" data-seek aria-haspopup="dialog">Seek <kbd>/</kbd></button>
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch to candlelight">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+            <path class="sun" d="M12 4v1.5M12 18.5V20M4 12h1.5M18.5 12H20M6.3 6.3l1.1 1.1M16.6 16.6l1.1 1.1M6.3 17.7l1.1-1.1M16.6 7.4l1.1-1.1" />
+            <circle class="sun" cx="12" cy="12" r="3.6" />
+            <path class="flame" d="M12 3c2.6 3.3 4.4 5.7 4.4 8.6A4.4 4.4 0 0 1 12 16a4.4 4.4 0 0 1-4.4-4.4C7.6 9.4 9 8 10 6.4c.4 1.4 1.1 2.2 2 2.6C12.4 7 12.4 5 12 3Z" />
+            <path class="flame" d="M9 19.5h6M10 21.5h4" />
+          </svg>
+        </button>
+      </nav>
+    </header>
+
+    <slot />
+
+    <footer class="colophon">
+      <div>
+        <p>
+          <b>Codex Tebou</b>, Cole Tebou’s commonplace book of tools, agents and infrastructure, catalogued after the manner of
+          Callimachus. Text <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener">CC BY 4.0</a>, code
+          <a href="https://github.com/coletebou/wiki/blob/master/LICENSE" rel="noopener">MIT</a>, fonts SIL Open Font License.
+          Agents keep it through an <a href="/wiki-mcp/">MCP</a>; every emendation is a <a href="https://github.com/coletebou/wiki" rel="noopener">pull request</a>.
+        </p>
+      </div>
+      <ul class="editions" aria-label="Editions of coletebou.com">
+        <li class="label">Editions</li>
+        {editions.map((e) => (
+          <li>{e.href ? <a href={withFrom(e.href)} data-edition={e.key}>{e.name}</a> : <span aria-current="page">{e.name}</span>}</li>
+        ))}
+      </ul>
+    </footer>
+
+    <dialog class="seek-dialog" aria-label="Seek in the library">
+      <form class="seek-form" method="dialog" role="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" /><path d="m15 15 5.5 5.5" /></svg>
+        <label class="visually-hidden" for="seek-input">Seek in the library</label>
+        <input id="seek-input" class="seek-input" type="search" placeholder="Seek a word, a tool, a folio…" autocomplete="off" spellcheck="false" aria-controls="seek-results" aria-autocomplete="list" />
+        <button type="submit" class="visually-hidden">Close</button>
+      </form>
+      <ul id="seek-results" class="seek-results" role="listbox" aria-label="Results"></ul>
+      <p class="seek-hint"><span><kbd>↑</kbd> <kbd>↓</kbd> to choose</span><span><kbd>Enter</kbd> to open</span><span><kbd>Esc</kbd> to close</span></p>
+    </dialog>
+
+    <div class="sillybos" role="tooltip" id="sillybos" hidden></div>
+
+    <script>
+      import '../scripts/theme';
+      import '../scripts/seek';
+      import '../scripts/sillybos';
+      import '../scripts/folio';
+    </script>
+  </body>
+</html>

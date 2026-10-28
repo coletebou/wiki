@@ -1,0 +1,26 @@
+---
+// <Diagram name="..." /> in MDX: the interactive ink drawings. Each one is a self-contained component.
+import AgentFleet from '../diagrams/AgentFleet.astro';
+import CloudflareFrontDoor from '../diagrams/CloudflareFrontDoor.astro';
+import CostCalculator from '../diagrams/CostCalculator.astro';
+import Observability from '../diagrams/Observability.astro';
+import TmuxKeymap from '../diagrams/TmuxKeymap.astro';
+import WorktreeFanout from '../diagrams/WorktreeFanout.astro';
+
+interface Props {
+  name: string;
+  scene?: string;
+}
+const { name, scene } = Astro.props;
+const all = {
+  'tmux-keymap': TmuxKeymap,
+  'agent-fleet': AgentFleet,
+  'worktree-fanout': WorktreeFanout,
+  observability: Observability,
+  'cloudflare-front-door': CloudflareFrontDoor,
+  'cost-calculator': CostCalculator,
+} as const;
+const Component = all[name as keyof typeof all];
+if (!Component) throw new Error(`<Diagram name="${name}"> is not a diagram (${Object.keys(all).join(', ')})`);
+---
+<Component scene={scene} />

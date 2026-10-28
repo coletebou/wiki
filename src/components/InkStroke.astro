@@ -1,0 +1,11 @@
+---
+// A hand-drawn stroke of red chalk under a title.
+const { seed = 1 } = Astro.props as { seed?: number };
+const w = (n: number) => (Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453) % 1;
+const y = (n: number) => (7 + w(n) * 2.2).toFixed(2);
+const d = `M2 ${y(1)} C 60 ${y(2)}, 120 ${y(3)}, 180 ${y(4)} S 300 ${y(5)}, 348 ${y(6)}`;
+---
+<svg class="underline-stroke" viewBox="0 0 350 14" preserveAspectRatio="none" aria-hidden="true">
+  <path d={d} fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.85" />
+  <path d={`M30 ${y(7)} C 110 ${y(8)}, 200 ${y(9)}, 300 ${y(10)}`} fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.45" />
+</svg>

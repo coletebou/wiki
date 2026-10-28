@@ -1,0 +1,128 @@
+---
+title: Vercel
+summary: >-
+  Where Cole's frontends live: Git-connected projects that build on every push, a preview deployment for every branch
+  and pull request, production on merge, checks that gate a release, and what Hobby and Pro really allow.
+table: works
+folio: 58
+aliases: [Vercel Pro, Vercel Hobby, preview deployments]
+updated: 2026-10-28
+sources:
+  - title: Vercel pricing
+    url: https://vercel.com/pricing
+  - title: Environments (Vercel docs)
+    url: https://vercel.com/docs/deployments/environments
+  - title: Deploying Git repositories (Vercel docs)
+    url: https://vercel.com/docs/git
+  - title: Deployment Checks (Vercel docs)
+    url: https://vercel.com/docs/deployment-checks
+  - title: Vercel Hobby plan (Vercel docs)
+    url: https://vercel.com/docs/plans/hobby
+  - title: Deployment Protection (Vercel docs)
+    url: https://vercel.com/docs/deployment-protection
+  - title: Using Cloudflare and other reverse proxies with Vercel (Vercel guide)
+    url: https://vercel.com/kb/guide/can-i-use-a-proxy-on-top-of-my-vercel-deployment
+---
+
+Vercel hosts the frontends of Cole's apps and sites, this wiki included. Each frontend is a project connected to its
+GitHub repository: every push builds, every branch and pull request gets its own preview deployment with its own URL,
+and a merge to the production branch deploys production. Cole never runs a deploy command for a frontend. The Git
+history is the deploy log.
+
+## How a change reaches production
+
+1. **Push a branch or open a pull request.** Vercel builds a **preview deployment** and posts its URLs on the pull
+   request: one that always follows the branch's latest commit, and one pinned to the exact commit.
+2. **Checks run.** The repository's [[github-actions|GitHub Actions]] workflows (build, lint, [[testing|tests]]) report
+   on the same pull request, and branch protection makes them required, so a red check blocks the merge. Reviewers,
+   human or agent, open the preview URL instead of pulling the branch.
+3. **Merge to the production branch.** Vercel builds a production deployment and moves the production domains to it
+   when it is ready. If something is wrong, rolling back is one click (or `vercel rollback`), because the previous
+   deployment still exists.
+
+Vercel's **Deployment Checks** add a gate after the merge: the production build exists, but Vercel holds it off the
+production domains until the required checks pass. The checks can be Vercel's own (it runs the project's `lint` and
+`typecheck` scripts), selected GitHub Actions results, or checks from Marketplace integrations. That matters when
+agents merge quickly: the code tested before a merge is not always the code that ships.
+
+## Environments
+
+Vercel has three environments by default: **Local**, **Preview** and **Production**. Each can hold its own environment
+variables: a preview points at a test database, production at the real one.
+
+```sh
+vercel link        # connect this directory to its Vercel project
+vercel env pull    # write the Development variables to .env.local
+```
+
+On Pro, **custom environments** add named ones such as `staging`, each with its own branch, domain and variables. On
+any plan, a long-lived `staging` branch with its own domain and branch-specific preview variables does most of the same
+job. Changing a variable needs a new deployment before it takes effect. How Cole keeps those variables out of the
+repository is on [[env-files]].
+
+## Domains and DNS
+
+The domains themselves live at [[cloudflare|Cloudflare]], like all of Cole's [[domains]]. A Vercel frontend's record is
+**DNS-only**: Cloudflare answers the DNS query and the browser connects straight to Vercel, which issues the
+certificate and runs its own CDN and firewall. That is Vercel's own recommendation; putting Cloudflare's proxy in front
+of Vercel hides visitors' addresses from Vercel's DDoS and bot protection and adds a second cache to keep in sync.
+
+Two more things come with every project:
+
+- **Standard Protection.** Every one of Cole's projects requires a Vercel login for preview and deployment URLs, and
+  leaves the production domains public. A preview of an unreleased feature is not on the open internet. For
+  automation, Vercel's *protection bypass for automation* secret lets a test runner in.
+- **Sentry.** The [[sentry|Sentry]] integration writes the project's `SENTRY_*` variables into Vercel and uploads
+  source maps on each build, so an error in production points at the original source line.
+
+The projects and their domains are part of the [[opentofu|OpenTofu]] estate. Their environment variables are not:
+some are owned by integrations, and the rest are secrets. Because a Vercel token can change anything in its team,
+the Vercel root is planned and applied by Cole locally, never by CI.
+
+## Hobby or Pro
+
+| | Hobby | Pro |
+|---|---|---|
+| Price | <Price id="vercel-hobby" format="bare" /> | <Price id="vercel-pro" format="bare" /> |
+| Use | Personal, non-commercial only | Commercial use, teams |
+| Projects | 200 | Unlimited |
+| Deployments per day | 100 | 6,000 |
+| Build machine | 2 vCPUs, 8 GB | 4 vCPUs by default, larger machines available |
+| Runtime logs | 1 hour | 1 day |
+| Vercel WAF custom rules | Up to 3 | Up to 40 |
+| Custom environments | No | Yes |
+| Extra usage | Not available: features pause until the limit resets | Pay as you go past the included credit |
+
+(Prices as of October 28, 2026, from vercel.com.) Two rules about Git matter as much as the table:
+
+- **On Hobby, only the owner's commits deploy**, and a private repository owned by a GitHub *organization* cannot
+  deploy to a Hobby team at all.
+- **On Pro, the commit author must be a member of the team.** An agent that commits under its own identity needs a
+  seat or an approval, or its pushes will not deploy.
+
+### Checking Cole's numbers
+
+Cole said: "we pay for the Vercel Pro plan only because of the amount of stuff we're building. I don't know what the
+limits are but the free plan, honestly, is probably good for most people."
+
+Vercel's pages agree, with conditions. Hobby is free, and its included usage (100 GB of fast data transfer, a million
+function invocations and a million CDN requests a month, 100 deployments a day) is plenty for a personal site or a side
+project. The catch is the license: Hobby is for personal, non-commercial use, so anything that sells something needs
+Pro, at <Price id="vercel-pro" /> per developer seat. For Cole, the volume decides it: many projects, many deployments
+a day from agents, and features such as custom environments and longer logs.
+
+## Gotchas
+
+- **The first deployment of a new project is always production**, whatever branch it came from.
+- **Preview deployments are not indexed** by search engines by default, but they can still be shared. Use protection
+  on anything that is not ready.
+- **Hobby limits pause, they do not bill.** Going over a Hobby limit can switch a feature off for up to 30 days.
+- **Commits from an unknown author are held.** Under a Pro team, a commit author who is not a member gets no
+  deployment until they are added to the team or approved, depending on the team's collaboration settings.
+
+<ColesTake>
+
+We pay for the Vercel Pro plan only because of the amount of stuff we're building. The free plan, honestly, is probably
+good for most people.
+
+</ColesTake>

@@ -1,0 +1,260 @@
+---
+title: Langfuse
+summary: >-
+  Cole's home for every AI trace and every token: a self-hosted Langfuse with a project per app, Claude Code sessions
+  in their own project beside the production AI traces, and the cost analysis all of it makes possible.
+table: observatory
+folio: 62
+aliases: [LLM observability, LLM traces, AI traces, cost analysis]
+updated: 2026-10-28
+sources:
+  - title: Langfuse documentation
+    url: https://langfuse.com/docs
+  - title: OpenTelemetry endpoint (Langfuse docs)
+    url: https://langfuse.com/integrations/native/opentelemetry
+  - title: Token and cost tracking (Langfuse docs)
+    url: https://langfuse.com/docs/observability/features/token-and-cost-tracking
+  - title: Self-host Langfuse (Langfuse docs)
+    url: https://langfuse.com/self-hosting
+  - title: Claude Code tracing with Langfuse (Langfuse docs)
+    url: https://langfuse.com/integrations/developer-tools/claude-code
+  - title: Billable units (Langfuse docs)
+    url: https://langfuse.com/docs/administration/billable-units
+  - title: Monitoring, traces (Claude Code docs)
+    url: https://code.claude.com/docs/en/monitoring-usage
+  - title: Langfuse pricing
+    url: https://langfuse.com/pricing
+---
+
+Langfuse is an open-source platform for tracing and analyzing applications built on language models. It records every
+model call with its prompt, response, model, token counts, latency and cost, and groups the calls into traces and
+sessions you can search, chart and score. Cole runs it self-hosted, and every AI trace goes there: the production apps
+and bots, each in its own project, and Claude Code's own sessions in a project of their own, right beside them. It is
+the place Cole goes to answer "what did that cost, and why".
+
+## What Langfuse records
+
+Langfuse's data model has a few nouns worth knowing:
+
+| Noun | What it is |
+|---|---|
+| **Trace** | One request or one interaction, from start to finish: a user's chat turn, a background job, one prompt to Claude Code |
+| **Observation** | A step inside a trace. *Generations* are model calls (with model, usage and cost); others are spans, tool calls, agents, retrievals, events |
+| **Session** | Traces that belong together, such as every turn of one conversation or one Claude Code session |
+| **User** | Who the trace was for, so cost and quality can be broken down per user |
+| **Score** | A judgment attached to a trace or an observation: a thumbs-up, an automated evaluator's grade, a test result |
+| **Project** | A separate space with its own API keys, traces, prompts, datasets and settings |
+
+Around those it adds prompt management (versioned prompts fetched at run time), datasets and experiments,
+model-graded evaluations, dashboards and a metrics API. Everything is reachable from code too: the public API, the SDKs,
+the Langfuse CLI (`npx @langfuse/cli api ...`) and an [[mcp|MCP]] server, so agents can query their own traces.
+
+## How Cole runs it
+
+Langfuse runs self-hosted on Cole's AWS [[servers]], as a Docker Compose stack: the web container (UI and API), the
+worker (which processes incoming events in the background), PostgreSQL for transactional data, ClickHouse for the
+traces themselves, Redis for queues and cache, and S3-compatible storage for raw events. Incoming events are written to
+blob storage first and only then into the database, so a database hiccup does not lose data. A public hostname at
+[[cloudflare|Cloudflare]] serves the UI, which requires a login.
+
+Self-hosting is a choice about the data more than the money. Traces carry prompts, code and tool output, and a
+self-hosted instance keeps all of that on Cole's own server. Self-hosted Langfuse is free under the MIT license, with no
+usage billing. The managed service, Langfuse Cloud, is the easier start:
+
+| Langfuse Cloud plan | Price | Included |
+|---|---|---|
+| Hobby | <Price id="langfuse-hobby" format="bare" /> | 50k units a month, 30 days of data, 2 users |
+| Core | <Price id="langfuse-core" format="bare" /> | 100k units a month, then more per 100k; 90 days of data; unlimited users |
+| Pro | <Price id="langfuse-pro" format="bare" /> | 100k units a month, then more per 100k; 3 years of data; higher rate limits |
+
+(Prices as of October 28, 2026, from langfuse.com.) A *unit* is one trace, one observation or one score, so a trace with
+a dozen model calls and tool steps counts as a dozen units or more.
+
+### A project per app
+
+One instance holds several projects, and each project has its own pair of API keys: a public key and a secret key.
+Whatever a client signs with those keys lands in that project. Cole's projects follow the shape of the work:
+
+- **One project per production app or bot**, so each product's traces, users, prompts and costs stay separate.
+- **A project for Claude Code**, holding Cole's own agent sessions, next to the production ones on the same instance.
+  The same dashboards, the same model prices and the same SQL work across both.
+
+Keeping development traffic out of the production projects matters more than it sounds: a single long agent session
+produces more generations than a day of a small app, and would drown its cost charts.
+
+## How Claude Code sessions get there
+
+Claude Code can export OpenTelemetry (OTel) traces natively, and Langfuse can receive them on its OTLP endpoint. Cole
+switches it on per machine; a machine that opts in sends every session's traces to the Claude Code project.
+
+### The native traces
+
+The traces are a beta feature of Claude Code, off by default. A minimal setup looks like this:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
+    "OTEL_TRACES_EXPORTER": "otlp",
+    "OTEL_METRICS_EXPORTER": "none",
+    "OTEL_LOGS_EXPORTER": "none",
+    "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "http/protobuf",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "https://langfuse.example.com/api/public/otel/v1/traces"
+  },
+  "otelHeadersHelper": "bash ~/.claude/langfuse-otel-headers.sh"
+}
+```
+
+Three details matter. Langfuse takes OTLP over HTTP only (no gRPC), so the protocol is set explicitly. The
+traces-specific endpoint ends in `/v1/traces`. And the keys are not in the settings file at all: `otelHeadersHelper` is
+a command Claude Code runs at startup and every 29 minutes after that, which prints the headers to send as JSON:
+
+```sh
+#!/usr/bin/env bash
+# Prints Langfuse's OTLP headers. Its output is a credential: never run it into a shared terminal or a log.
+set -euo pipefail
+auth=$(printf '%s:%s' "$LANGFUSE_PUBLIC_KEY" "$LANGFUSE_SECRET_KEY" | base64 | tr -d '\n')
+printf '{"Authorization": "Basic %s", "x-langfuse-ingestion-version": "4"}\n' "$auth"
+```
+
+`Authorization: Basic` with the base64 of `public:secret` is how Langfuse authenticates OTLP, and the
+`x-langfuse-ingestion-version: 4` header makes the traces appear in real time instead of up to ten minutes late. Cole's
+helper reads the two keys from the machine's secrets file (see [[env-files]]) and refuses to mix keys from two
+projects. Claude Code reads these settings when a session starts, so a session started before a change keeps the old
+endpoint until it restarts.
+
+### The collector in front
+
+Claude Code reports tokens on each model-call span as `input_tokens`, `output_tokens`, `cache_read_tokens` and
+`cache_creation_tokens`. Langfuse prices generations from the OpenTelemetry GenAI names (`gen_ai.usage.*`), so out of
+the box the spans arrive with no cost. Cole's Langfuse therefore sits behind a small OpenTelemetry Collector: nginx
+routes the traces path to the collector and everything else to Langfuse, and the collector copies the token counts into
+the names Langfuse understands before forwarding them. The heart of it is a transform like this:
+
+```yaml
+processors:
+  transform/claude_usage:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        conditions:
+          - attributes["span.type"] == "llm_request"
+        statements:
+          - set(attributes["gen_ai.usage.input_tokens"], Int(attributes["input_tokens"])) where attributes["input_tokens"] != nil
+          - set(attributes["gen_ai.usage.output_tokens"], Int(attributes["output_tokens"])) where attributes["output_tokens"] != nil
+          - set(attributes["gen_ai.usage.cache_read_input_tokens"], Int(attributes["cache_read_tokens"])) where attributes["cache_read_tokens"] != nil
+          - set(attributes["gen_ai.usage.cache_creation_input_tokens"], Int(attributes["cache_creation_tokens"])) where attributes["cache_creation_tokens"] != nil
+```
+
+The collector forwards each request with the caller's own `Authorization` header, so the keys a client sends still
+decide which project its traces land in. It listens on loopback only and runs in a locked-down container (read-only
+filesystem, no capabilities, capped memory). Production traces have their own receiver on the same collector, with a
+stricter pipeline: an allowlist decides which attributes survive, so nothing a client sends can set its own cost or
+user.
+
+### What a session looks like
+
+Each prompt to Claude Code becomes a trace whose root is a `claude_code.interaction` span. Its children are the model
+calls (`claude_code.llm_request`), the tool calls (`claude_code.tool`, each with the time spent waiting for a permission
+decision and the time spent running) and the hooks. A subagent's own model and tool calls nest under the Agent tool call
+that started it. Each model-call span carries the model, the effort level, the speed, time to first token, which
+subsystem sent it (the main thread or a named subagent) and the four token counts.
+
+Two more behaviors are useful:
+
+- **Child runs nest.** While tracing is on, Bash commands inherit a `TRACEPARENT` variable, and a `claude -p` started
+  from one becomes a child of the tool call that started it. To give a nested run its own trace, unset it:
+  `env -u TRACEPARENT claude -p "..."`.
+- **Content stays out unless you ask.** Spans redact prompt text, tool inputs and tool output by default. Each has its
+  own switch (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`), and Cole's per-machine
+  opt-in leaves them off: the traces carry structure, timing, models and tokens, not the conversation.
+
+### The transcript path
+
+There is a second way in, and Langfuse's own Claude Code plugin uses it: a hook replays the session's transcript into
+Langfuse. Cole's [[hooks]] include a heavier version of the same idea. When a session ends, a `SessionEnd` hook hands the
+finished transcript to a walker that emits **one trace per conversation** (turns, then model calls, then tool calls),
+with each subagent's whole turn tree nested under the Agent call that started it and each workflow run grouped under a
+span of its own. A conversation's identity is its session id, not its file path, because the same transcript can exist
+as several mirrored copies across machines; a ledger of fingerprints skips anything already sent, and a scheduled sweep
+catches the sessions whose `SessionEnd` never fired (a crash, a killed terminal). Because this path carries the
+conversation's content, it only sends to an allow-listed instance.
+
+When both paths are on, they describe the same model calls twice. Price one of them: the native spans see every API
+request (a transcript misses some), so they are the cost of record, and the transcript copy keeps its usage as metadata
+only.
+
+## Production AI traces
+
+Each production app and bot reports its model calls to its own project: through the Langfuse SDK, through
+OpenTelemetry, or through an ingestion job that reads a bot's session logs on a timer and sends what is new. A few
+habits make those traces useful:
+
+- **Set the session and user on every span**, not only the root, so filters and per-user cost work across all
+  observations.
+- **Name traces after the feature** ("chat reply", "summarize document"), not the function, so a dashboard reads like
+  the product.
+- **Tag the environment.** Production, staging and local development in one project are only useful if they can be told
+  apart.
+- **Send the provider's own token counts.** Langfuse can tokenize text itself, but the provider's counts are exact,
+  include cached and reasoning tokens, and are required for reasoning models.
+
+## Cost analysis
+
+For every generation, Langfuse stores two things per usage type (input, output, cache reads, cache writes):
+**usage details** (how many units) and **cost details** (how many dollars). Either can be sent with the trace, or
+inferred: Langfuse matches the generation's model name against its **model definitions**, each a regular expression with
+a price per usage type, and multiplies. It ships with definitions for the major OpenAI, Anthropic and Google models,
+including **pricing tiers** such as a higher rate above 200,000 input tokens, or a premium for a faster service tier.
+Custom definitions take priority, which is how a self-hosted instance prices model names Langfuse does not know: a
+gateway's aliases, a cloud provider's route names, a fine-tuned model.
+
+Three things to know before trusting the numbers:
+
+- **Prices apply at ingestion.** A new or corrected model definition prices only the traces that arrive after it.
+  Repricing history means re-sending or backfilling it.
+- **Usage keys must match exactly.** A cache write reported under a name the model definition does not price costs
+  nothing. Anthropic bills 5-minute and 1-hour cache writes at different rates, so keep them as separate usage types,
+  and do not also send their total, or the writes are counted twice.
+- **A subscription is not an API bill.** Claude Code on a flat plan has no per-token bill, but Langfuse prices the
+  tokens at API rates anyway. That is a feature: it says what the same work would have cost on the API, which is the
+  number that decides whether a plan pays for itself (see [[what-it-costs]]).
+
+With prices in place, the questions Cole asks most are: which model and which project cost the most this week, which
+sessions were the most expensive and what they were doing, how much of the input was served from cache, which subagent
+types burn the most tokens, and whether a change to the instructions moved any of it. The dashboards answer most of
+them. For bulk questions on a self-hosted instance, SQL against ClickHouse is faster:
+
+```sql
+SELECT provided_model_name AS model,
+       count() AS calls,
+       round(sum(total_cost), 2) AS usd
+FROM observations
+WHERE type = 'GENERATION'
+  AND project_id = '<project id>'
+  AND start_time >= now() - INTERVAL 7 DAY
+GROUP BY model
+ORDER BY usd DESC
+```
+
+The rest of the [[observability|observability path]] covers what Langfuse does not: application errors in
+[[sentry|Sentry]], host metrics and logs in [[datadog|Datadog]].
+
+## Gotchas
+
+- **HTTP only.** Langfuse's OTLP endpoint accepts HTTP with protobuf or JSON, not gRPC.
+- **Real time needs a header.** Without `x-langfuse-ingestion-version: 4`, directly ingested OTel data can take up to ten
+  minutes to appear.
+- **Self-hosted needs a recent version.** The OTLP endpoint arrived in v3.22; older instances answer it with 4xx errors.
+- **Restart after changing telemetry settings.** A running Claude Code session keeps the endpoint it started with.
+- **Never print the headers helper's output.** It is a credential in plain text.
+- **ClickHouse grows.** A busy instance fills its disk faster than anything else on the server; decide on retention
+  before it decides for you.
+
+<ColesTake>
+
+Langfuse is where all our traces and cost analysis live. We put all our Claude Code stuff there in its own project,
+right next to our production AI traces.
+
+</ColesTake>

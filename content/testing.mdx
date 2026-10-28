@@ -1,0 +1,134 @@
+---
+title: Tests
+summary: >-
+  How Cole's agents prove work instead of claiming it: never edit a test to pass, run the real flow end to end, prove
+  a regression test fails before the fix, and test the tooling itself in sandboxes that cannot touch anything real.
+table: workshop
+folio: 48
+aliases: [tests, test suites]
+updated: 2026-10-28
+sources:
+  - title: Review before ship, verification before done (dx docs)
+    url: https://github.com/coletebou/dx/blob/master/docs/workflow/review.md
+  - title: dx CI workflow
+    url: https://github.com/coletebou/dx/blob/master/.github/workflows/ci.yml
+  - title: Vitest
+    url: https://vitest.dev/guide/
+  - title: Bun test runner
+    url: https://bun.com/docs/test
+  - title: Node.js test runner
+    url: https://nodejs.org/api/test.html
+---
+
+Tests are how Cole's agents prove their work instead of claiming it. An agent that says "done" has to say what it ran,
+what came back, and what it could not check. The rules are strict because agents, left alone, take the shortest path
+to a green run, and the shortest path is often editing the test.
+
+## The rules
+
+From Cole's universal agent rules:
+
+- **Never edit, skip or delete a test just to make it pass.** Fix the real defect. Change a test only when the intended
+  behavior changed, and say why.
+- **Done means the real flow ran.** A passing build, unit tests or reading the source do not establish that something
+  works. Run it end to end.
+- **The report says what was verified, how, and what was not.** If the real flow could not run, name the blocker and
+  leave that part explicitly unverified.
+- **A negative result needs controls.** "Rejected", 401, 403, 404 or "doesn't work" counts only when the same input
+  succeeds on a known-good path and a known-bad input fails the same way.
+- **A job is running only if you hold its id.** If a command returned output, it already finished; read the output
+  before reporting.
+
+<ColesTake>
+
+Never edit a test to make it pass. Fix the real defect. If the behavior was supposed to change, change the test and
+say why.
+
+</ColesTake>
+
+## Levels of evidence
+
+Cole's [review docs](https://github.com/coletebou/dx/blob/master/docs/workflow/review.md) rank what "it works" can
+mean, weakest first:
+
+1. the unit test passes;
+2. the real input (the actual failing payload from the logs, not a fixture's shape) goes through the real function and
+   comes out right;
+3. the real path (the HTTP endpoint, the deployed process, the device) returns the right thing.
+
+Go all the way to the third whenever it is reachable, and say so when it is not. For a frontend, the cheapest real
+path is often its preview deployment: Cole's frontends on [[vercel|Vercel]] get one for every pull request, so an
+agent can check the change on a real URL before it merges. Three habits come with it:
+
+- **Prove the running process is the new one.** A deploy that copies files but never restarts the service leaves the
+  old code answering. Compare the process start time with the deploy time, or read the commit from a health endpoint.
+- **Prove where you are before anything destructive.** A script pointed at production through two settings can use
+  one from production and one from development. Count a fixture only production has; zero where you expected N means
+  stop. Dry-run first.
+- **Find every caller before adding a side effect.** A delete that now cascades turns an old scheduled cleanup into a
+  data-loss job. Search the schedules and admin scripts too, and add a test that the protected shape survives.
+
+## A control run for every new test
+
+A regression test proves something only if it fails on the code before the fix. Cole's procedure, with a worktree so
+nothing in your checkout moves:
+
+```sh
+git worktree add --detach ../control <fix-sha>^                    # the code before the fix
+git -C ../control restore --source <fix-sha> -- tests/new.test.ts  # only the new test
+(cd ../control && <run that one test>)                            # must FAIL, on the expected assertion
+(cd <fix checkout> && <run that one test>)                        # must pass
+git worktree remove ../control
+```
+
+Record both results. A test that passes on the old code tests nothing, however well it reads. (More on the worktree
+trick in [[git-worktrees]].)
+
+## Testing the tooling
+
+Cole's agent tooling (hooks, launchers, the handoff tool, the parking tool) runs inside every session on every machine,
+so it gets tested as seriously as an app:
+
+- **Hermetic suites.** Each suite builds its world in temporary directories: fake servers, a fake Claude Code that
+  writes a real-shaped transcript and replies once, a fake `ssh` that is really a second host with its own home
+  directory and tmux server. No real agents, no network.
+- **A tmux sandbox.** The tmux suites unset `TMUX`, pass a private socket on every call, and put a guard first on the
+  `PATH` that refuses any other socket and any `kill-server`. They refuse to run at all if a real tmux socket is
+  visible. That guard exists because a manual test once killed the real tmux server, and every session on it.
+- **One runner, a summary at the end.** `scripts/tests/run-all.sh` runs every suite, prints each failing check with its
+  expected and actual values, and exits non-zero if any failed.
+- **CI on two operating systems.** The [dx CI](https://github.com/coletebou/dx/blob/master/.github/workflows/ci.yml)
+  runs every suite on Ubuntu and macOS, plus a lint job (ShellCheck at a pinned version verified by checksum,
+  `zsh -n`, ruff, jq), actionlint over the workflows, and gitleaks over every commit. See [[github-actions]].
+
+The same standard runs through the other public repositories: [[drover|Drover]] tests with Node's built-in runner
+(`node --test`, zero dependencies) and includes a world of pretend sessions for trying clients safely; the
+[[shared-brain|brain]] runs unit and integration tests against an in-memory MongoDB, an end-to-end suite that drives
+the real server over MCP, and a retrieval eval that fails when a superseded fact leaks into search.
+
+## Test runners
+
+| Runner | Where Cole uses it | Why |
+|---|---|---|
+| Vitest | The app workspaces in one of Cole's apps | Fast, Jest-style API, works with Vite |
+| `bun test` | Scripts and infrastructure tests in the same Bun repository | Built into Bun, nothing to install |
+| `node --test` | Zero-dependency tools like Drover | Built into Node |
+| Plain bash and Python suites | The dotfiles tooling | The tools are bash and Python; so are their tests |
+
+The choice follows the [[package-managers|package manager and runtime]]: a Bun repository gets `bun test` for free, a
+Node tool with no dependencies uses Node's own runner, and a Vite app gets Vitest.
+
+## Tests under load
+
+A dozen agents on one machine share its CPU and memory, and a slow machine makes timing-sensitive tests fail. Cole's
+rules for that:
+
+- **Check the load before anything heavy:** `uptime` and free memory. On a crowded box, send the job to CI or wait.
+- **Check for the same job already running**, by exact process name (`pgrep -x`).
+- **A failure under load is no result.** A test that times out or fails only in a slow run gets rerun alone before
+  anyone investigates it, and a job the system killed for memory is reported, not restarted into the same pressure.
+
+## Before the reviewers
+
+Run the cheap deterministic checks yourself first: the linter ([[oxlint]]), the type checker, the tests you touched.
+Reviewers, human or model, should spend their attention on behavior, not on typos a tool would have caught.

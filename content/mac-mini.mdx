@@ -1,0 +1,106 @@
+---
+title: The Mac mini
+summary: >-
+  The Mac on Cole's desk: an M4 Mac mini with 16 GB of memory that runs the desktop, tmux sessions full of agents, and
+  everything that has to be a Mac, like iOS builds. How it is set up, and how to live with its memory.
+table: desk
+folio: 4
+aliases: [mac mini m4]
+updated: 2026-10-28
+sources:
+  - title: Mac mini technical specifications (Apple)
+    url: https://www.apple.com/mac-mini/specs/
+  - title: Buy Mac mini (Apple)
+    url: https://www.apple.com/shop/buy-mac/mac-mini
+  - title: caffeinate(8) manual
+    url: https://keith.github.io/xcode-man-pages/caffeinate.8.html
+  - title: cc-park autopark schedule (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/launchagents/com.cc-park-auto.plist
+---
+
+The Mac mini is the computer on Cole's desk, an M4 Mac mini with 16 GB of memory. It runs the desktop apps, a stack of [[tmux]] sessions full of [[claude-code|Claude Code]] and
+[[codex|Codex]] agents, and everything that has to happen on a Mac, like building iOS apps. The servers are AWS
+machines that never sleep; the Mac mini is where Cole sits, and the machine every other one is reached from.
+
+## Why a Mac mini
+
+A Mac mini is the cheapest way into macOS that is a real desktop: a small box with no screen, keyboard or mouse of its
+own, so you bring your own. Apple's current base model (<Price id="mac-mini" />) has moved on to a newer chip than
+Cole's, but still starts at 16 GB of unified memory and a 256 GB SSD. Cole's M4 has the same 16 GB.
+
+What earns a Mac a place on the desk is what only a Mac can do:
+
+- **Apple platforms.** Building, signing and shipping iPhone, Apple Watch and Mac apps needs Xcode, which runs only on
+  macOS ([[ios-development]], [[xcode]], [[mac-apps]]).
+- **A Unix underneath.** macOS is a certified UNIX, so the same shell, tmux, git and agent setup that runs on the Linux
+  servers runs here too ([[posix]]).
+- **The desk apps.** [[ghostty|Ghostty]] for the terminal, [[wispr-flow|Wispr Flow]] for dictation, browsers, and the
+  rest of the [[homebrew|Brewfile]].
+
+Around it sit the [[mechanical-keyboard|mechanical keyboard]] and the [[mice]], both switchable between several
+machines.
+
+## Reachable from anywhere
+
+A desktop that only works when you sit at it wastes half its value. The Mac mini is on Cole's
+[[tailscale|tailnet]], so from anywhere:
+
+- **A terminal:** [[ssh|SSH]] to it by name, from a laptop or from [[termius|Termius]] on the phone, then `tm` to pick
+  a tmux session.
+- **The screen:** [[screens-5|Screens 5]] shows and controls the whole desktop from a phone, a tablet or another Mac,
+  for the things a terminal cannot do, like clicking through a permission dialog or watching a simulator.
+
+For that to work, the Mac has to be awake. Cole's shell has a `caf` helper that keeps it from sleeping for a set
+number of hours, detached from the terminal that started it (see [[system-utilities]]).
+
+## Living with 16 GB
+
+Sixteen gigabytes goes quickly when agents live on the machine. Each Claude Code session brings its own helpers, MCP
+servers, language servers and sometimes a browser, and a dozen of them fill memory fast. Under pressure macOS
+compresses memory and then swaps to the internal SSD, which is also where the system lives. Cole's setup has three
+answers:
+
+- **Park idle sessions.** [[cc-park]] stops idle Claude Code sessions to free their memory, leaving each pane with the
+  session's last screen and its resume command typed at the prompt. On every Mac a launchd job runs it every 30
+  minutes for sessions idle six hours or more.
+- **Send long runs to the servers.** Long agent sessions can run on a server instead, which has memory to spare and
+  never sleeps. The [[agent-fleet]] page shows how work moves between machines.
+- **Watch what is left running.** A booted iOS simulator with nothing driving it can tie up gigabytes and a crowd of
+  background processes; `xcrun simctl shutdown all` ends them.
+
+<ColesTake>
+
+Sixteen gigs fills up fast with a dozen agents open. Park what you aren't using.
+
+</ColesTake>
+
+A caution when measuring: on a Mac under memory pressure, the resident memory figure that `ps` and htop show leaves
+out pages macOS has compressed or swapped, so it undercounts what an agent session really holds.
+
+## Storage on external drives
+
+The internal 256 GB fills too, with swap, caches, simulators and worktrees. On Cole's Mac mini, `~/code` links into
+external USB drives, so repositories and their [[git-worktrees|worktrees]] live off the internal disk. Two side
+effects come with that:
+
+- **Cold reads are slow.** The first scan of a big folder on a USB drive, especially under memory pressure, can be far
+  slower than on the internal SSD. A test that scans source files can hit its timeout without anything being wrong.
+- **Tools that follow links pay for it.** [[starship|Starship]] is configured not to follow symlinks, because statting
+  link targets on a cold external drive blew past its 30 millisecond scan budget.
+
+## Gotchas
+
+- **UI tests want a logged-in console.** Cole's agents found that `xcodebuild test` can hang on a Mac sitting at the
+  login window, because macOS will not allow test automation there. Logging in at the console, with Screens 5 if
+  nobody is at the desk, gets the tests moving.
+- **Sleep pauses everything.** A sleeping Mac pauses every agent on it and stops answering SSH. Use `caf` or
+  `caffeinate` for long runs.
+- **One machine, many sessions.** When the Mac feels slow, check memory before blaming the processor. On Cole's Mac
+  mini the slowdowns have come from memory pressure, with the processor mostly idle.
+
+## Set up a Mac mini like this
+
+1. Sign in, install Homebrew, clone your dotfiles and run the [[bootstrap-script|bootstrap script]].
+2. Install Tailscale and turn on Screen Sharing (System Settings, General, Sharing) so the Mac is reachable.
+3. Plug in an external SSD for code if you bought the base storage.
+4. Set up session parking before you need it, not after the first out-of-memory slowdown.

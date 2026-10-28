@@ -1,0 +1,144 @@
+---
+title: The Bootstrap Script
+summary: >-
+  install.sh turns a blank Mac, Linux box or WSL install into one of Cole's machines: packages, pinned toolchains,
+  linked configs, generated Claude Code settings and scheduled jobs, with a dry run and a log of every change.
+table: shell
+folio: 19
+aliases: [install.sh, bootstrap]
+updated: 2026-10-28
+sources:
+  - title: install.sh (public copy in dx)
+    url: https://github.com/coletebou/dx/blob/master/install.sh
+  - title: dx README, quick start
+    url: https://github.com/coletebou/dx/blob/master/README.md
+  - title: Homebrew Bundle and the Brewfile
+    url: https://docs.brew.sh/Brew-Bundle-and-Brewfile
+  - title: Ghostty terminfo help
+    url: https://ghostty.org/docs/help/terminfo
+---
+
+A bootstrap script turns a blank machine into your machine with one command. Cole's is `install.sh`, at the top of
+the [[dotfiles]]: it detects the operating system and processor, installs packages, pins the developer toolchain,
+links every config file into place, generates the Claude Code settings, sets up scheduled jobs, and writes down every
+change it makes. Run it twice and the second run changes nothing.
+
+<ColesTake>
+
+It's so nice to have a good bootstrap script. A new machine is one command away from feeling like home.
+
+</ColesTake>
+
+## Why it is worth the effort
+
+- **New machines take minutes.** A fresh Mac, a rebuilt server or a new [[wsl|WSL]] install gets the same shell,
+  prompt, tmux, git setup and agent configuration as every other machine.
+- **Servers are disposable.** When a server can be recreated from scratch and bootstrapped in one go, rebuilding is
+  routine instead of scary. Cole's [[servers]] are AWS machines defined with [[opentofu|OpenTofu]]; OpenTofu creates the
+  machine, and the bootstrap script makes it one of Cole's.
+- **It doubles as maintenance.** [[dotfiles|dotsync]] reruns the installer on every machine whenever a change touches
+  something the installer acts on, so adding a tool to the list installs it everywhere.
+
+## Two installers
+
+There are two versions, for two audiences.
+
+**The public component installer**, [install.sh in dx](https://github.com/coletebou/dx/blob/master/install.sh), is for
+strangers who want one piece. It installs components you name and nothing else:
+
+```bash
+./install.sh --list                  # what each component installs
+./install.sh --all --dry-run         # every change it would make, making none
+./install.sh --all                   # or --with shell,git,tmux,claude,...
+```
+
+The components are `shell`, `git`, `tmux`, `claude`, `codex`, and the plugin CLIs (`session`, `worktrees`, `memory`,
+`review`), plus three that `--all` leaves out on purpose: `schedules` (background jobs), `github-kit` (issue forms,
+labels and workflows copied into a repository) and `manager` (a [[drover|Drover]] setting). It never installs
+packages; it links files and generates a few.
+
+**Cole's own installer** does all of that and also builds the machine: packages, toolchains, system tweaks. It runs on
+macOS with Homebrew and on Linux and WSL with apt, on Intel and ARM processors alike.
+
+## What a full run does
+
+| Phase | What happens |
+|---|---|
+| Detect | Operating system, processor architecture, and the machine's identity and role from `~/.df-profile` |
+| Log | A timestamped log and a JSON-lines record of every change the run makes |
+| Authenticate | `sudo` once, up front, on Linux (on a Mac only if a package installer needs it) |
+| Packages | `brew bundle` from the [[homebrew|Brewfile]] on a Mac; a fixed apt list on Linux |
+| Developer tools | fnm, Node, bun and Go at pinned versions |
+| Modern CLI tools | eza, delta, zoxide, lazygit |
+| Shared configs | Links for tmux, the prompt, git, the terminal, and the rest |
+| Claude Code | `settings.json`, `CLAUDE.md` and MCP servers, generated from layers |
+| Shell entry points | `zshenv`, `zshrc`, aliases and profiles for the machine's role |
+| Schedules | systemd user units on Linux, launchd agents on macOS |
+| Swap | A modest swap file on a Linux machine that has no swap at all |
+| Summary | Counted from the change log, so it reports what really happened |
+
+The Linux package list is short and practical: zsh, jq, ripgrep, fd, htop, ncdu, tmux, tree, mtr, fortune, bat, fzf,
+unzip, curl, the zsh autosuggestion and syntax-highlighting plugins, Python's venv module, and bubblewrap for
+[[codex|Codex]]'s sandbox. The [[grep-ripgrep-ugrep]] and [[system-utilities]] pages cover the most useful of them.
+
+Two flags change the shape of a run. `--config-only` skips every phase that needs `sudo` or a package manager and only
+writes to the home directory, which makes it safe on a locked-down machine. `--dry-run` shows what would happen and
+changes nothing; on a Mac it lists exactly which Brewfile entries would be installed or upgraded.
+
+## Design rules worth stealing
+
+**Idempotent.** Every step checks before it acts. A link that already points at the right file is left alone, a
+package that is installed is skipped, and a run with nothing to do says so.
+
+**Never delete.** The public installer moves anything it would replace into `~/.dotfiles-backup/<time>/`, with a
+`changes.jsonl` describing each move, and never removes a file. Undoing a run is a copy back.
+
+**Best effort, on purpose.** Cole's full installer deliberately does not use `set -e`. Its header explains why: it runs
+across very different machines, with or without `sudo`, with or without an editor installed, and one failed package
+must not stop the part that matters most, the links, the profile and the configs. Each step reports its own success or
+failure instead. The smaller public installer, which only links files, is strict and stops at the first error. Both
+choices are right for what each script does.
+
+**Pin, then verify.** The toolchain versions are pinned in one block at the top (fnm, Node, bun, Rust, lazygit,
+gitleaks, pre-commit and more), and the tmux plugins are pinned to exact commits. On Linux, downloaded release
+archives are checked against known checksums before they are installed, so a machine built next month gets the same
+tools as one built today, even if an upstream "latest" tag moves.
+
+**Check the result, not the exit code.** `brew bundle` reports the whole list as failed when a single entry fails. The
+comment in the installer records the day one cask's download error made about 45 installed formulae look broken. So
+after a failed bundle, the installer asks `brew bundle check` what is really missing and names only those entries.
+
+**Fix the known breakage.** The script carries fixes for problems that would otherwise bite every new machine:
+
+- **The Ghostty terminfo.** [[ghostty|Ghostty]] sets `TERM=xterm-ghostty`, but macOS ships no description of that
+  terminal, so programs like fzf, vim and less cannot decode the arrow keys and print `[` and `^` garbage instead.
+  The installer installs the terminfo entry into `~/.terminfo`, from a copy kept in the repository or from the app.
+- **`fd` versus `fdfind`.** Debian and Ubuntu package fd under the name `fdfind`; the installer adds an `fd` link.
+- **Codex's sandbox on newer Ubuntu.** From Ubuntu 23.10, unprivileged user namespaces are restricted, which breaks
+  the bubblewrap sandbox Codex uses for its write mode. The installer adds a sysctl setting that allows them.
+- **Tokens in remote URLs.** Every run rewrites an HTTPS remote with a token baked into it to SSH, a guard added after
+  exactly that turned up in `git remote -v`.
+
+**Work from anywhere.** Many files refer to `~/.dotfiles`, so cloning the repository somewhere else would break every
+shell. The installer links `~/.dotfiles` to the checkout when nothing is there yet, and the public one stops and
+explains your options when something else is.
+
+## Bootstrapping a server
+
+A server runs the same script with `--role server`. The role picks a leaner shell profile, and on Linux the installer
+enables systemd user timers, such as the one that saves every tmux layout every 15 minutes even when nobody is
+attached (see [[tmux]]). On a Mac the same jobs are launchd agents, including the one that parks idle agent sessions
+([[cc-park]]). After the bootstrap, the server reaches the other machines over [[tailscale|Tailscale]] and
+[[ssh|SSH]], and `dotsync` keeps it current from then on.
+
+## Try it
+
+```bash
+git clone https://github.com/coletebou/dx ~/.dotfiles
+cd ~/.dotfiles
+./install.sh --all --dry-run
+```
+
+Read the dry run before the real one. Then copy `identities/example` to your own identity, install with
+`--identity <you>`, and open a new shell. When you write your own bootstrap script, start with three features from
+this one: a dry run, a backup instead of a delete, and a summary of what changed.

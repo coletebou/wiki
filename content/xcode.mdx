@@ -1,0 +1,189 @@
+---
+title: Xcode
+summary: >-
+  Apple's IDE and toolchain, the only way to build, sign and upload Apple apps. In Cole's setup it is mostly a
+  toolchain that agents drive from the terminal: XcodeGen projects, xcodebuild, simctl, and Xcode's own MCP server.
+table: atelier
+folio: 68
+aliases: [xcodebuild, xcrun, simctl, XcodeGen, Device Hub, Xcode MCP]
+updated: 2026-10-28
+sources:
+  - title: Xcode 27 release notes
+    url: https://developer.apple.com/documentation/xcode-release-notes/xcode-27-release-notes
+  - title: Xcode 26.3 release notes (agentic coding)
+    url: https://developer.apple.com/documentation/xcode-release-notes/xcode-26_3-release-notes
+  - title: Giving external agents access to Xcode
+    url: https://developer.apple.com/documentation/xcode/giving-external-agents-access-to-xcode
+  - title: Setting up coding intelligence
+    url: https://developer.apple.com/documentation/xcode/setting-up-coding-intelligence
+  - title: Downloading and installing additional Xcode components
+    url: https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components
+  - title: Running your app on simulated or physical devices
+    url: https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices
+  - title: XcodeGen
+    url: https://github.com/yonaskolb/XcodeGen
+  - title: Drover's XcodeGen part convention (Cole's public repo)
+    url: https://github.com/coletebou/drover/blob/master/native/docs/xcodegen.md
+  - title: Tide's project.yml (Cole's public repo)
+    url: https://github.com/coletebou/tide/blob/master/project.yml
+---
+
+Xcode is Apple's integrated development environment and, more importantly, its toolchain: the Swift compiler, the
+SDKs, the simulators, the code signing machinery and the upload tools that every iPhone, Apple Watch and Mac app
+passes through. It is free and runs only on a Mac. In Cole's setup Xcode is less an editor than an engine: agents
+write the Swift, and they build, test and run it through Xcode's command line tools, with the Xcode window open
+mostly for the simulator, signing and the few things only it does. It is one stop on the [[ios-development]] map.
+
+## What is in it
+
+| Part | What it does |
+|---|---|
+| The Xcode app | Editor, SwiftUI previews, the debugger, the coding assistant |
+| Device Hub | Simulators and paired devices, in one window (Xcode 27) |
+| Instruments | Profiling: time, memory, energy, leaks |
+| Organizer | Archives, distribution to TestFlight and Developer ID, crash reports |
+| `xcodebuild` | Builds, tests, archives and exports from the terminal |
+| `xcrun simctl` | Creates, boots and drives simulators |
+| `xcrun devicectl` | Installs and launches apps on real devices ([[push-to-your-phone]]) |
+| `xcrun notarytool`, `stapler` | Notarization for Mac apps ([[mac-apps]]) |
+| `xcode-select` | Chooses which installed Xcode the command line tools use |
+
+As of late October 2026 the current release is Xcode 27.1, with Swift 6.4 and the iOS 27.1 SDK; it needs macOS
+Tahoe 26.6 or later and debugs on devices running iOS 17 and watchOS 10 or later. Xcode 27.2 is at release candidate.
+
+## Installing it, and keeping it sane
+
+Install Xcode from the Mac App Store or from Apple's developer site, where betas are available even to free
+accounts. Simulator runtimes and some platform tools download separately, from Xcode's Components settings or the
+terminal:
+
+```sh
+xcodebuild -downloadPlatform iOS                 # the iOS simulator runtime
+xcodebuild -downloadComponent MetalToolchain     # once, for projects that need it (Tide's terminal does)
+xcodebuild -version                              # which Xcode the command line is really using
+```
+
+Three things trip up almost everyone who scripts Xcode:
+
+- **Which Xcode is active.** `xcode-select -p` prints the developer directory the tools use. If it points at the
+  Command Line Tools instead of the full Xcode, `xcodebuild` fails with "requires Xcode." Fix it once with
+  `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`, or per command with `DEVELOPER_DIR`. Keeping a
+  beta next to a release is easy this way.
+- **The license.** A fresh or updated Xcode refuses to build until someone runs `sudo xcodebuild -license accept`.
+  In Cole's release scripts an unaccepted license shows up as an archive dying immediately with exit code 69.
+  Note that `sudo` drops `DEVELOPER_DIR`, so pass it through (`sudo env DEVELOPER_DIR=... xcodebuild -license
+  accept`) when Xcode is not the selected one. Agents do not get to accept licenses; Cole does.
+- **Command Line Tools are not enough.** They compile Swift packages, but in Cole's setup they could not build
+  SwiftUI code, because the SwiftUI macro plugins ship with the full Xcode.
+
+## XcodeGen: the project file as YAML
+
+An Xcode project lives in a `.pbxproj` file that Xcode writes and humans cannot really review: every file gets
+random identifiers in several sections, and two branches that each add a file conflict in it. Both of Cole's public
+Apple projects use [XcodeGen](https://github.com/yonaskolb/XcodeGen) instead, which generates the project from a
+short `project.yml`. Tide's README puts it plainly: "project.yml is the source of truth." The top of
+[Tide's spec](https://github.com/coletebou/tide/blob/master/project.yml):
+
+```yaml
+name: Tide
+options:
+  bundleIdPrefix: com.coletebou
+  deploymentTarget:
+    iOS: "17.0"
+```
+
+[Drover](https://github.com/coletebou/drover/blob/master/native/docs/xcodegen.md) goes further. Its root `project.yml`
+holds only shared settings, the shared Swift package and an include list, and each app (Mac, menu bar, iPhone, watch,
+widgets, Safari extension) adds its targets in its own part file. Several agents built those apps in parallel
+without ever touching each other's files, and the generated `Drover.xcodeproj` is not even committed. Signing stays
+out of the specs too: the development team comes from an environment variable, so the same spec makes unsigned CI
+builds and signed local ones.
+
+```sh
+brew install xcodegen
+xcodegen generate          # Tide: writes Tide.xcodeproj from project.yml
+script/generate.sh         # Drover: a wrapper that skips app parts that don't exist yet
+```
+
+The one rule to remember: the generated project only knows about files that existed when it was generated. After
+adding a Swift file, regenerate, or `swift test` will pass while `xcodebuild` says it "cannot find" the new type.
+
+<ColesTake>
+
+project.yml is the source of truth. The .xcodeproj is something XcodeGen writes, not something I edit.
+
+</ColesTake>
+
+## Building and testing from the terminal
+
+Everything the Xcode window does has a command, which is what lets agents in [[tmux]] sessions do the work:
+
+```sh
+xcodebuild -list -project Drover.xcodeproj                       # schemes and targets
+xcodebuild build -project Drover.xcodeproj -scheme DroveriOS \
+  -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO     # compile check, no signing
+swift test --package-path Packages/TideCore                       # the core logic, in seconds
+xcodebuild test -project Tide.xcodeproj -scheme Tide \
+  -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)' # UI tests on a simulator
+xcrun simctl list devices available                               # simulators you can boot
+```
+
+Tide's [[github-actions|GitHub Actions]] workflow runs exactly these three layers on every push: the core package
+tests, a simulator build, and its UI tests on an iPad simulator, with the screenshots kept as an artifact. Drover's
+apps take a `--mock` launch argument (`xcrun simctl launch <device> dev.drover.app --mock`) that runs them on
+synthetic data, which is how its screenshots are made without a real daemon.
+
+## Agents inside Xcode
+
+Xcode 26.3 added agentic coding: Anthropic's Claude Agent and OpenAI's Codex can work inside Xcode, and Xcode exposes
+its own capabilities (building, testing, previews, the project structure) to any agent through the Model Context
+Protocol ([[mcp|MCP]]). For agents that run outside Xcode, like Cole's [[claude-code|Claude Code]] and
+[[codex|Codex]] sessions, the setup is two steps. In Xcode, open Settings, then Intelligence, and under Model Context
+Protocol turn on "Allow external agents to use Xcode tools." Then register the bridge:
+
+```sh
+claude mcp add --transport stdio xcode -- xcrun mcpbridge
+codex mcp add xcode -- xcrun mcpbridge
+```
+
+Open the project in Xcode before prompting, and Xcode shows when an outside agent connects and when it is active.
+
+Xcode 27 widened what those agents can do:
+
+- They can boot simulators, install and launch the app, tap the screen and take screenshots to check the UI, and
+  press the Digital Crown and side button on a watch simulator.
+- New MCP tools read and change build settings, entitlements and `Info.plist` keys, switch schemes and run
+  destinations, and drive the debugger console. LLDB ships its own MCP server, `lldb-mcp`.
+- Plugins can bundle [[skills-and-plugins|skills]] (invoked as slash commands), MCP servers and agent configurations,
+  and Xcode speaks the Agent Client Protocol, so other agents can plug in.
+- A preview MCP server runs without an open workspace: `sudo xcrun mcp-server enable`, then
+  `xcrun mcp-server status`. Apple offers an `--unsafe-always-allow-all-agents` flag for unattended machines and
+  says it "is not a recommended configuration for at-desk use."
+
+## Signing, briefly
+
+Locally, "Automatically manage signing" in a target's Signing and Capabilities tab registers devices and creates
+profiles for you. In CI, signing should be manual and explicit. Drover's signed workflow imports a `.p12` certificate
+into a throwaway keychain, creates provisioning profiles through the App Store Connect API, and passes
+`CODE_SIGN_STYLE=Manual` on the command line, so the specs keep automatic signing for local builds and a CI runner
+never creates certificates on its own. The details of devices and profiles are on [[push-to-your-phone]]; uploads and
+API keys are on [[app-store-connect]].
+
+## Gotchas
+
+- **A locked keychain breaks headless exports.** Run from a detached tmux session while the login keychain is locked,
+  an export that signs with a local Distribution identity fails with `errSecInternalComponent`. Unlock the Mac first,
+  or sign with a throwaway keychain the script unlocks itself, the way Drover's CI does. The same applies to builds
+  started over [[ssh|SSH]].
+- **Homebrew's rsync can break exports.** Cole hit `Copy failed` during `-exportArchive` because the Homebrew rsync on
+  `PATH` lacked an option Apple's tools expect. Running with `PATH=/usr/bin:/bin:/usr/sbin:/sbin` fixed it.
+- **Downloaded artifacts carry extended attributes.** Code signing rejects "resource fork, Finder information, or
+  similar detritus" on files that came through synced folders; `xattr -cr <dir>` clears them. App Store Connect also
+  refuses Mac apps whose files carry the `com.apple.quarantine` attribute.
+- **UI tests want a logged-in Mac.** `xcodebuild test` can hang on a Mac sitting at the login window; see the
+  [[mac-mini#gotchas|Mac mini]] page.
+- **Privacy-protected folders and agents.** Apple's Xcode 26.3 notes warn that denying Claude or Codex access to a
+  project in Desktop, Documents or Downloads cannot be reversed from Xcode; the fix is System Settings, if an entry
+  appears there, or moving the project. Keep projects in a plain folder such as `~/code`.
+- **The first simulator launch is slow.** Apple lists "Initial Simulator launch can take several minutes" as a known
+  issue in Xcode 27.1, so do not mistake it for a hang.

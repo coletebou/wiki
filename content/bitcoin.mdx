@@ -1,0 +1,185 @@
+---
+title: Bitcoin
+summary: >-
+  The open, permissionless money network, and a public ledger anyone can read forever. How it works, self-custody,
+  mining at home, the privacy tools that exist, and why Cole says the government sees everything you do with it.
+table: mint
+folio: 77
+aliases: [BTC, chain analysis, CoinJoin, PayJoin, silent payments, self-custody]
+updated: 2026-10-28
+sources:
+  - title: Bitcoin FAQ (bitcoin.org)
+    url: https://bitcoin.org/en/faq
+  - title: Protect your privacy (bitcoin.org)
+    url: https://bitcoin.org/en/protect-your-privacy
+  - title: Running a full node (bitcoin.org)
+    url: https://bitcoin.org/en/full-node
+  - title: BIP 78, a simple payjoin proposal
+    url: https://github.com/bitcoin/bips/blob/master/bip-0078.mediawiki
+  - title: BIP 77, async payjoin
+    url: https://github.com/bitcoin/bips/blob/master/bip-0077.md
+  - title: BIP 352, silent payments
+    url: https://github.com/bitcoin/bips/blob/master/bip-0352.mediawiki
+  - title: Digital assets (IRS), including Form 1099-DA reporting
+    url: https://www.irs.gov/filing/digital-assets
+  - title: FinCEN guidance on convertible virtual currency (FIN-2019-G001)
+    url: https://www.fincen.gov/system/files/2019-05/FinCEN%20Guidance%20CVC%20FINAL%20508.pdf
+  - title: Chainalysis Government Solutions
+    url: https://www.chainalysis.com/government/
+  - title: Samourai Wallet founders sentenced (US Attorney's Office, SDNY)
+    url: https://www.justice.gov/usao-sdny/pr/founders-samourai-wallet-cryptocurrency-mixing-service-sentenced-five-and-four-years
+  - title: Bitcoin Core releases
+    url: https://github.com/bitcoin/bitcoin/releases
+---
+
+Bitcoin is an open payment network and a digital money with no company or government in charge: in bitcoin.org's
+words, "the first decentralized peer-to-peer payment network that is powered by its users with no central authority
+or middlemen." Its ledger, the blockchain, is public, and every computer running a full node checks every rule for
+itself. In Cole's setup Bitcoin shows up three ways: the self-custody wallets on Cole's list, a small open-source
+miner at home (a [[bitaxe|Bitaxe]]), and as the reference point for privacy, because every Bitcoin transaction is
+visible to anyone, forever. That last fact is why Cole points to [[monero|Monero]] when privacy is the whole point.
+
+This page explains what the software does. It is not financial advice, and nothing here suggests buying anything.
+
+## How it works, briefly
+
+- **A ledger of coins, not accounts.** Bitcoin tracks individual chunks of value (unspent transaction outputs, or
+  UTXOs), each locked to a key. A wallet's balance is the sum of the coins its keys can spend.
+- **Keys sign, nodes verify.** A wallet keeps a private key and uses it to sign each transaction. Nodes check the
+  signature and the rules, and reject anything that breaks them.
+- **Miners order the transactions.** New blocks arrive "approximately every 10 minutes on average," each carrying a
+  proof of work that took enormous computation to find. Miners are paid newly issued bitcoin plus fees, and the
+  amount issued keeps halving until it stops at 21 million coins in total.
+- **Settled means permanent.** Each new block buries the earlier ones deeper. Bitcoin transactions are, as
+  bitcoin.org puts it, "secure, irreversible." A payment sent to the wrong address is gone.
+- **The software is open.** Bitcoin Core, the reference node, is at version 31.1 (released July 2026). Changes to the
+  protocol are proposed as BIPs (Bitcoin Improvement Proposals), several of which appear below.
+
+## Self-custody
+
+You can hold bitcoin two ways. On an exchange, the company holds the keys and you hold an IOU. In self-custody, your
+wallet holds the keys and nobody can freeze, lose or lend out your coins, which also means nobody can recover them
+for you.
+
+A self-custody wallet starts from a *seed*, usually 12 or 24 words, from which every key and address is derived.
+Whoever has the words has the money. Write them down on paper or stamp them in metal, keep them offline, and never
+type them into a website or a chat window. (This wiki never publishes seed words, keys, extended public keys or
+addresses. Its [[wiki-mcp#the-public-safety-rules|public-safety check]], which also screens every agent edit made
+through the wiki's MCP server, rejects Bitcoin addresses outright.)
+
+The two wallets on Cole's list cover the two places you hold keys:
+
+- **[[sparrow-wallet|Sparrow]]** on the desktop: coin control, labels, hardware wallets, multisig, and a direct
+  connection to your own node.
+- **[[cake-wallet|Cake Wallet]]** on the phone: Bitcoin with silent payments and PayJoin, plus Monero.
+
+Running your own node finishes the picture. Sparrow's guide puts it simply: "Not only are you keeping your
+transactions private, but you are validating them yourself."
+
+## Running a node
+
+A full node downloads every block since 2009 and checks every rule itself, so it never has to trust anyone about
+what the ledger says, and your wallet never has to tell a stranger which addresses are yours. The reference software
+is Bitcoin Core, and bitcoin.org's full node guide lists what it costs to run:
+
+- **Disk.** The full chain is over 750 GB. Pruned mode keeps only recent blocks and cuts that "to around 7GB," at the
+  price of features that need the old blocks (a transaction index and wallet rescans).
+- **The first sync.** Expect about 740 GB of download the first time the node starts, before it is caught up.
+- **Ongoing traffic.** Around 20 GB a month down, and "200 gigabytes upload or more a month" is common on fast
+  connections, because a node serves blocks to other nodes.
+
+Pruning is one line in `bitcoin.conf`, measured in MiB:
+
+```ini
+prune=10000
+```
+
+A node can live on an always-on desktop like the [[mac-mini|Mac mini]] (pruned, or with an external drive for the
+full chain) or on a small [[servers|server]]. Point [[sparrow-wallet|Sparrow]] at it and your wallet's questions
+never leave your own machines; reach it from a laptop or phone over [[tailscale|Tailscale]] rather than opening it to
+the internet. A node can also run its connections over Tor, so peers cannot tie the transactions you broadcast to
+your home IP address.
+
+## What the public ledger reveals
+
+bitcoin.org says it plainly: "All Bitcoin transactions are public, traceable, and permanently stored in the Bitcoin
+network." Bitcoin is *pseudonymous*: addresses are not names, but the history attached to an address never goes
+away, and "once addresses are used, they become tainted by the history of all transactions they are involved with."
+
+Several things turn that pseudonym into a person:
+
+- **Heuristics.** Analysts assume that all the inputs of a transaction belong to one owner, and they guess which
+  output is change from its script type or a round amount. BIP 78 names these "common-input,"
+  "change-scriptpubkey" and "change-round-amount."
+- **Chain analysis companies.** Firms like Chainalysis sell tools to "trace funds" and "uncover real-world entities,"
+  and its government arm works with "United States defense, intelligence, law enforcement, and civilian agencies."
+- **Exchanges know who you are.** In the United States, a business that buys or sells cryptocurrency for customers is
+  a money transmitter under FinCEN's rules, covered by the Bank Secrecy Act, so it verifies identity, keeps records and
+  reports suspicious activity. The day you withdraw from an exchange, your name is attached to those coins on its
+  books.
+- **The tax system gets copies.** US brokers must report gross proceeds on Form 1099-DA "for transactions effected on
+  or after Jan. 1, 2025," and basis on certain transactions from January 1, 2026. Form 1040 and other federal returns
+  ask a yes-or-no question about digital assets.
+- **Your IP address.** A wallet that talks to someone else's server, or a node that broadcasts without Tor, tells the
+  network where a transaction came from. bitcoin.org suggests Tor "so that it cannot be logged."
+
+Privacy tools are not out of reach of the law either. In November 2025, the founders of Samourai Wallet, whose
+Whirlpool service ran CoinJoins and whose Ricochet feature added extra hops, were sentenced to five and four years in
+prison after pleading guilty to a money transmitting conspiracy in which, prosecutors said, they knowingly moved
+criminal proceeds.
+
+<ColesTake>
+
+With Bitcoin, the government sees everything. Every coin's history is public forever, and the moment it touches an
+exchange that knows your name, that history is yours.
+
+</ColesTake>
+
+## Privacy tools, and how far they go
+
+None of these make Bitcoin private the way Monero is private, but each closes a specific leak. Status as of late
+October 2026:
+
+| Technique | What it hides | Where it stands |
+|---|---|---|
+| A new address for every payment | Links between your payments | Every good wallet does it; reusing an address undoes it |
+| Coin control and labels | Which coins get spent together | Built into Sparrow and Cake Wallet |
+| Your own node, over Tor | Your addresses from public servers, your IP from the network | Sparrow connects straight to Bitcoin Core, with Tor built in |
+| CoinJoin | The link from inputs to outputs, by mixing many people's coins in one transaction | Shrinking: Samourai's Whirlpool is gone, Wasabi's original coordinator shut down in June 2024 (the wallet now uses independent coordinators), and JoinMarket's original code was archived in April 2026 |
+| PayJoin (BIP 78) | The common-input assumption: the receiver adds an input, so the inputs no longer all belong to the sender | BIP 78 is deployed; its asynchronous successor, BIP 77, is a draft. Sparrow has supported it since 2020, Cake Wallet since May 2025 |
+| Silent payments (BIP 352) | Links between payments to one published address: senders derive a fresh address each time | BIP 352 is complete. Cake Wallet has supported them since 2024; Sparrow can send to them since October 2025 |
+| Lightning | Individual payments, which move off the chain | Channel openings and closings are still on-chain |
+
+Two limits apply to all of them. The amounts and the transaction graph stay public forever, so analysis can be
+re-run years later with better tools. And a single careless step (a withdrawal from a KYC exchange straight into a
+"private" wallet, an address posted online, a reused address) links everything around it.
+
+## Mining at home
+
+Mining is how new blocks get made, and anyone can join. Industrial miners run warehouses of machines, but open-source
+hardware like the [[bitaxe|Bitaxe]] puts a single mining chip on a board that sits on a desk, draws around 15 to 20
+watts, and *solo mines*: it tries to find a whole block by itself. Its odds of ever finding one are small
+and the hardware will not pay for itself; what it does is make you a participant instead of a spectator, and teach
+how the network works. The [[bitaxe]] page has the details and the math.
+
+## Bitcoin in the rest of the setup
+
+- **Keys are secrets like any other.** Seeds belong offline. Anything that touches a wallet's secrets follows the same
+  rules as Cole's other credentials ([[env-files]], [[pgp]]): never in a repository, never in a chat, never pasted
+  into an agent's prompt.
+- **The curve is everywhere.** Bitcoin's elliptic curve, secp256k1, also protects the keys of dotenvx, the encrypted
+  env-file tool on the [[env-files]] page.
+- **No financial advice, no addresses.** The wiki explains tools; it never asks for money and never prints an
+  address.
+
+## Gotchas
+
+- **Irreversible means irreversible.** Check the address on the hardware wallet's screen before sending. Clipboard
+  malware that swaps a copied address is a known attack.
+- **Change outputs leak.** Spending one coin usually creates change back to you, which ties the payment to your wallet.
+  Coin control lets you choose which coins to spend.
+- **Public servers learn your wallet.** A wallet that asks a public Electrum server about your addresses tells that
+  server your whole balance. Sparrow warns that "sharing your balance with public servers may be making you a target."
+- **Lost seed, lost coins.** There is no reset. Bitcoin.org notes lost coins "remain dormant forever."
+- **Taxes follow the coins.** For US tax purposes, "digital assets are considered property, not currency," so selling
+  or spending can be a taxable event.

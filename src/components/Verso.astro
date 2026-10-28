@@ -1,0 +1,62 @@
+---
+// The back of the leaf: who cites this folio, what it rests on, and how to emend it.
+import { folioLabel } from '../../lib/schema.mjs';
+import { href, tableOf, type Page } from '../lib/wiki';
+
+interface Props {
+  page: Page;
+  citedBy: Page[];
+  cites: Page[];
+  prev?: Page;
+  next?: Page;
+  stichoi: number;
+}
+const { page, citedBy, cites, prev, next, stichoi } = Astro.props;
+const { folio, sources = [], updated } = page.data;
+const editUrl = `https://github.com/coletebou/wiki/edit/master/content/${page.id}.mdx`;
+const historyUrl = `https://github.com/coletebou/wiki/commits/master/content/${page.id}.mdx`;
+const emended = updated.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+---
+<section class="verso" aria-labelledby="verso-head">
+  <h2 class="verso-head" id="verso-head"><span class="folio-no">{folioLabel(folio, 'v')}</span> The back of the leaf</h2>
+  <section aria-labelledby="cited-by">
+    <h3 id="cited-by">Cited by</h3>
+    {citedBy.length ? (
+      <ul>
+        {citedBy.map((p) => (
+          <li><a href={href(p.id)}>{p.data.title}</a><small>{folioLabel(p.data.folio)} · {tableOf(p.data.table).title}</small></li>
+        ))}
+      </ul>
+    ) : <p class="empty">No folio cites this one yet.</p>}
+  </section>
+  <section aria-labelledby="cites">
+    <h3 id="cites">Cites</h3>
+    {cites.length ? (
+      <ul>
+        {cites.map((p) => (
+          <li><a href={href(p.id)}>{p.data.title}</a><small>{folioLabel(p.data.folio)} · {tableOf(p.data.table).title}</small></li>
+        ))}
+      </ul>
+    ) : <p class="empty">This folio cites no other.</p>}
+  </section>
+  <section aria-labelledby="fontes">
+    <h3 id="fontes">Fontes · sources</h3>
+    {sources.length ? (
+      <ul>
+        {sources.map((s) => (
+          <li><a href={s.url} rel="noopener">{s.title}</a><small>{new URL(s.url).hostname.replace(/^www\./, '')}</small></li>
+        ))}
+      </ul>
+    ) : <p class="empty">Drawn from Cole’s own setup.</p>}
+    <h3 style="margin-top:1.6rem">Colophon of this leaf</h3>
+    <ul>
+      <li>Last emended <time datetime={updated.toISOString().slice(0, 10)}>{emended}</time><small><a href={historyUrl} rel="noopener">every emendation</a></small></li>
+      <li>{stichoi.toLocaleString('en-US')} stichoi<small>lines of 36 letters, as Alexandria counted</small></li>
+      <li><a class="emend" href={editUrl} rel="noopener">Emend this folio</a><small>on GitHub, or by an agent through the <a href="/wiki-mcp/">wiki’s MCP</a></small></li>
+    </ul>
+  </section>
+  <nav class="turn" aria-label="Turn the leaf">
+    {prev && <a class="prev" href={href(prev.id)}><small>← {folioLabel(prev.data.folio)}</small>{prev.data.title}</a>}
+    {next && <a class="next" href={href(next.id)}><small>{folioLabel(next.data.folio)} →</small>{next.data.title}</a>}
+  </nav>
+</section>

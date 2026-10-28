@@ -1,0 +1,153 @@
+---
+title: Pushing Straight to Your Phone
+summary: >-
+  Running your own app on your own iPhone, from Xcode or the command line: pairing by cable or Wi-Fi, Developer
+  Mode, the free account's seven-day limits, devicectl for agents, ad hoc builds, and TestFlight as the cable-free way.
+table: atelier
+folio: 71
+aliases: [Developer Mode, devicectl, free provisioning, Personal Team, ad hoc distribution, sideloading]
+updated: 2026-10-28
+sources:
+  - title: Enabling Developer Mode on a device
+    url: https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device
+  - title: Managing your simulated and physical devices in Device Hub
+    url: https://developer.apple.com/documentation/xcode/managing-your-simulated-and-physical-devices-in-device-hub
+  - title: Running your app on simulated or physical devices
+    url: https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices
+  - title: Choosing a membership (Personal Team limits)
+    url: https://developer.apple.com/support/compare-memberships/
+  - title: Devices overview (registration limits)
+    url: https://developer.apple.com/help/account/devices/devices-overview
+  - title: Create an ad hoc provisioning profile
+    url: https://developer.apple.com/help/account/provisioning-profiles/create-an-ad-hoc-provisioning-profile
+  - title: Xcode 27 release notes (Device Hub, devicectl)
+    url: https://developer.apple.com/documentation/xcode-release-notes/xcode-27-release-notes
+  - title: devicectl install and launch commands (Apple Developer Forums)
+    url: https://developer.apple.com/forums/thread/759036
+---
+
+Pushing straight to your phone means running your own build on your own iPhone, directly from [[xcode|Xcode]], with
+no TestFlight and no App Store in between. It is the tightest loop in [[ios-development]]: change a line, press
+Run, and the app is on the phone a few seconds later with the debugger attached. You can do it with a free Apple
+Account, within limits; this page covers the setup, those limits, the command line version that agents use, and the
+two ways to reach a phone without a cable.
+
+## The quick version
+
+1. **Sign in to Xcode.** Xcode, Settings, Apple Accounts. A free account shows up as a *Personal Team*.
+2. **Set up signing.** In your app target's Signing and Capabilities tab, turn on "Automatically manage signing,"
+   pick your team and give the app a unique bundle ID (for example `com.yourname.hello`).
+3. **Pair the phone.** Connect it with a cable and tap Trust on the phone's "Trust This Computer" dialog. With iOS 27
+   and Xcode 27 you can skip the cable: open Device Hub, choose the add button, then "Pair Nearby Device…" while the
+   phone is on the same Wi-Fi.
+4. **Turn on Developer Mode** on the phone (next section).
+5. **Run.** Choose the phone as the run destination and press <kbd>⌘</kbd>+<kbd>R</kbd>. The first time, Xcode
+   registers the device and creates a development profile for it.
+
+<ColesTake>
+
+Plug in once, trust the Mac, flip on Developer Mode, and from then on it's just Command-R. With a phone on iOS 27 you
+don't even need the cable anymore.
+
+</ColesTake>
+
+## Developer Mode
+
+Developer Mode is the switch that lets an iPhone, iPad, Apple Watch or Vision Pro run apps signed for development.
+Apple's reason: it "protects people from inadvertently installing potentially harmful software." It does not affect
+apps from the App Store or [[testflight|TestFlight]]; it is needed only for builds you run from Xcode or `.ipa` files
+you install with Apple Configurator.
+
+- On the phone, open Settings, Privacy and Security, and turn on Developer Mode under Security. The phone warns that
+  it reduces security and asks to restart.
+- After the restart, confirm with Enable and your passcode.
+- The switch appears only once you have started pairing the device with a Mac (or paired it before), so a brand new
+  phone will not show it until you plug it in or pair it.
+- For an Apple Watch, turn it on on both the watch and its paired iPhone (see [[apple-watch-apps]]).
+
+To turn it off, flip the same switch and restart; Xcode can no longer run apps on the device until you turn it back
+on.
+
+## The free account and its limits
+
+A Personal Team costs nothing and is enough for building on your own phone. Apple lists the limits:
+
+- Up to 10 App IDs and 3 devices, each expiring after 7 days.
+- Up to 3 of your apps installed on a device at once.
+- Provisioning profiles expire 7 days after they are issued, so the app stops launching after a week and you rebuild
+  and reinstall it.
+- No push notifications, iCloud, Sign in with Apple, Associated Domains or Apple Pay. App Groups, Keychain Sharing,
+  HealthKit and background modes do work.
+
+The first launch of a free-signed app can stop at an "Untrusted Developer" alert. Trust your developer certificate
+once in Settings, General, VPN and Device Management, and it launches normally after that.
+
+The paid Apple Developer Program (<Price id="apple-developer-program" />) removes the weekly expiry and the
+capability gaps, and lets you register up to 100 devices of each kind per membership year.
+
+## Without the cable
+
+Xcode 27 pairs iPhones and iPads running iOS 27 over the network, and Apple calls it "a more reliable experience for
+pairing watches" too. For phones on older iOS versions, pair with a cable once; after that, Apple's docs say you "can
+disconnect the physical cable and run apps on the device through Xcode using Wi-Fi with IPv6 enabled on the same
+network as your Mac."
+
+A wireless pairing does not survive an operating system upgrade: after updating the phone, pair it again. And if the
+Trust dialog was dismissed by accident or the device never shows up, Apple's advice is to restart the device.
+
+## From the command line
+
+Agents in [[tmux]] sessions cannot click Run, so they use `devicectl`, Apple's command line tool for physical devices,
+which ships with Xcode. (Older guides use the third-party `ios-deploy`, which does not support iOS 17 and later.)
+
+```sh
+xcrun devicectl list devices                     # paired devices and their identifiers
+
+xcodebuild -scheme MyApp -destination 'generic/platform=iOS' \
+  -derivedDataPath build -allowProvisioningUpdates build
+
+xcrun devicectl device install app --device <device-id> build/Build/Products/Debug-iphoneos/MyApp.app
+xcrun devicectl device process launch --device <device-id> com.yourname.hello
+```
+
+`-allowProvisioningUpdates` lets `xcodebuild` register the device and refresh profiles the way the Xcode window does;
+it is fine on your own Mac, and the wrong thing in CI, where it creates certificates on every clean runner. Add
+`--json-output <file>` to a `devicectl` command to get results a script can parse; Xcode 27 can also send that JSON to
+standard output (`devicectl --help` has the details).
+
+That is how Cole's agents check a build on real hardware: install it with `devicectl`, launch it, and confirm on the
+device that the right bundle, version and build number are installed and the process is running. A successful install
+proves exactly that much. Signing in, the camera, location and push still need a human with the phone in hand.
+
+## Ad hoc builds
+
+An ad hoc build is a release-signed build that runs on a fixed list of registered devices, with no TestFlight and no
+review. It needs the paid program, an App ID, a distribution certificate and an ad hoc provisioning profile that
+names the devices; with automatic signing, Xcode manages that profile for you.
+
+The limit is the device list: up to 100 devices per product family (iPhone, iPad, Apple Watch, Mac and so on) per
+membership year. Disabling a device during the year does not give its slot back; you can remove devices and restore
+the count to 100 only at the start of a new membership year. For most teams, TestFlight's internal testing does the
+same job with less bookkeeping.
+
+## TestFlight: the cable-free route
+
+When the Mac that builds is not next to the phone, or a build comes out of CI, internal [[testflight|TestFlight]]
+testing is the practical way to push to your phone. Internal builds skip Beta App Review, and with automatic
+distribution on, a build reaches every phone in the internal group a few minutes after it finishes processing. The
+trade-off is the upload and processing time, and no debugger.
+
+The cross-platform stacks have their own shortcuts to a device: `npx cap run ios` for Capacitor, and development
+builds from EAS Build for Expo (see [[capacitor-expo-swift]]).
+
+## Gotchas
+
+- **Seven days, three apps.** On a free account an app you installed last week stops launching. Rebuild it, or join
+  the program.
+- **Bundle IDs are global.** Xcode refuses to set up signing with a bundle ID someone else already registered, so
+  pick something with your own name or domain in it.
+- **The phone can be too new.** Xcode has to support the iOS version on the device. Update Xcode when the phone gets a
+  major update, and remember that Xcode 27 debugs only devices on iOS 17 or later.
+- **Developer Mode is per device.** A new phone, or a phone that was erased, needs it turned on again.
+- **Installed is not working.** `devicectl` proves the app is on the phone and launched. The feature still needs
+  someone to use it.
