@@ -2,6 +2,8 @@
 // Study: worktree fan-out. One `pw launch` drawn as a botanical study: the repository is the trunk, each manifest row
 // grows a branch to its own worktree, the worktree is bootstrapped, its agent starts in a tmux window, and each
 // summary lands in the merged log between sentinel lines. Choose how many lanes, launch, or pick a lane.
+import { HATCH_TURN, overshoot, plate } from './ink';
+
 const lanes = [
   { tag: 'search', branch: 'feat/search-filters', engine: 'claude', done: 'Filter chips and URL state; 14 tests pass.' },
   { tag: 'export', branch: 'feat/csv-export', engine: 'claude', done: 'CSV export with streaming rows; e2e green.' },
@@ -16,6 +18,107 @@ const laneY = (i: number) => 92 + i * 60;
 const trunkX = 262;
 const branchFrom = (i: number) => laneY(i) + 46;
 const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
+
+// The tree, drawn as a botanical study: a trunk that tapers from its roots, ringed with bark and shaded on its right;
+// branches that thicken where they leave it; leaves with a midrib and one hatched half.
+type P = [number, number];
+const r1 = (n: number) => Math.round(n * 10) / 10;
+const xy = (p: P) => `${r1(p[0])} ${r1(p[1])}`;
+const bez = (a: P, b: P, c: P, d: P, t: number): P => {
+  const u = 1 - t;
+  return [u * u * u * a[0] + 3 * u * u * t * b[0] + 3 * u * t * t * c[0] + t * t * t * d[0], u * u * u * a[1] + 3 * u * u * t * b[1] + 3 * u * t * t * c[1] + t * t * t * d[1]];
+};
+const TRUNK: [P, P, P, P] = [[trunkX, 452], [trunkX - 6, 360], [trunkX + 8, 200], [trunkX - 2, 92]];
+const halfWidth = (t: number) => 4 + 7.4 * Math.pow(1 - t, 1.25) + (t < 0.1 ? Math.pow((0.1 - t) / 0.1, 2) * 9 : 0);
+function tapered(curve: [P, P, P, P], w: (t: number) => number, n = 40) {
+  const left: P[] = [];
+  const right: P[] = [];
+  const mid: P[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const p = bez(...curve, t);
+    const q = bez(...curve, Math.min(1, t + 0.01));
+    const o = bez(...curve, Math.max(0, t - 0.01));
+    const d = [q[0] - o[0], q[1] - o[1]];
+    const l = Math.hypot(d[0], d[1]) || 1;
+    const nrm: P = [-d[1] / l, d[0] / l];
+    left.push([p[0] + nrm[0] * w(t), p[1] + nrm[1] * w(t)]);
+    right.push([p[0] - nrm[0] * w(t), p[1] - nrm[1] * w(t)]);
+    mid.push(p);
+  }
+  return { left, right, mid, outline: `M${left.map(xy).join('L')}L${right.slice().reverse().map(xy).join('L')}Z` };
+}
+const trunk = tapered(TRUNK, halfWidth);
+// Its shaded half, toward the lower right, and the rings of bark across it.
+const trunkShade = `M${trunk.mid.map(xy).join('L')}L${trunk.right.slice().reverse().map(xy).join('L')}Z`;
+const bark =
+  trunk.mid
+    .filter((_, i) => i % 3 === 1 && i < 39)
+    .map((p, k) => {
+      const i = k * 3 + 1;
+      const [l, r] = [trunk.left[i], trunk.right[i]];
+      return `M${xy(l)}Q${xy([p[0], p[1] + 2.2 + (k % 2)])} ${xy(r)}`;
+    })
+    .join('') +
+  // Fissures running up the bark, a third of the way in from each side.
+  [0.35, 0.68].map((f) => `M${trunk.mid.slice(1, 34).map((p, i) => xy([trunk.left[i + 1][0] + (trunk.right[i + 1][0] - trunk.left[i + 1][0]) * f + Math.sin(i * 1.3) * 0.6, p[1]])).join('L')}`).join('');
+// Where a branch leaves the trunk: the trunk's right edge at that height.
+const trunkEdge = (y: number) => {
+  let best = 0;
+  trunk.right.forEach((p, i) => {
+    if (Math.abs(p[1] - y) < Math.abs(trunk.right[best][1] - y)) best = i;
+  });
+  return Math.max(trunk.right[best][0], trunk.left[best][0]) - 1.2;
+};
+// Roots, each a tapering stroke into the ground, and the ground hatched under them.
+const roots = ([
+  [[trunkX - 12, 444], [trunkX - 24, 452], [trunkX - 40, 455], [trunkX - 58, 462]],
+  [[trunkX + 12, 443], [trunkX + 24, 450], [trunkX + 36, 452], [trunkX + 52, 458]],
+  [[trunkX - 6, 448], [trunkX - 12, 458], [trunkX - 20, 462], [trunkX - 30, 469]],
+  [[trunkX + 6, 448], [trunkX + 12, 457], [trunkX + 18, 462], [trunkX + 26, 469]],
+  [[trunkX, 450], [trunkX + 1, 458], [trunkX - 2, 464], [trunkX, 470]],
+] as [P, P, P, P][]).map((c, i) => tapered(c, (t) => (i < 2 ? 4.2 : 3) * Math.pow(1 - t, 0.8) + 0.25, 16).outline);
+// The ground, a few strokes of it, hatched under the roots where they go in.
+const ground = Array.from({ length: 13 }, (_, i) => {
+  const x = trunkX - 54 + i * 8.6 + (i % 3);
+  return `M${r1(x)} ${462 + (i % 2) * 1.5}l4.2 6`;
+}).join('');
+// Each lane's branch: the curve it grows along, the thicker stretch where it leaves the trunk, and two leaves.
+const branchCurve = (i: number): [P, P, P, P] => {
+  const y = laneY(i);
+  const fy = branchFrom(i);
+  const x0 = trunkEdge(fy);
+  return [[x0, fy], [x0 + 46, fy - 7], [trunkX + 60, y + 24], [380, y + 22]];
+};
+function split(c: [P, P, P, P], t: number): [P, P, P, P] {
+  const lerp = (a: P, b: P): P => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const [a, b, cc, d] = c;
+  const ab = lerp(a, b);
+  const bc = lerp(b, cc);
+  const cd = lerp(cc, d);
+  const abc = lerp(ab, bc);
+  const bcd = lerp(bc, cd);
+  return [a, ab, abc, lerp(abc, bcd)];
+}
+const curveD = (c: [P, P, P, P]) => `M${xy(c[0])}C${xy(c[1])} ${xy(c[2])} ${xy(c[3])}`;
+function leaf(at: P, deg: number, len: number) {
+  const a = (deg * Math.PI) / 180;
+  const v: P = [Math.cos(a), Math.sin(a)];
+  const n: P = [-v[1], v[0]];
+  const p = (u: number, w: number): P => [at[0] + v[0] * u * len + n[0] * w * len, at[1] + v[1] * u * len + n[1] * w * len];
+  // A stalk, then the blade: broad near its base, drawn out to a point.
+  const blade = `M${xy(p(0.12, 0))}C${xy(p(0.3, 0.3))} ${xy(p(0.72, 0.27))} ${xy(p(1, 0))}C${xy(p(0.72, -0.22))} ${xy(p(0.3, -0.27))} ${xy(p(0.12, 0))}Z`;
+  const half = `M${xy(p(0.12, 0))}C${xy(p(0.3, 0.3))} ${xy(p(0.72, 0.27))} ${xy(p(1, 0))}Z`;
+  const veins = `M${xy(p(0, 0))}L${xy(p(0.93, 0))}` + [0.32, 0.5, 0.68, 0.82].map((u) => `M${xy(p(u, 0))}Q${xy(p(u + 0.06, 0.1))} ${xy(p(u + 0.12, 0.2 - (u - 0.3) * 0.25))}M${xy(p(u, 0))}Q${xy(p(u + 0.06, -0.09))} ${xy(p(u + 0.12, -0.18 + (u - 0.3) * 0.22))}`).join('');
+  return { blade, half, veins };
+}
+const branches = lanes.map((_, i) => {
+  const c = branchCurve(i);
+  const up = leaf(bez(...c, 0.28), -58 - (i % 3) * 7, 21);
+  const down = leaf(bez(...c, 0.6), 32 + (i % 2) * 10, 16);
+  return { d: curveD(c), base: curveD(split(c, 0.22)), mid: curveD(split(c, 0.5)), leaves: [up, down] };
+});
+const sheet = plate(800, 470);
 ---
 <figure class="study fanout" data-pagefind-ignore data-lanes="4" aria-labelledby="wf-title">
   <figcaption class="study-head">
@@ -32,8 +135,8 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
   <div class="study-scroll">
     <svg class="study-svg wf-svg" viewBox="0 0 800 470" role="group" aria-label="One launch of parallel worktrees" style="min-width: 660px">
       <defs>
-        <pattern id="wf-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="5" stroke="currentColor" stroke-width="0.9" opacity="0.4" />
+        <pattern id="wf-hatch" width="3.6" height="3.6" patternUnits="userSpaceOnUse" patternTransform={`rotate(${HATCH_TURN})`}>
+          <line x1="0" y1="0" x2="0" y2="3.6" stroke="currentColor" stroke-width="0.75" opacity="0.5" />
         </pattern>
         <filter id="wf-ink" x="-3%" y="-3%" width="106%" height="106%">
           <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="11" result="n" />
@@ -41,6 +144,11 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
         </filter>
       </defs>
 
+      <g class="wf-plate" aria-hidden="true">
+        <path d={sheet.ticks} />
+        <path d={sheet.corners} />
+      </g>
+      <text class="label-hand wf-motto" x="20" y="462" aria-hidden="true">de arboribus</text>
       <text class="caps wf-head" x="20" y="74">The manifest</text>
       <text class="caps wf-head" x="240" y="74">The repository</text>
       <text class="caps wf-head" x="380" y="74">Worktrees</text>
@@ -48,21 +156,25 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
 
       <g class="wf-tabs">
         <g class="wf-tab log-tab">
-          <rect x="20" y="16" width="70" height="26" rx="4" />
+          <rect x="20" y="16" width="70" height="26" rx="2" />
           <text x="55" y="34" text-anchor="middle">0:log</text>
         </g>
         {lanes.map((l, i) => (
           <g class="wf-tab lane-tab" data-lane={i}>
-            <rect x={96 + i * 84} y="16" width="80" height="26" rx="4" />
+            <rect x={96 + i * 84} y="16" width="80" height="26" rx="2" />
             <text x={136 + i * 84} y="34" text-anchor="middle">{i + 1}:{l.tag}</text>
           </g>
         ))}
       </g>
 
-      <path class="trunk" d={`M${trunkX} 452 C ${trunkX - 6} 360, ${trunkX + 8} 200, ${trunkX - 2} 92`} filter="url(#wf-ink)" />
-      <path class="trunk-fine" d={`M${trunkX + 7} 452 C ${trunkX + 2} 360, ${trunkX + 14} 210, ${trunkX + 5} 104`} />
-      <path class="roots" d={`M${trunkX} 452 q -26 6 -40 14 M${trunkX + 3} 452 q 18 8 36 12 M${trunkX + 6} 450 q 4 10 2 18`} />
-      <text class="wf-root" x={trunkX + 16} y="465">origin/HEAD</text>
+      <g class="wf-tree" aria-hidden="true">
+        <path class="ground" d={ground} />
+        {roots.map((d) => <path class="root" d={d} filter="url(#wf-ink)" />)}
+        <path class="trunk" d={trunk.outline} filter="url(#wf-ink)" />
+        <path class="trunk-shade" d={trunkShade} fill="url(#wf-hatch)" />
+        <path class="bark" d={bark} />
+      </g>
+      <text class="wf-root" x={trunkX + 58} y="466">origin/HEAD</text>
 
       {lanes.map((l, i) => {
         const y = laneY(i);
@@ -70,16 +182,27 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
         return (
           <g class="lane" data-lane={i} tabindex="0" role="button" aria-label={`Lane ${l.tag}: branch ${l.branch}, engine ${l.engine}`}>
             <g class="row">
-              <rect class="row-box" x="16" y={y - 2} width="214" height="50" rx="5" />
+              <rect class="row-box" x="16" y={y - 2} width="214" height="50" rx="2" />
+              <path class="row-rule" d={`M22 ${y + 4}V${y + 42}`} />
               <text class="row-tag" x="28" y={y + 18}>{l.tag}</text>
               <text class={`row-engine ${l.engine.startsWith('codex') ? 'codex' : ''}`} x="218" y={y + 18} text-anchor="end">{l.engine}</text>
               <text class="row-branch" x="28" y={y + 37}>{l.branch}</text>
             </g>
-            <path class="branch" d={`M${trunkX + 2} ${fy} C ${trunkX + 50} ${fy - 6}, ${trunkX + 60} ${y + 24}, 380 ${y + 22}`} />
-            <path class="leaf" d={`M${trunkX + 26} ${fy - 8} q 10 -12 22 -6 q -8 10 -22 6`} />
+            <path class="branch-base" d={branches[i].base} />
+            <path class="branch-base mid" d={branches[i].mid} />
+            <path class="branch" d={branches[i].d} />
+            {branches[i].leaves.map((lf) => (
+              <g class="leaf">
+                <path class="leaf-blade" d={lf.blade} />
+                <path class="leaf-half" d={lf.half} fill="url(#wf-hatch)" />
+                <path class="leaf-veins" d={lf.veins} />
+              </g>
+            ))}
             <g class="tree">
-              <rect class="tree-shade" x="385" y={y + 3} width="196" height="46" rx="6" fill="url(#wf-hatch)" />
-              <rect class="tree-box" x="380" y={y - 2} width="196" height="46" rx="6" />
+              <rect class="tree-shade" x="384.5" y={y + 2.5} width="196" height="46" rx="2" fill="url(#wf-hatch)" />
+              <rect class="tree-box" x="380" y={y - 2} width="196" height="46" rx="2" />
+              <rect class="tree-rule" x="383.5" y={y + 1.5} width="189" height="39" rx="1" />
+              <path class="tree-ticks" d={overshoot(380, y - 2, 196, 46, 4, 5)} />
               <text class="tree-path" x="392" y={y + 17}>.claude/worktrees/{l.tag}</text>
               <g class="chips">
                 {boot.map((b, j) => (
@@ -93,7 +216,19 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
         );
       })}
 
-      <rect class="log-box" x="592" y="86" width="196" height="370" rx="6" />
+      {/* The merged log, a scroll: rolled at its head and its foot. */}
+      <rect class="log-box" x="596" y="92" width="188" height="358" />
+      <g class="log-rolls" aria-hidden="true">
+        {[86, 452].map((ry) => (
+          <g>
+            <path class="log-roll" d={`M592 ${ry - 6}H788V${ry + 6}H592Z`} />
+            <path class="log-roll-shade" d={`M592 ${ry + 1.5}H788V${ry + 6}H592Z`} fill="url(#wf-hatch)" />
+            <ellipse class="log-roll-end" cx="592" cy={ry} rx="2.4" ry="6" />
+            <ellipse class="log-roll-end" cx="788" cy={ry} rx="2.4" ry="6" />
+            <path class="log-roll-fine" d={`M589.6 ${ry}h-4M790.4 ${ry}h4M592 ${ry - 2.6}a1 2.6 0 0 0 0 5.2a1 2.6 0 0 0 0 -5.2`} />
+          </g>
+        ))}
+      </g>
       <g class="log-lines"></g>
     </svg>
   </div>
@@ -123,20 +258,32 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
   .wf-svg .wf-tab.log-tab rect {
     fill: color-mix(in srgb, var(--sanguine) 12%, var(--paper));
   }
-  .wf-svg .trunk {
+  .wf-svg .wf-plate {
     fill: none;
     stroke: currentColor;
-    stroke-width: 5;
-    stroke-linecap: round;
-    opacity: 0.85;
+    stroke-width: 0.6;
+    opacity: 0.3;
   }
-  .wf-svg .trunk-fine,
-  .wf-svg .roots {
+  .wf-svg .wf-motto {
+    opacity: 0.55;
+  }
+  .wf-svg .trunk,
+  .wf-svg .root {
+    fill: var(--paper-2);
+    stroke: currentColor;
+    stroke-width: 1.2;
+    stroke-linejoin: round;
+  }
+  .wf-svg .trunk-shade {
+    stroke: none;
+  }
+  .wf-svg .bark,
+  .wf-svg .ground {
     fill: none;
     stroke: currentColor;
-    stroke-width: 1;
-    opacity: 0.55;
+    stroke-width: 0.6;
     stroke-linecap: round;
+    opacity: 0.6;
   }
   .wf-svg .wf-root {
     font-family: var(--font-mono);
@@ -151,6 +298,11 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
     fill: var(--paper);
     stroke: var(--rule);
     stroke-width: 1;
+  }
+  .wf-svg .row-rule {
+    stroke: var(--sanguine-2);
+    stroke-width: 0.6;
+    opacity: 0.6;
   }
   .wf-svg .row-tag {
     font-family: var(--font-mono);
@@ -171,21 +323,46 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
     font-size: 11.5px;
     fill: var(--ink-2);
   }
-  .wf-svg .branch {
+  .wf-svg .branch,
+  .wf-svg .branch-base {
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.8;
+    stroke-width: 1.5;
     stroke-linecap: round;
     stroke-dasharray: 260;
     stroke-dashoffset: 260;
     transition: stroke-dashoffset 0.9s ease-out, stroke 0.2s;
   }
+  /* Where a branch leaves the trunk it is thicker: a second, shorter stroke that grows with it. */
+  .wf-svg .branch-base {
+    stroke-width: 3.1;
+    stroke-dasharray: 110;
+    stroke-dashoffset: 110;
+    transition-duration: 0.35s, 0.2s;
+  }
+  .wf-svg .branch-base.mid {
+    stroke-width: 2.2;
+    stroke-dasharray: 160;
+    stroke-dashoffset: 160;
+    transition-duration: 0.55s, 0.2s;
+  }
   .wf-svg .leaf {
-    fill: url(#wf-hatch);
-    stroke: currentColor;
-    stroke-width: 0.8;
     opacity: 0;
     transition: opacity 0.4s 0.5s;
+  }
+  .wf-svg .leaf-blade {
+    fill: var(--paper);
+    stroke: currentColor;
+    stroke-width: 0.8;
+  }
+  .wf-svg .leaf-half {
+    stroke: none;
+  }
+  .wf-svg .leaf-veins {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.5;
+    stroke-linecap: round;
   }
   .wf-svg .tree {
     opacity: 0;
@@ -195,6 +372,13 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
     fill: var(--paper);
     stroke: currentColor;
     stroke-width: 1.2;
+  }
+  .wf-svg .tree-rule,
+  .wf-svg .tree-ticks {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.5;
+    opacity: 0.45;
   }
   .wf-svg .tree-path {
     font-family: var(--font-mono);
@@ -222,6 +406,25 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
     stroke: currentColor;
     stroke-width: 1.1;
   }
+  .wf-svg .log-roll {
+    fill: var(--paper-2);
+    stroke: currentColor;
+    stroke-width: 1.1;
+  }
+  .wf-svg .log-roll-shade {
+    stroke: none;
+  }
+  .wf-svg .log-roll-end {
+    fill: var(--paper-3);
+    stroke: currentColor;
+    stroke-width: 0.9;
+  }
+  .wf-svg .log-roll-fine {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.6;
+    stroke-linecap: round;
+  }
   .wf-svg :global(.log-line) {
     font-family: var(--font-mono);
     font-size: 10px;
@@ -240,7 +443,7 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
   .wf-svg .lane-tab {
     opacity: 0;
   }
-  .wf-svg .lane.grown .branch {
+  .wf-svg .lane.grown :is(.branch, .branch-base) {
     stroke-dashoffset: 0;
   }
   .wf-svg .lane.grown .leaf,
@@ -273,7 +476,7 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
     stroke: var(--sanguine);
     stroke-width: 2;
   }
-  .wf-svg .lane.picked .branch {
+  .wf-svg .lane.picked :is(.branch, .branch-base) {
     stroke: var(--sanguine-2);
   }
   .wf-svg .lane:focus-visible .row-box {
@@ -287,6 +490,7 @@ const data = JSON.stringify({ lanes, boot }).replace(/</g, '\\u003c');
   }
   @media (prefers-reduced-motion: reduce) {
     .wf-svg .branch,
+    .wf-svg .branch-base,
     .wf-svg .leaf,
     .wf-svg .tree,
     .wf-svg .chip {
