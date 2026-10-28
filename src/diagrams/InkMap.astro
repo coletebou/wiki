@@ -120,7 +120,6 @@ const payload = JSON.stringify(
               <g class="flow-g" data-flow={fl.id} data-from={fl.from} data-to={fl.to}>
                 <path class={`flow-line${fl.dashed ? ' dashed' : ''}`} d={g.d} marker-end={`url(#${uid}-arrow)`} style={`--len:${g.len}`} />
                 {particles && <circle class="particle" r="3"><animateMotion dur="2.4s" repeatCount="indefinite" path={g.d} /></circle>}
-                {fl.label && <text class="flow-label" x={f(g.lx)} y={f(g.ly)} text-anchor="middle">{fl.label}</text>}
               </g>
             );
           })}
@@ -155,6 +154,13 @@ const payload = JSON.stringify(
               </g>
             );
           })}
+          {/* Flow labels last, over the boxes, each with its halo of paper: a box drawn later never hides one. */}
+          <g class="flow-labels" aria-hidden="true">
+            {scene.flows.filter((fl) => fl.label).map((fl) => {
+              const g = geometry(scene, fl);
+              return <text class="flow-label" data-label-for={fl.id} x={f(g.lx + (fl.ldx ?? 0))} y={f(g.ly + (fl.ldy ?? 0))} text-anchor="middle">{fl.label}</text>;
+            })}
+          </g>
         </g>
       ))}
     </svg>
@@ -228,6 +234,10 @@ const payload = JSON.stringify(
     font-family: var(--font-mono);
     font-size: 13px;
     fill: var(--ink-2);
+    paint-order: stroke;
+    stroke: var(--paper-2);
+    stroke-width: 4px;
+    stroke-linejoin: round;
   }
   .inkmap-svg :global(.ring) {
     fill: none;
@@ -278,7 +288,8 @@ const payload = JSON.stringify(
   .inkmap-svg .flow-line.dashed {
     stroke-dasharray: 5 4;
   }
-  .inkmap-svg .scene[data-quiet='true'] .flow-g:not(.lit) .flow-label {
+  /* A busy scene names only the flows a step lights; this outranks the dimming of a focused map below. */
+  .inkmap .inkmap-svg .scene[data-quiet='true'] .flow-label:not(.lit) {
     opacity: 0;
   }
   .inkmap-svg .flow-label {
@@ -300,7 +311,8 @@ const payload = JSON.stringify(
   }
   /* Lit: the parts a step or a chosen node is about. Everything else steps back. */
   .inkmap.focused .inkmap-svg .node:not(.lit),
-  .inkmap.focused .inkmap-svg .flow-g:not(.lit) {
+  .inkmap.focused .inkmap-svg .flow-g:not(.lit),
+  .inkmap.focused .inkmap-svg .flow-label:not(.lit) {
     opacity: 0.3;
   }
   .inkmap .inkmap-svg .node,
@@ -320,7 +332,7 @@ const payload = JSON.stringify(
     stroke-width: 2;
     opacity: 1;
   }
-  .inkmap .inkmap-svg .flow-g.lit .flow-label {
+  .inkmap .inkmap-svg .flow-label.lit {
     fill: var(--sanguine);
   }
   @media (prefers-reduced-motion: no-preference) {
@@ -367,6 +379,8 @@ const payload = JSON.stringify(
 </style>
 
 <script>
+  import { reveal } from '../scripts/study-scroll';
+
   type Step = { title: string; text: string; on: string[]; flows?: string[] };
   type SceneData = {
     id: string;
@@ -398,7 +412,7 @@ const payload = JSON.stringify(
       fig.classList.add('focused');
       const g = group();
       for (const id of nodes) g.querySelector(`[data-node="${id}"]`)?.classList.add('lit');
-      for (const id of flows) g.querySelector(`[data-flow="${id}"]`)?.classList.add('lit');
+      for (const id of flows) for (const el of g.querySelectorAll(`[data-flow="${id}"], [data-label-for="${id}"]`)) el.classList.add('lit');
     };
     const intro = () => {
       note.innerHTML = `<h4>${esc(scene.name)}</h4><p>${esc(scene.intro)}</p>`;
@@ -414,6 +428,7 @@ const payload = JSON.stringify(
       step = Math.max(0, Math.min(scene.steps.length - 1, i));
       const s = scene.steps[step];
       light(s.on, s.flows ?? []);
+      reveal(group().querySelectorAll('.node.lit'));
       count.textContent = `${step + 1} / ${scene.steps.length}`;
       note.innerHTML = `<h4>${step + 1}. ${esc(s.title)}</h4><p>${esc(s.text)}</p>`;
     }

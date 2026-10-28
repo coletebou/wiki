@@ -1054,6 +1054,20 @@ kbd {
   color: var(--ink-3);
   font-style: italic;
 }
+/* The browser's own clear button, drawn in ink rather than the system's blue. */
+.seek-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.8rem;
+  height: 0.8rem;
+  cursor: pointer;
+  background-color: var(--ink-3);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1 1l8 8M9 1L1 9' stroke='%23000' stroke-width='1.7' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1 1l8 8M9 1L1 9' stroke='%23000' stroke-width='1.7' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.seek-input::-webkit-search-cancel-button:hover {
+  background-color: var(--sanguine);
+}
 .seek-results {
   max-height: calc(min(80vh, 46rem) - 5rem);
   overflow-y: auto;
@@ -1381,6 +1395,9 @@ kbd {
   right: 1.1rem;
   font-size: 0.85rem;
   color: var(--ink-3);
+}
+.table-card .count + h3 {
+  padding-right: 3.2rem;
 }
 .section-title {
   margin: 3rem 0 0.3rem;

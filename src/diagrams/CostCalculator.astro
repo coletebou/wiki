@@ -187,12 +187,12 @@ const short = (id: string, none = 'None') => (id === 'none' ? none : all[id].lab
     font-size: 0.98rem;
   }
   .c-label small,
-  .c-price small {
+  .c-price :global(small) {
     display: block;
     font-size: 0.8rem;
     color: var(--ink-3);
   }
-  .c-price a {
+  .c-price :global(a) {
     color: var(--verdigris);
     font-size: 0.92rem;
   }

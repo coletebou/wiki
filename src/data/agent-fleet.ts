@@ -26,6 +26,9 @@ export interface Flow {
   to: string;
   bend?: number;
   label?: string;
+  /** Moves the label off the curve's midpoint, where it would sit on another label or between two close boxes. */
+  ldx?: number;
+  ldy?: number;
   dashed?: boolean;
 }
 export interface Step {
@@ -125,20 +128,20 @@ export const SCENES: Scene[] = [
     ],
     flows: [
       { id: 'h-load', from: 's-memory', to: 'e-start', bend: -50, label: 'memory, open items' },
-      { id: 'h-brief', from: 's-drover', to: 'e-start', bend: 120, label: 'who is waiting' },
+      { id: 'h-brief', from: 's-drover', to: 'e-start', bend: 120, label: 'who is waiting', ldy: 9 },
       { id: 'h-spool', from: 'e-prompt', to: 's-spool', bend: -10, label: 'capture' },
-      { id: 'h-name', from: 'e-prompt', to: 's-tmux', bend: 20, label: 'window name' },
-      { id: 'h-advise', from: 'e-prompt', to: 's-memory', bend: 70, label: 'staged reflections' },
-      { id: 'h-record', from: 'e-pretool', to: 's-memory', bend: 60, label: 'handoff recorded' },
+      { id: 'h-name', from: 'e-prompt', to: 's-tmux', bend: 20, label: 'window name', ldx: 30, ldy: -16 },
+      { id: 'h-advise', from: 'e-prompt', to: 's-memory', bend: 70, label: 'staged reflections', ldy: 18 },
+      { id: 'h-record', from: 'e-pretool', to: 's-memory', bend: 60, label: 'handoff recorded', ldx: 9, ldy: 3 },
       { id: 'h-cwd', from: 'e-posttool', to: 's-tmux', bend: -10, label: 'cwd' },
-      { id: 'h-batch', from: 'e-batch', to: 's-memory', bend: -60, label: 'reflections at 20, 40, 60, 80%' },
-      { id: 'h-notify', from: 'e-notify', to: 's-drover', bend: 10, label: 'waiting, with its question' },
-      { id: 'h-sub', from: 'e-sub', to: 's-sub', bend: -10, label: 'the contract' },
-      { id: 'h-stop', from: 'e-stop', to: 's-tmux', bend: -80, label: 'name, timestamp' },
+      { id: 'h-batch', from: 'e-batch', to: 's-memory', bend: -60, label: 'reflections at 20, 40, 60, 80%', ldx: 27, ldy: -3 },
+      { id: 'h-notify', from: 'e-notify', to: 's-drover', bend: 10, label: 'waiting, with its question', ldy: 27 },
+      { id: 'h-sub', from: 'e-sub', to: 's-sub', bend: -10, label: 'the contract', ldy: -15 },
+      { id: 'h-stop', from: 'e-stop', to: 's-tmux', bend: -80, label: 'name, timestamp', ldx: 36, ldy: 6 },
       { id: 'h-fail', from: 'e-fail', to: 'e-fail' },
-      { id: 'h-compact', from: 'e-compact', to: 's-memory', bend: 10, label: 'reflect first' },
-      { id: 'h-end-mem', from: 'e-end', to: 's-memory', bend: 30, label: 'last reflection' },
-      { id: 'h-end-trace', from: 'e-end', to: 's-langfuse', bend: -10, label: 'one trace' },
+      { id: 'h-compact', from: 'e-compact', to: 's-memory', bend: 10, label: 'reflect first', ldx: 3, ldy: 9 },
+      { id: 'h-end-mem', from: 'e-end', to: 's-memory', bend: 30, label: 'last reflection', ldx: -9, ldy: 3 },
+      { id: 'h-end-trace', from: 'e-end', to: 's-langfuse', bend: -10, label: 'one trace', ldy: -9 },
     ],
     decor:
       '<circle cx="400" cy="240" r="130" class="ring" /><circle cx="400" cy="240" r="124" class="ring-fine" />' +
@@ -203,11 +206,11 @@ export const SCENES: Scene[] = [
       { id: 'truth', kind: 'store', x: 290, y: 392, w: 220, h: 58, label: 'Truth file', sub: 'every message, sender and id', info: 'Each message is appended with who sent it; dotsync carries the file to every machine.' },
     ],
     flows: [
-      { id: 'g-near', from: 'm-send', to: 'm-near', bend: 0, label: 'SendMessage' },
-      { id: 'g-ask', from: 'm-send', to: 'm-drover', bend: -110, label: 'drover_send' },
+      { id: 'g-near', from: 'm-send', to: 'm-near', bend: 0, label: 'SendMessage', ldy: 6 },
+      { id: 'g-ask', from: 'm-send', to: 'm-drover', bend: -110, label: 'drover_send', ldy: -30 },
       { id: 'g-ssh', from: 'm-drover', to: 's-drover', bend: 0, label: 'SSH over Tailscale' },
       { id: 'g-deliver', from: 's-drover', to: 's-worker', bend: 150 },
-      { id: 'g-follow', from: 's-drover', to: 's-next', bend: 0, label: 'gone? follow the chain', dashed: true },
+      { id: 'g-follow', from: 's-drover', to: 's-next', bend: 0, label: 'gone? follow the chain', dashed: true, ldy: 6 },
       { id: 'g-record', from: 'm-drover', to: 'truth', bend: 20, label: 'recorded' },
     ],
     steps: [
@@ -236,13 +239,13 @@ export const SCENES: Scene[] = [
       { id: 'chain', kind: 'store', x: 540, y: 292, w: 230, h: 62, label: 'The chain', sub: 'every brief and transcript', info: 'Any later generation can hand off again, on this machine or another. Messages to an old name reach the newest live one.' },
     ],
     flows: [
-      { id: 'k-fill', from: 'pass', to: 'brief', bend: -20, label: 'init, fill' },
-      { id: 'k-launch', from: 'brief', to: 'next', bend: -20, label: 'launch' },
+      { id: 'k-fill', from: 'pass', to: 'brief', bend: -20, label: 'init, fill', ldx: 6, ldy: -27 },
+      { id: 'k-launch', from: 'brief', to: 'next', bend: -20, label: 'launch', ldx: -6, ldy: -27 },
       { id: 'k-tab', from: 'tab-1', to: 'tab-2', bend: -12 },
-      { id: 'k-echo', from: 'hist', to: 'next', bend: 20, label: 'echoed in' },
+      { id: 'k-echo', from: 'hist', to: 'next', bend: 20, label: 'echoed in', ldy: 6 },
       { id: 'k-reply', from: 'next', to: 'pass', bend: 70, label: 'first reply', dashed: true },
-      { id: 'k-close', from: 'watch', to: 'pass', bend: -30, label: 'closes it' },
-      { id: 'k-keep', from: 'next', to: 'chain', bend: 20, label: 'kept' },
+      { id: 'k-close', from: 'watch', to: 'pass', bend: -30, label: 'closes it', ldy: 12 },
+      { id: 'k-keep', from: 'next', to: 'chain', bend: 20, label: 'kept', ldy: 12 },
     ],
     steps: [
       { title: 'Time to pass it on', text: 'At 70% and 85% of its advisory budget the context advisor asks a judge whether this is a natural stopping point; at one, the session hands off without being asked.', on: ['pass'] },
@@ -267,11 +270,11 @@ export const SCENES: Scene[] = [
       { id: 'ledger', kind: 'store', x: 300, y: 372, w: 220, h: 62, label: 'cc-park status', sub: 'the way back, kept', info: 'Every parked and closed session with its resume command, and which were resumed.' },
     ],
     flows: [
-      { id: 'p-find', from: 'idle', to: 'park', bend: 0, label: 'idle 6 h+' },
-      { id: 'p-keep', from: 'park', to: 'kept', bend: -20, label: 'may be needed' },
+      { id: 'p-find', from: 'idle', to: 'park', bend: 0, label: 'idle 6 h+', ldx: 3 },
+      { id: 'p-keep', from: 'park', to: 'kept', bend: -20, label: 'may be needed', ldx: -3 },
       { id: 'p-close', from: 'park', to: 'closed', bend: 20, label: 'finished' },
-      { id: 'p-enter', from: 'enter', to: 'kept', bend: -40, label: 'resume' },
-      { id: 'p-ledger', from: 'closed', to: 'ledger', bend: 20, label: 'resume command' },
+      { id: 'p-enter', from: 'enter', to: 'kept', bend: -40, label: 'resume', ldx: -42, ldy: 27 },
+      { id: 'p-ledger', from: 'closed', to: 'ledger', bend: 20, label: 'resume command', ldx: -21 },
     ],
     steps: [
       { title: 'Idle is not free', text: 'An idle session keeps Claude Code, its MCP servers and any language server in memory; dozens of them held tens of gigabytes.', on: ['idle'] },
