@@ -72,7 +72,7 @@ Small roots mean small plans, a failure in one cannot touch another, and a Cloud
 | AWS organization | The accounts, service control policies, single sign-on, the org-wide audit trail, a budget and cost anomaly alerts | Cole, locally |
 | Cloudflare account | Tunnels (the objects, not their routes), R2 buckets, Access login methods, Email Routing destination addresses | CI |
 | Cloudflare zones | One root per production zone, plus one shared root that loops over every small zone | CI |
-| Cloudflare Access | The applications and policies that put a login in front of private hostnames | CI |
+| [[cloudflare-front-door\|Cloudflare Access]] | The applications and policies that put a login in front of private hostnames | CI |
 | Servers | The AWS instances, their volumes, public IPs and firewalls | CI |
 | Tailscale | The tailnet policy file | CI, on GitHub-hosted runners only |
 | GitHub | Repositories, rulesets, environments and variables | CI |
