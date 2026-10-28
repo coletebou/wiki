@@ -47,7 +47,7 @@ hoisted next to it.
 
 Cole uses npm where reach matters more than speed: small tools, the [[shared-brain|brain]] server (whose instructions
 are `npm ci && npm run build`), and the fleet's own command-line tools. Every machine installs the same set of Node
-CLIs (dotenvx, the Codex CLI, the Playwright MCP server, Cloudflare's `cf`, pnpm itself, the Pyright and TypeScript
+[[CLIs]] (dotenvx, the [[codex|Codex CLI]], the Playwright MCP server, [[Cloudflare]]'s `cf`, pnpm itself, the Pyright and TypeScript
 language servers, and a few more) from one committed lockfile with `npm ci --omit=dev`, on one pinned Node version, so
 every machine runs exactly the same versions (see [[bootstrap-script]]). [[drover|Drover]] goes further and has no
 npm dependencies at all.

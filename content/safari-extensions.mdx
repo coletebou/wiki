@@ -25,7 +25,7 @@ sources:
 A Safari web extension is a browser extension for Safari on the Mac, iPhone, iPad and Vision Pro, written with the
 same HTML, CSS, JavaScript and `manifest.json` as a [[chrome-extensions|Chrome extension]]. The difference is
 packaging: Safari extensions ship inside an app, signed by Apple's rules and distributed through the App Store or
-[[testflight|TestFlight]]. Cole's Drover extension runs in both browsers from one source folder, and this page shows
+[[testflight|TestFlight]]. Cole's [[Drover]] extension runs in both browsers from one source folder, and this page shows
 how, along with the two ways Apple offers to package an extension today.
 
 ## What is different about Safari
@@ -33,7 +33,7 @@ how, along with the two ways Apple offers to package an extension today.
 - **The extension lives in an app.** On the Mac and on iOS, the extension is an app extension embedded in a
   *containing app*. Installing the app installs the extension; the user then turns it on in Safari.
 - **Distribution is Apple's.** The containing app goes through [[app-store-connect|App Store Connect]], so shipping a
-  Safari extension needs the Apple Developer Program (<Price id="apple-developer-program" />). Apple also notes that
+  Safari extension needs the [[ios-development|Apple Developer Program]] (<Price id="apple-developer-program" />). Apple also notes that
   testing a Safari extension on an iOS device requires membership, though the simulator works before you join.
 - **Not every Chrome API exists.** Safari has no side panel and no omnibox, among others. The packager lists the
   manifest keys the current Safari does not support, and the extension has to work around them.

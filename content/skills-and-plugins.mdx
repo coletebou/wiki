@@ -103,7 +103,7 @@ and everything it runs, runs as you. Read a plugin before you trust it.
 | `review` | `adversarial-review`, `mcp-agent-safety`, `fable-second-opinion` | Reviews whose findings must survive refuters; canary tests for MCP servers; a second-opinion advisor |
 
 Beyond its own, Cole's setup enables a curated set from Anthropic's official marketplace (the TypeScript, Pyright and
-Swift language servers, Playwright, Context7, `code-simplifier`, `commit-commands`, `feature-dev`), Cloudflare's skills
+Swift language servers, Playwright, Context7, `code-simplifier`, `commit-commands`, `feature-dev`), [[Cloudflare]]'s skills
 marketplace, and skills linked from the public [agent-skills](https://github.com/coletebou/agent-skills) collection
 (`handoff`, `autoreview`, `session-viewer`). [[drover|Drover]] ships its own two skills, `drover` and `drover-manager`.
 
@@ -153,7 +153,7 @@ Patterns from Cole's own skills:
   date or the symptom that taught it.
 - **Answer the excuses.** The handoff skill has a "Rationalizations" table pairing each excuse an agent might make
   ("I'll suggest it to the user instead") with why it is wrong.
-- **Ship the CLI with tests.** A skill that drives a script is only as good as the script; the CLIs in `dx` have
+- **Ship the CLI with tests.** A skill that drives a script is only as good as the script; the [[CLIs]] in `dx` have
   hermetic test suites, and CI runs them on every push.
 - **One skill, one job.** A skill that tries to cover three workflows never triggers at the right moment for any of
   them.

@@ -21,7 +21,7 @@ sources:
 The reflection store is one searchable record, per repository, of what Cole's agents learned and what they left open:
 learnings, decisions, gotchas, ideas, handoffs, and action items that can be marked done. Background reflections fill
 it while sessions run, before they compact and when they end; every new session starts by reading its open items.
-Claude Code and Codex use it through the same small CLI, `reflections`.
+[[Claude Code]] and [[Codex]] use it through the same small CLI, `reflections`.
 
 It exists because the other places memory could live each miss something. A transcript is complete but huge and gets
 compacted. Compaction keeps a conversation going, not what it decided or left unfinished. A curated `MEMORY.md` is
@@ -141,7 +141,7 @@ restricted.
 
 ## Setting it up
 
-The pieces are public in [dx](https://github.com/coletebou/dx): `./install.sh --with memory,claude` installs the CLIs
+The pieces are public in [dx](https://github.com/coletebou/dx): `./install.sh --with memory,claude` installs the [[CLIs]]
 and the hooks, the three `claude/*.conf.example` files map your repositories to their memory homes, and
 `./install.sh --with schedules` adds the nightly analyzer and dream sweep. Keep the memory itself in a private
 repository; it is data, not code.
