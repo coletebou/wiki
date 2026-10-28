@@ -89,7 +89,7 @@ trick in [[git-worktrees]].)
 Cole's agent tooling (hooks, launchers, the handoff tool, the parking tool) runs inside every session on every machine,
 so it gets tested as seriously as an app:
 
-- **Hermetic suites.** Each suite builds its world in temporary directories: fake servers, a fake Claude Code that
+- **Hermetic suites.** Each suite builds its world in temporary directories: fake servers, a fake [[Claude Code]] that
   writes a real-shaped transcript and replies once, a fake `ssh` that is really a second host with its own home
   directory and tmux server. No real agents, no network.
 - **A tmux sandbox.** The tmux suites unset `TMUX`, pass a private socket on every call, and put a guard first on the

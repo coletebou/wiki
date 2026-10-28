@@ -182,7 +182,7 @@ That protection holds only on Serve's own path. A backend that trusts those head
 and nothing else: a second route to the same port, another reverse proxy or a tunnel, passes whatever headers the
 caller wrote.
 
-Funnel goes further and publishes a service to the public internet. For public traffic Cole uses Cloudflare Tunnels
+Funnel goes further and publishes a service to the public internet. For public traffic Cole uses [[cloudflare-front-door|Cloudflare Tunnels]]
 instead (see [[cloudflare-front-door]]), so public names, firewall rules and bot protection all live in one place.
 
 Before moving any service to `127.0.0.1` because "only the tunnel uses it", find out who calls it: another machine on
