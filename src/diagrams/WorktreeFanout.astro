@@ -28,7 +28,7 @@ const bez = (a: P, b: P, c: P, d: P, t: number): P => {
   const u = 1 - t;
   return [u * u * u * a[0] + 3 * u * u * t * b[0] + 3 * u * t * t * c[0] + t * t * t * d[0], u * u * u * a[1] + 3 * u * u * t * b[1] + 3 * u * t * t * c[1] + t * t * t * d[1]];
 };
-const TRUNK: [P, P, P, P] = [[trunkX, 452], [trunkX - 6, 360], [trunkX + 8, 200], [trunkX - 2, 92]];
+const TRUNK: [P, P, P, P] = [[trunkX, 452], [trunkX - 16, 352], [trunkX + 20, 210], [trunkX - 4, 100]];
 const halfWidth = (t: number) => 4 + 7.4 * Math.pow(1 - t, 1.25) + (t < 0.1 ? Math.pow((0.1 - t) / 0.1, 2) * 9 : 0);
 function tapered(curve: [P, P, P, P], w: (t: number) => number, n = 40) {
   const left: P[] = [];
@@ -51,17 +51,31 @@ function tapered(curve: [P, P, P, P], w: (t: number) => number, n = 40) {
 const trunk = tapered(TRUNK, halfWidth);
 // Its shaded half, toward the lower right, and the rings of bark across it.
 const trunkShade = `M${trunk.mid.map(xy).join('L')}L${trunk.right.slice().reverse().map(xy).join('L')}Z`;
+// Bark: short curved marks across one side or the other, never a ladder of rungs, and two fissures running up it.
 const bark =
   trunk.mid
-    .filter((_, i) => i % 3 === 1 && i < 39)
-    .map((p, k) => {
-      const i = k * 3 + 1;
+    .map((p, i) => ({ p, i }))
+    .filter(({ i }) => i > 1 && i < 37 && i % 2 === 0)
+    .map(({ i }, k) => {
       const [l, r] = [trunk.left[i], trunk.right[i]];
-      return `M${xy(l)}Q${xy([p[0], p[1] + 2.2 + (k % 2)])} ${xy(r)}`;
+      const from = [0.1, 0.42, 0.22, 0.55, 0.05, 0.36][k % 6];
+      const span = [0.4, 0.45, 0.3, 0.38, 0.5, 0.33][k % 6];
+      const at = (f: number): P => [l[0] + (r[0] - l[0]) * f, l[1] + (r[1] - l[1]) * f];
+      const a = at(from);
+      const b = at(from + span);
+      return `M${xy(a)}Q${xy([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 1.8])} ${xy(b)}`;
     })
     .join('') +
-  // Fissures running up the bark, a third of the way in from each side.
-  [0.35, 0.68].map((f) => `M${trunk.mid.slice(1, 34).map((p, i) => xy([trunk.left[i + 1][0] + (trunk.right[i + 1][0] - trunk.left[i + 1][0]) * f + Math.sin(i * 1.3) * 0.6, p[1]])).join('L')}`).join('');
+  [0.33, 0.7].map((f, j) => `M${trunk.mid.slice(2, 36).map((p, i) => xy([trunk.left[i + 2][0] + (trunk.right[i + 2][0] - trunk.left[i + 2][0]) * f + Math.sin(i * 1.1 + j) * 0.7, p[1]])).join('L')}`).join('');
+// The crown: the trunk ends in a few twigs and leaves above the first branch, not in a cut-off pole.
+const top = trunk.mid[trunk.mid.length - 1];
+const crown = {
+  twigs: [
+    [[top[0] - 1, top[1] + 4], [top[0] - 6, top[1] - 4], [top[0] - 12, top[1] - 8], [top[0] - 20, top[1] - 9]],
+    [[top[0] + 1, top[1] + 3], [top[0] + 4, top[1] - 5], [top[0] + 10, top[1] - 9], [top[0] + 17, top[1] - 12]],
+    [[top[0], top[1] + 2], [top[0] + 1, top[1] - 4], [top[0] - 1, top[1] - 9], [top[0] + 1, top[1] - 15]],
+  ].map((c) => tapered(c as [P, P, P, P], (t) => 1.4 * (1 - t) + 0.3, 10).outline),
+};
 // Where a branch leaves the trunk: the trunk's right edge at that height.
 const trunkEdge = (y: number) => {
   let best = 0;
@@ -118,6 +132,7 @@ const branches = lanes.map((_, i) => {
   const down = leaf(bez(...c, 0.6), 32 + (i % 2) * 10, 16);
   return { d: curveD(c), base: curveD(split(c, 0.22)), mid: curveD(split(c, 0.5)), leaves: [up, down] };
 });
+const crownLeaves = [leaf([top[0] - 20, top[1] - 9], -150, 13), leaf([top[0] + 17, top[1] - 12], -28, 13), leaf([top[0] + 1, top[1] - 15], -92, 12)];
 const sheet = plate(800, 470);
 ---
 <figure class="study fanout" data-pagefind-ignore data-lanes="4" aria-labelledby="wf-title">
@@ -173,6 +188,14 @@ const sheet = plate(800, 470);
         <path class="trunk" d={trunk.outline} filter="url(#wf-ink)" />
         <path class="trunk-shade" d={trunkShade} fill="url(#wf-hatch)" />
         <path class="bark" d={bark} />
+        {crown.twigs.map((d) => <path class="root" d={d} />)}
+        {crownLeaves.map((lf) => (
+          <g class="crown-leaf">
+            <path class="leaf-blade" d={lf.blade} />
+            <path class="leaf-half" d={lf.half} fill="url(#wf-hatch)" />
+            <path class="leaf-veins" d={lf.veins} />
+          </g>
+        ))}
       </g>
       <text class="wf-root" x={trunkX + 58} y="466">origin/HEAD</text>
 
@@ -427,7 +450,7 @@ const sheet = plate(800, 470);
   }
   .wf-svg :global(.log-line) {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 9.4px;
     fill: var(--ink-2);
   }
   .wf-svg :global(.log-line.sentinel) {

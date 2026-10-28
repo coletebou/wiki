@@ -69,7 +69,7 @@ const data = JSON.stringify({ lines, presets, prices: priceData, limits: LIMITS 
 const groups = [...new Set(lines.map((l) => l.group))];
 const host = (u: string) => new URL(u).hostname.replace(/^www\./, '');
 const fmtDate = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-// A balance, drawn above the totals: coins in one pan, a toothed wheel in the other, the beam dipped toward the coins.
+// A balance, drawn above the totals: coins in one pan, a toothed wheel in the other, and the machines outweigh their price.
 const beamTilt = -4.2;
 const rad = (beamTilt * Math.PI) / 180;
 const pivot = { x: 130, y: 22 };
@@ -228,7 +228,7 @@ const short = (id: string, none = 'None') => (id === 'none' ? none : all[id].lab
     fill: var(--paper);
   }
   .calc-libra .libra-label {
-    font-size: 8.5px;
+    font-size: 9.5px;
     font-style: italic;
     fill: var(--ink-3);
   }
@@ -271,6 +271,7 @@ const short = (id: string, none = 'None') => (id === 'none' ? none : all[id].lab
   .calc-form legend::before {
     /* The rubricator's mark, as before every section of the text. */
     content: '¶';
+    content: '¶' / '';
     margin-right: 0.45em;
     font-family: var(--font-text);
     letter-spacing: 0;

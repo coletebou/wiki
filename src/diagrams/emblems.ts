@@ -40,7 +40,7 @@ function wheel(c: P, r: number, teeth: number, phase = 0) {
 // The lit crescent: the outer edge of the disc on the right, the terminator a wider arc inside it.
 const CRESCENT = 'M-4 -28A30 30 0 0 1 -4 32A40 40 0 0 0 -4 -28Z';
 
-const EMBLEMS: Record<string, (id: string) => string> = {
+const EMBLEMS = {
   // Two toothed wheels in mesh.
   rotae: () => wheel([-11, 9], 23, 13, 0.1) + wheel([25.6, -21.6], 12.4, 7, 0.5) + path('M-46 44H40M-40 47.5H30', 'fine'),
   // An hourglass: its sand half run down.
@@ -61,13 +61,15 @@ const EMBLEMS: Record<string, (id: string) => string> = {
     hatched(`${id}-flap`, 'M-34 24L0 4L34 24Z', [-34, 4, 34, 24], 2.6) +
     circle([0, 6], 7.6, 'seal') +
     path('M-3 4L0 9L3 4M0 1V9', 'seal-mark'),
-  // A torch, to be handed on.
+  // A torch for the relay, as the Greeks ran it: a bound staff, a basket of pitch, the flame streaming back.
   fax: () =>
-    path('M-4.4 44L-6.2 -4H6.2L4.4 44Z', 'paper') +
-    path('M-5.6 4L5.8 12M-5.2 14L5.4 22M-4.9 24L5 32M-4.6 34L4.7 42', 'fine') +
-    path('M-10 -4H10L8 -10H-8Z', 'paper') +
-    path('M0 -10C-12 -18 -10 -30 -2 -46C-1 -34 8 -32 6 -20C10 -24 10 -30 9 -34C16 -22 10 -12 0 -10Z', 'flame') +
-    path('M0 -12C-5 -18 -4 -24 0 -32C1 -24 5 -22 2 -14', 'flame'),
+    path('M-3.6 46L-5.4 4H5.4L3.6 46Z', 'paper') +
+    path('M-5.2 8L5.2 13M-5 15L5 20M-4.7 22L4.8 27M-4.5 29L4.5 34M-4.2 36L4.3 41', 'fine') +
+    path('M-12 4L-9 -8H9L12 4Z', 'paper') +
+    path('M-10.6 -2H10.6M-9.6 -6L-6 4M-3 -8L-1 4M3 -8L1 4M9.6 -6L6 4', 'fine') +
+    path('M0 -9C-14 -14 -16 -26 -8 -40C-6 -32 -2 -30 -1 -36C0 -42 4 -46 3 -50C12 -40 10 -30 6 -26C10 -27 13 -30 14 -34C18 -24 12 -12 0 -9Z', 'flame') +
+    path('M0 -11C-6 -15 -7 -21 -3 -28C-1 -24 1 -24 1 -28C5 -23 5 -16 0 -11Z', 'flame') +
+    path('M-12 -44l-1.6 -3M15 -40l1.8 -2.6M8 -52l0.4 -3', 'flame'),
   // The moon, with the ashen light Leonardo explained: the dark part lit by the earth.
   luna: (id) =>
     circle([-4, 2], 30, 'ashen') +
@@ -192,7 +194,7 @@ const EMBLEMS: Record<string, (id: string) => string> = {
       path('M-46 -30C-30 -38 -6 -40 14 -30M-48 -18C-30 -26 -10 -28 6 -22M-46 40C-26 34 0 34 24 24M-30 46C-12 42 8 40 30 30', 'fine')
     );
   },
-};
+} satisfies Record<string, (id: string) => string>;
 
 export interface Emblem {
   name: keyof typeof EMBLEMS;
