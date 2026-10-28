@@ -24,7 +24,7 @@ sources:
 
 Claude Code is Anthropic's agentic coding tool: a model in your terminal that reads files, runs commands, edits code
 and keeps going until the job is done. It is the engine of Cole's whole setup. On any given day nearly all the work,
-on the Mac mini and on the AWS servers alike, is a Claude Code session running in its own [[tmux]] window, started
+on the Mac mini and on the [[servers|AWS servers]] alike, is a Claude Code session running in its own [[tmux]] window, started
 with [[yu]], wrapped in [[hooks]], and visible to every other session through [[drover|Drover]].
 
 This page covers how Cole configures and runs it. The pieces that grew around it have pages of their own: the
@@ -124,7 +124,7 @@ There is also a playful one: `spinnerVerbs` appends a list of liturgical verbs (
 censer", "Illuminating") to the spinner, which suits a wiki styled after a Renaissance notebook.
 
 The plugins it enables include the official TypeScript, Pyright and Swift language servers, Playwright, Context7,
-`code-simplifier`, `commit-commands`, `feature-dev` and Cloudflare's skills. One popular plugin is deliberately off:
+`code-simplifier`, `commit-commands`, `feature-dev` and [[Cloudflare]]'s skills. One popular plugin is deliberately off:
 its startup hook tells every session to invoke a skill before any reply, which fought Cole's own routing.
 
 ## The rules every session gets

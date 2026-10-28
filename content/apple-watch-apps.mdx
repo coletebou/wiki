@@ -22,7 +22,7 @@ sources:
     url: https://github.com/coletebou/drover/blob/master/native/Apps/watchOS/README.md
 ---
 
-An Apple Watch app is a watchOS app: SwiftUI on a screen the size of a postage stamp, with a strict budget for
+An Apple Watch app is a watchOS app: [[capacitor-expo-swift|SwiftUI]] on a screen the size of a postage stamp, with a strict budget for
 running in the background. It can stand alone or ship alongside an iPhone app, and its most visible part is often not
 the app at all but a complication on the watch face or a notification that taps your wrist. Cole's example is the
 Drover watch app, which lists the agent sessions waiting on Cole, shows each one's last message, and answers with a
@@ -32,7 +32,7 @@ canned reply or dictation. Watch apps are built with [[xcode|Xcode]] like the re
 
 | Kind | What it means |
 |---|---|
-| Watch-only | No iPhone app. Xcode still creates a small iOS stub target, used for the bundle ID and App Store packaging, but nothing installs on the phone |
+| Watch-only | No iPhone app. Xcode still creates a small iOS stub target, used for the bundle ID and [[app-store-connect\|App Store]] packaging, but nothing installs on the phone |
 | Independent, with a companion | Ships with an iPhone app but installs and runs without it ("Supports Running Without iOS App Installation") |
 | Dependent | Installs on the watch, but cannot launch until the iPhone app is installed |
 

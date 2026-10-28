@@ -36,7 +36,7 @@ An app or framework loads `.env` at start, and so does Docker Compose, which use
 - **They are not in git, so they are not in new checkouts.** A fresh clone or [[git-worktrees|worktree]] has no
   `.env`. Without one, Compose warns about every unset variable, and if a service mounts `./.env` it creates an empty
   directory with that name. Cole's [[parallel-worktrees|worktree launcher]] copies `.env`, `.env.local` and
-  `.env.keys` into every new worktree for this reason, and Claude Code's `.worktreeinclude` does the same for its own.
+  `.env.keys` into every new worktree for this reason, and [[Claude Code]]'s `.worktreeinclude` does the same for its own.
 
 ## One secrets file per machine
 
@@ -100,7 +100,7 @@ after:
   `env -i HOME="$HOME" PATH=/usr/bin:/bin bash -c '…'` shows what a process gets without them.
 - **One secret, one process.** Cole's password manager session is blanked in every Claude Code session, and a small
   wrapper injects a single field into a single child process when a task needs it.
-- **References, not values, in config.** `.mcp.json` uses `${VAR}`, Codex uses `bearer_token_env_var`, and
+- **References, not values, in config.** `.mcp.json` uses `${VAR}`, [[Codex]] uses `bearer_token_env_var`, and
   [[drover|Drover]]'s credential pool stores only `$NAME` references, so config files never hold a key.
 - **Redact what gets rendered.** The handoff tool redacts credential shapes and the literal values of secret
   environment variables from every transcript it renders.

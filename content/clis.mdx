@@ -47,14 +47,14 @@ capability is one op, available as `drover op <op>`, as an MCP tool and as a but
 | `jq` | Reading and reshaping JSON: hook payloads, API answers, transcripts |
 | `rg`, `fd` | Fast text search and file finding (see [[grep-ripgrep-ugrep]]) |
 | `tmux` | Windows for every session; capture, send keys (see [[tmux]]) |
-| `cf` | Cloudflare's own CLI, for DNS, tunnels and the rest (see [[cloudflare-api]]) |
+| `cf` | [[Cloudflare]]'s own CLI, for DNS, tunnels and the rest (see [[cloudflare-api]]) |
 | `aws` | The AWS servers and storage (see [[servers]] and [[s3-and-glacier]]) |
 | `docker` | Compose stacks per worktree |
 | `dotenvx` | Encrypted env files (see [[env-files]]) |
 | `gitleaks` | Secret scanning on every commit and push |
 | `claude`, `codex` | Starting more agents, headless (`claude -p`, `codex exec`) or in tmux |
 
-Inside Claude Code there is one twist: Cole's rules tell agents to prefer Claude Code's built-in Read, Grep and Glob
+Inside [[Claude Code]] there is one twist: Cole's rules tell agents to prefer Claude Code's built-in Read, Grep and Glob
 tools over `cat`, `rg` and `find` within a session. The shell versions are for pipelines, scripts and machines without
 the agent.
 
