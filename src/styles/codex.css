@@ -908,20 +908,6 @@ kbd {
   top: auto;
   bottom: 0.55rem;
 }
-.sillybos.sheet::before {
-  display: none;
-}
-.sillybos .tag-off {
-  margin-left: auto;
-  padding: 0;
-  font: inherit;
-  font-size: 0.82rem;
-  color: var(--ink-3);
-  background: none;
-  border: 0;
-  text-decoration: underline;
-  cursor: pointer;
-}
 .sillybos .tag-table {
   display: block;
   margin-bottom: 0.15rem;
@@ -954,50 +940,6 @@ kbd {
 }
 .sillybos .tag-foot .folio-no {
   font-size: 0.95rem;
-}
-.sillybos .tag-open {
-  display: none;
-}
-.sillybos.sheet {
-  position: fixed;
-  left: 0.75rem !important;
-  right: 0.75rem;
-  top: auto !important;
-  bottom: 0.75rem;
-  width: auto;
-  border-radius: 10px;
-}
-.sillybos.sheet .tag-open {
-  display: inline-flex;
-  margin-top: 0.7rem;
-  padding: 0.45rem 0.9rem;
-  color: var(--paper);
-  background: var(--sanguine);
-  border-radius: var(--radius);
-  text-decoration: none;
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-.sillybos.sheet .tag-close {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.5rem;
-  padding: 0.3rem 0.5rem;
-  font: inherit;
-  font-size: 1.2rem;
-  line-height: 1;
-  color: var(--ink-3);
-  background: none;
-  border: 0;
-  cursor: pointer;
-}
-.sillybos .tag-close {
-  display: none;
-}
-.sillybos.sheet .tag-close {
-  display: block;
 }
 .sillybos-string {
   position: absolute;
