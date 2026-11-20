@@ -1,0 +1,103 @@
+/* The page that is not there: a leaf that was in the fire. Its lower corner is burnt away, the edge the fire stopped
+   at is scorched and charred, and by lamplight a line of ember is still alive in it. The burnt edge, the char and the
+   ember are drawn in lib/materials.mjs (virtual:burn.css) in a box that sits in the leaf's lower right corner. */
+
+.lost-table {
+  /* The box the burn is drawn in: as wide as the screen allows, and always the same shape. */
+  --bw: min(46rem, 92vw);
+  --bh: calc(var(--bw) * 5 / 9);
+  /* The shadow follows what is left of the leaf: a shadow of the whole rectangle would lie where the corner was. */
+  filter: drop-shadow(0 1.5rem 1.3rem rgb(44 32 14 / 0.42)) drop-shadow(0 0.3rem 0.4rem rgb(44 32 14 / 0.22));
+}
+:root[data-theme='lucerna'] .lost-table {
+  filter: drop-shadow(0 1.6rem 1.5rem rgb(0 0 0 / 0.8)) drop-shadow(0 0.3rem 0.4rem rgb(0 0 0 / 0.5));
+}
+.lost.leaf::before,
+.lost .leaf-under {
+  /* This leaf lies alone: whatever was under it burned too. */
+  display: none;
+}
+.lost {
+  /* What is left of the leaf: the burn's box in the lower right corner, cut to the burnt edge, and all of the leaf
+     above the box and to the left of it. The cut is made on the leaf and not on its sheet, which already wears the
+     outline the knife gave it: two masks on one element are added together, and these two must both hold. */
+  -webkit-mask-image: var(--burn-left), linear-gradient(#000, #000), linear-gradient(#000, #000);
+  mask-image: var(--burn-left), linear-gradient(#000, #000), linear-gradient(#000, #000);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: right bottom, left top, left top;
+  mask-position: right bottom, left top, left top;
+  -webkit-mask-size: var(--bw) var(--bh), 100% calc(100% - var(--bh) + 1px), calc(100% - var(--bw) + 1px) 100%;
+  mask-size: var(--bw) var(--bh), 100% calc(100% - var(--bh) + 1px), calc(100% - var(--bw) + 1px) 100%;
+}
+.lost .leaf-sheet {
+  overflow: clip;
+}
+.lost .char,
+.lost .ember {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  /* The scorch is drawn with room to fade out in, above the burn's box and to the left of it. */
+  width: calc(var(--bw) * var(--burn-reach));
+  height: calc(var(--bh) * var(--burn-rise));
+  pointer-events: none;
+  background: var(--burn-char) center / 100% 100% no-repeat;
+}
+.lost .ember {
+  background-image: var(--burn-ember);
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* An ember breathes: it brightens where the air reaches it and dulls again. */
+  :root[data-theme='lucerna'] .lost .ember {
+    animation: ember 5.2s ease-in-out infinite;
+  }
+  @keyframes ember {
+    0%, 100% { opacity: 0.55; }
+    18% { opacity: 1; }
+    34% { opacity: 0.7; }
+    52% { opacity: 0.95; }
+    71% { opacity: 0.45; }
+    86% { opacity: 0.85; }
+  }
+}
+.lost .folio {
+  /* The words keep to the part of the leaf the fire did not reach: above the burn, unless the leaf is wide enough
+     for them to stand clear of it on the left. */
+  min-height: calc(var(--bh) + 9rem);
+  padding-bottom: calc(var(--bh) * 0.94);
+}
+.lost-text {
+  grid-column: 1 / -1;
+  max-width: 35rem;
+  padding: 1.5rem 0 0;
+}
+.lost-text .seek-large {
+  margin: 1.4rem 0 0;
+}
+.lost-ways {
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.6rem;
+}
+@media (min-width: 76rem) {
+  .lost .folio {
+    padding-bottom: calc(var(--bh) * 0.3);
+  }
+}
+@media print {
+  .lost-table {
+    filter: none;
+  }
+  .lost {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .lost .char,
+  .lost .ember {
+    display: none;
+  }
+}

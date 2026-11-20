@@ -46,6 +46,15 @@
   --under-shade: rgb(70 46 16 / 0.42);
   --hole-shade: rgb(70 46 18 / 0.34);
   --hole-hatch: rgb(70 46 18 / 0.2);
+  /* The catalogue's roll: papyrus, the colour of straw and honey, its wooden rod and the shade a roll throws. */
+  --papyrus: #ead9ae;
+  --papyrus-2: #dcc590;
+  --papyrus-join: rgb(120 84 30 / 0.09);
+  --roll-light: rgb(255 249 226 / 0.62);
+  --roll-shade: rgb(66 42 12 / 0.6);
+  --roll-ring: rgb(98 68 26 / 0.55);
+  --rod: #7a5632;
+  --rod-shade: #3c2814;
   /* Red chalk, and green from copper. */
   --sanguine: #93361c;
   --sanguine-2: #b8552f;
@@ -103,6 +112,14 @@
   --under-shade: rgb(0 0 0 / 0.6);
   --hole-shade: rgb(0 0 0 / 0.6);
   --hole-hatch: rgb(0 0 0 / 0.42);
+  --papyrus: #271d10;
+  --papyrus-2: #33260f;
+  --papyrus-join: rgb(0 0 0 / 0.16);
+  --roll-light: rgb(255 206 140 / 0.2);
+  --roll-shade: rgb(0 0 0 / 0.72);
+  --roll-ring: rgb(0 0 0 / 0.6);
+  --rod: #4e3820;
+  --rod-shade: #150d06;
   --sanguine: #ee9a72;
   --sanguine-2: #f2b08e;
   --sanguine-wash: rgb(238 154 114 / 0.14);

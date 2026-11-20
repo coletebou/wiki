@@ -1,18 +1,30 @@
 ---
 import Leaf from '../components/Leaf.astro';
 import Base from '../layouts/Base.astro';
+import 'virtual:burn.css';
+import '../styles/lost.css';
 ---
 <Base title="A lost scroll" description="No folio lives at this address." notFound>
-  <Leaf>
+  <div class="lost-table">
+  <Leaf leaf="lost">
     <div class="running-head"><span>Codex Tebou</span><span class="folio-no">f. —</span></div>
     <div class="folio">
-      <div class="text-block" style="grid-column: 1 / -1; text-align: center; padding: 2rem 0 3rem">
+      <div class="lost-text">
         <p class="kicker">Not in the catalogue</p>
         <h1 class="title">A lost scroll</h1>
         <p class="summary" style="margin-top: 1rem">No folio lives at this address. It may have been renamed, or it burned with the rest of Alexandria.</p>
-        <button type="button" class="seek-large" data-seek style="margin-inline:auto">Seek it in the library <kbd>/</kbd></button>
-        <p style="margin-top: 1.6rem"><a href="/pinakes/">Browse the Pinakes</a> · <a href="/">Return to the frontispiece</a></p>
+        <button type="button" class="seek-large" data-seek>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" /><path d="m15 15 5.5 5.5" /></svg>
+          Seek it in the library <kbd>/</kbd>
+        </button>
+        <ul class="lost-ways">
+          <li><a href="/pinakes/">Browse the Pinakes</a></li>
+          <li><a href="/">Return to the frontispiece</a></li>
+        </ul>
       </div>
     </div>
+    <div class="char" aria-hidden="true"></div>
+    <div class="ember" aria-hidden="true"></div>
   </Leaf>
+  </div>
 </Base>
