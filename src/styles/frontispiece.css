@@ -88,6 +88,18 @@
   letter-spacing: 0.08em;
   color: var(--lapis);
 }
+/* Under the drawing, whose it is: small, as a caption is written. */
+.frontispiece .vt-credit {
+  margin: -0.6rem 0 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--ink-3);
+}
+.frontispiece .vt-credit a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
 .frontispiece .being {
   max-width: 36rem;
   margin: 1.1rem auto 0;
