@@ -16,7 +16,7 @@ interface Props {
   title: string;
   description: string;
   /** Which masthead link is the current page. */
-  current?: 'home' | 'pinakes' | 'search' | 'about' | 'agents';
+  current?: 'home' | 'pinakes' | 'planisphere' | 'search' | 'about' | 'agents';
   ogType?: 'website' | 'article';
   /** The not-found page: served at every missing address, so it names no address of its own and is not indexed. */
   notFound?: boolean;
@@ -82,6 +82,7 @@ const withFrom = (h: string) => {
       </a>
       <nav aria-label="Library">
         <a href="/pinakes/" aria-current={current === 'pinakes' ? 'page' : undefined}>Pinakes</a>
+        <a href="/planisphere/" class="wide-only" aria-current={current === 'planisphere' ? 'page' : undefined}>Planisphere</a>
         <a href="/how-to-be-a-beast/" class="wide-only">Start here</a>
         <a href="/wiki-mcp/" class="wide-only" aria-current={current === 'agents' ? 'page' : undefined}>For agents</a>
         <a href="/about-this-wiki/" aria-current={current === 'about' ? 'page' : undefined}>About</a>
@@ -141,6 +142,7 @@ const withFrom = (h: string) => {
           <div><dt><kbd>n</kbd> <kbd>p</kbd></dt><dd>The next leaf, the leaf before</dd></div>
           <div><dt><kbd>v</kbd></dt><dd>The back of this leaf: who cites it, its sources</dd></div>
           <div><dt><kbd>c</kbd></dt><dd>The catalogue</dd></div>
+          <div><dt><kbd>m</kbd></dt><dd>The planisphere: the library as a map of stars</dd></div>
           <div><dt><kbd>h</kbd></dt><dd>The frontispiece</dd></div>
           <div><dt><kbd>s</kbd></dt><dd>Sortes: a leaf drawn by lot</dd></div>
           <div><dt><kbd>l</kbd></dt><dd>Light the lamp, or put it out</dd></div>

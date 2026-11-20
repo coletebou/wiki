@@ -15,7 +15,7 @@ People and agents edit it the same way: by pull request. An agent edit that pass
 | `content/*.mdx` | One page per file. Format: [docs/EDITING.md](docs/EDITING.md) |
 | `src/` | The Astro site: layouts, components, the interactive studies (`src/diagrams`), styles, routes |
 | `src/data/prices.json` | Every price on the site, with the date it was read and the vendor page it was read on |
-| `lib/` | Shared, dependency-free code: wiki links, the link graph, validation, search, the public-safety lint, and the drawing of the materials (vellum, stone, papyrus, the outlines of the leaf and the roll, the burnt edge), of each folio's illuminated initial, of Attic numerals and of Roman dates |
+| `lib/` | Shared, dependency-free code: wiki links, the link graph, validation, search, the public-safety lint, and the drawing of the materials (vellum, stone, papyrus, the outlines of the leaf and the roll, the burnt edge), of each folio's illuminated initial, of Attic numerals and Roman dates, and the layout of the planisphere |
 | `mcp/` | The MCP server for agents (stdio) |
 | `scripts/` | Checks: pages, links in the built site, public safety, the deny-list tool; and the tracing of the frontispiece's drawing from a photograph of Leonardo's sheet |
 | `safety/denylist.json` | Salted hashes of phrases that must never be published |
