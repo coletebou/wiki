@@ -1,20 +1,28 @@
 ---
 import { folioLabel } from '../../lib/schema.mjs';
-import Vitruvian from '../components/Vitruvian.astro';
+import Armarium from '../components/Armarium.astro';
+import Headpiece from '../components/Headpiece.astro';
 import Leaf from '../components/Leaf.astro';
+import Manicule from '../components/Manicule.astro';
+import Vitruvian from '../components/Vitruvian.astro';
+import { emblem } from '../diagrams/emblems';
 import Base from '../layouts/Base.astro';
 import { href, incipit, tableOf, wiki } from '../lib/wiki';
+import '../styles/frontispiece.css';
 
 const { pages, tables, graph, bySlug } = await wiki();
 const start = bySlug.get('how-to-be-a-beast');
-const studies = [
-  { slug: 'tmux-keymap', name: 'The tmux keymap', note: 'Every binding on a drawn keyboard, prefix and Alt layers.' },
-  { slug: 'agent-fleet', name: 'The agent fleet', note: 'Hooks, messages, handoffs, parking and the shared brain.' },
-  { slug: 'parallel-worktrees', name: 'Worktree fan-out', note: 'One repository, many branches, an agent in each.' },
-  { slug: 'observability', name: 'The observability path', note: 'Where every trace, error, log and archive flows.' },
-  { slug: 'cloudflare-front-door', name: 'The Cloudflare front door', note: 'A request’s passage from DNS to origin.' },
-  { slug: 'what-it-costs', name: 'What it costs', note: 'A calculator over every price, each with its date.' },
-].filter((s) => bySlug.has(s.slug));
+// Each study with the emblem of its own Latin motto: of keys, of machines, of trees, of rivers, of gates, of the balance.
+const studies = (
+  [
+    { slug: 'tmux-keymap', name: 'The tmux keymap', note: 'Every binding on a drawn keyboard, prefix and Alt layers.', emblem: 'clavis', motto: 'de clavibus' },
+    { slug: 'agent-fleet', name: 'The agent fleet', note: 'Hooks, messages, handoffs, parking and the shared brain.', emblem: 'rotae', motto: 'de machinis' },
+    { slug: 'parallel-worktrees', name: 'Worktree fan-out', note: 'One repository, many branches, an agent in each.', emblem: 'arbor', motto: 'de arboribus' },
+    { slug: 'observability', name: 'The observability path', note: 'Where every trace, error, log and archive flows.', emblem: 'vortex', motto: 'de fluminibus' },
+    { slug: 'cloudflare-front-door', name: 'The Cloudflare front door', note: 'A request’s passage from DNS to origin.', emblem: 'porta', motto: 'de portis' },
+    { slug: 'what-it-costs', name: 'What it costs', note: 'A calculator over every price, each with its date.', emblem: 'libra', motto: 'de sumptibus' },
+  ] as const
+).filter((s) => bySlug.has(s.slug));
 const recent = [...pages].sort((a, b) => b.data.updated.valueOf() - a.data.updated.valueOf() || a.data.folio - b.data.folio).slice(0, 8);
 const cited = [...pages]
   .map((p) => ({ p, n: (graph.backlinks.get(p.id) ?? []).length }))
@@ -27,8 +35,9 @@ const cited = [...pages]
     <div class="folio">
       <div class="text-block" style="grid-column: 1 / -1">
         <section class="frontispiece">
+          <Headpiece seed={1} />
           <p class="greek" lang="grc" title="“The house of healing for the soul”, the inscription said to stand over the library">ΨΥΧΗΣ · ΙΑΤΡΕΙΟΝ</p>
-          <h1>CODEX TEBOU</h1>
+          <h1 data-text="CODEX TEBOU">CODEX TEBOU</h1>
           <p class="beast">How to Be a Beast</p>
           <Vitruvian />
           <p class="being">
@@ -42,42 +51,48 @@ const cited = [...pages]
         </section>
 
         {start && (
-          <section style="max-width: var(--measure); margin: 2.6rem auto 0">
-            <p class="summary" style="font-style: normal; text-align: center">{start.data.summary}</p>
-            <p style="text-align: center; margin: 0"><a href={href(start.id)} class="table-card" style="display:inline-block; padding: 0.6rem 1.2rem"><span class="numeral" style="font-size: 1rem">{folioLabel(start.data.folio)}</span> &nbsp;Begin with “{start.data.title}”</a></p>
+          <section class="incipit-liber">
+            <p>{start.data.summary}</p>
+            <a class="begin" href={href(start.id)}><Manicule />Begin with “{start.data.title}”<span class="folio-no">{folioLabel(start.data.folio)}</span></a>
           </section>
         )}
 
-        <h2 class="section-title">The Ten Tables</h2>
-        <p class="section-sub">Callimachus sorted the half-million scrolls of Alexandria into the <i>Pinakes</i>, tables by subject. This library keeps ten.</p>
-        <div class="tables-grid">
-          {tables.map((t) => (
-            <a class="table-card" href={`/pinakes/#table-${t.id}`}>
-              <span class="numeral">{t.numeral}</span>
-              <span class="count">{t.pages.length} folio{t.pages.length === 1 ? '' : 's'}</span>
-              <h3>{t.title}</h3>
-              <p>{t.subtitle}</p>
-            </a>
-          ))}
-        </div>
+        <section aria-labelledby="tables-title">
+          <h2 class="section-title" id="tables-title">The Ten Tables</h2>
+          <p class="section-sub">
+            Callimachus sorted the half-million scrolls of Alexandria into the <i>Pinakes</i>, tables by subject. This library
+            keeps ten, and here is its cabinet: a roll for every folio, each with its tag.
+          </p>
+          <Armarium tables={tables} cited={new Set(cited.map(({ p }) => p.id))} recent={new Set(recent.map((p) => p.id))} />
+          <p class="armarium-key">
+            <svg class="roll" viewBox="-16 -16 32 32" aria-hidden="true"><circle class="roll-end" r="14" /><circle class="roll-boss gold" r="2.7" /></svg>
+            a gold boss: among the eight most cited
+            <svg class="roll recent" viewBox="-20 -16 36 40" aria-hidden="true"><circle class="roll-end" r="14" /><circle class="roll-boss" r="2.7" /><path class="roll-tag" d="M-9.5 9.5L-13 15.5M-15.6 14.4L-10.6 17.4L-13.4 22L-18.4 19Z" /></svg>
+            a red tag: among the eight most lately emended
+          </p>
+        </section>
 
         {studies.length > 0 && (
-          <>
-            <h2 class="section-title">Studies in Ink</h2>
+          <section aria-labelledby="studies-title">
+            <h2 class="section-title" id="studies-title">Studies in Ink</h2>
             <p class="section-sub">Drawings you can work: press the keys, follow the flows, run the numbers.</p>
-            <div class="tables-grid">
+            <ul class="plates">
               {studies.map((s) => {
                 const p = bySlug.get(s.slug)!;
                 return (
-                  <a class="table-card" href={href(s.slug)}>
-                    <span class="count">{folioLabel(p.data.folio)}</span>
-                    <h3>{s.name}</h3>
-                    <p>{s.note}</p>
-                  </a>
+                  <li>
+                    <a class="plate" href={href(s.slug)}>
+                      <svg viewBox="-56 -56 112 112" aria-hidden="true" focusable="false"><g class="emblem" set:html={emblem({ name: s.emblem, x: 0, y: 0, size: 100 }, `plate-${s.slug}`)} /></svg>
+                      <span class="plate-motto" aria-hidden="true">{s.motto}</span>
+                      <span class="plate-name">{s.name}</span>
+                      <span class="plate-note">{s.note}</span>
+                      <span class="plate-folio">{folioLabel(p.data.folio)}</span>
+                    </a>
+                  </li>
                 );
               })}
-            </div>
-          </>
+            </ul>
+          </section>
         )}
 
         <div class="verso" style="border-top: 1px solid var(--rule)">

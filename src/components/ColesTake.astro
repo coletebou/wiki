@@ -1,21 +1,9 @@
 ---
-// Cole's opinions, set apart as a reader's note: a stroke of red chalk down the side and a manicule, the little
-// pointing hand readers have drawn in margins since the twelfth century to say "mark this". Used in MDX as
-// <ColesTake>...</ColesTake>.
+// Cole's opinions, set apart as a reader's note: a stroke of red chalk down the side and a manicule in the margin.
+// Used in MDX as <ColesTake>...</ColesTake>.
+import Manicule from './Manicule.astro';
 ---
 <aside class="coles-take" aria-label="Cole's take">
-  <p class="label">
-    <svg class="manicule" viewBox="0 0 44 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M9.6 5.2H3.4C2.3 5.2 1.8 5.9 1.8 6.9V18.3C1.8 19.3 2.3 20 3.4 20H9.6Z" />
-      <path d="M5.6 9V16.2" />
-      <path d="M9.6 6.4C12.6 5.3 15 4.9 17 4.9" />
-      <path d="M22.6 5.6L41 8.4C42.6 8.8 42.6 11.2 40.9 11.4L27.6 11.9" />
-      <path d="M17 4.9C18.8 2.9 21.8 1.9 24.8 2.1C26.4 2.3 26.6 4.3 25.1 4.8L22.6 5.6C21.4 6 20.3 6.6 19.6 7.6" />
-      <path d="M27.6 11.9C29.6 12.2 29.7 15.4 27.7 15.7L23.4 16" />
-      <path d="M24.6 15.9C26 16.6 25.8 19.2 24.1 19.4L20.2 19.7" />
-      <path d="M21.2 19.6C22.2 20.5 21.7 22.3 20.3 22.4C16.6 22.7 12.8 21.9 9.6 19.4" />
-    </svg>
-    Cole’s take
-  </p>
+  <p class="label"><Manicule />Cole’s take</p>
   <div class="body"><slot /></div>
 </aside>

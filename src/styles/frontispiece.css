@@ -1,0 +1,447 @@
+/* The frontispiece: the book's first page. A headpiece of white vine, the title in burnished gold, the beast; and
+   below them the library's cabinet of rolls and the plate of studies. */
+
+/* ── Headpiece and title ──────────────────────────────────────────────────────────────────────────────────── */
+.frontispiece {
+  text-align: center;
+  padding: 0 0 1rem;
+}
+.headpiece {
+  height: clamp(2.1rem, 1.5rem + 2vw, 2.9rem);
+  max-width: 50rem;
+  margin: 0 auto clamp(1rem, 2.2vw, 1.5rem);
+  border: 2px solid var(--gold);
+  outline: 1px solid var(--il-line);
+  box-shadow: inset 0 0 0 1px var(--il-line);
+  overflow: hidden;
+}
+.headpiece svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.frontispiece .greek {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 0.95rem;
+  letter-spacing: 0.4em;
+  color: var(--sanguine);
+}
+.frontispiece h1 {
+  position: relative;
+  margin: 0.45rem 0 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2.6rem, 1.6rem + 5.5vw, 5.6rem);
+  line-height: 1.02;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  /* Gold leaf, as a title was laid: the letters first drawn in ink and raised with gesso (the heading itself, with
+     a stroke round it and a shadow under), then the leaf burnished over them (the same words again, cut from a
+     gradient of the leaf's lights and shades). */
+  .frontispiece h1 {
+    color: var(--il-line);
+    -webkit-text-stroke: 0.05em var(--il-line);
+    text-shadow: 0.018em 0.04em 0.02em rgb(30 18 6 / 0.45);
+  }
+  .frontispiece h1::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(104deg, transparent 42%, rgb(255 251 232 / 0.9) 50%, transparent 58%) 160% 0 / 260% 100% no-repeat,
+      linear-gradient(172deg, var(--gold-hi) 8%, var(--gold) 30%, var(--gold-hi) 46%, var(--gold) 58%, var(--gold-lo) 94%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    /* Once the beast below has drawn himself, the leaf catches the light, once. */
+    .frontispiece h1::after {
+      animation: glint 1.7s cubic-bezier(0.4, 0, 0.3, 1) 2.7s 1 both;
+    }
+    @keyframes glint {
+      from { background-position: 160% 0, 0 0; }
+      to { background-position: -60% 0, 0 0; }
+    }
+  }
+}
+@media (forced-colors: active) {
+  .frontispiece h1 {
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+  }
+  .frontispiece h1::after {
+    display: none;
+  }
+}
+.frontispiece .beast {
+  margin: 0.7rem 0 0;
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  letter-spacing: 0.08em;
+  color: var(--lapis);
+}
+.frontispiece .being {
+  max-width: 36rem;
+  margin: 1.1rem auto 0;
+  font-size: var(--step-1);
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-wrap: balance;
+}
+
+/* Where to begin: the scribe's "here begins the book", pointed at. */
+.incipit-liber {
+  max-width: var(--measure);
+  margin: 2.6rem auto 0;
+  text-align: center;
+}
+.incipit-liber p {
+  margin: 0 0 0.9rem;
+  font-size: var(--step-1);
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-wrap: balance;
+}
+.begin {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.2rem 0.7rem;
+  font-size: var(--step-1);
+  color: var(--sanguine);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+.begin .manicule {
+  width: 2.5rem;
+  height: 1.36rem;
+  stroke-width: 1.1;
+}
+.begin .folio-no {
+  font-size: 1rem;
+  color: var(--ink-3);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .begin .manicule {
+    transition: transform 0.25s;
+  }
+  .begin:hover .manicule {
+    transform: translateX(0.25rem);
+  }
+}
+
+/* ── The armarium: a pigeonhole for each table, a roll for each folio ──────────────────────────────────────── */
+.armarium {
+  --wood: var(--ink-2);
+  max-width: 70rem;
+  margin: 2.2rem auto 0;
+}
+.armarium-cornice,
+.armarium-plinth {
+  height: 0.85rem;
+  margin: 0 -0.55rem;
+  border: 1.5px solid var(--wood);
+  background: repeating-linear-gradient(90deg, transparent 0 0.5rem, color-mix(in srgb, var(--wood) 55%, transparent) 0.5rem calc(0.5rem + 1px));
+}
+.armarium-cornice {
+  border-bottom: 0;
+  /* A fillet under the cornice, and its dentils above. */
+  box-shadow: 0 -3px 0 -1.5px var(--paper), 0 -3px 0 0 var(--wood);
+}
+.armarium-plinth {
+  border-top: 0;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--wood) 30%, transparent) 0 1px, transparent 1px 4px);
+}
+.armarium-shelves {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1.5px solid var(--wood);
+  border-left: 1.5px solid var(--wood);
+}
+@media (min-width: 40rem) {
+  .armarium-shelves {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  /* Ten into three leaves one over: the last table takes the whole of the lowest shelf. */
+  .nidus:last-child {
+    grid-column: 1 / -1;
+  }
+  .nidus:last-child .nidus-hole {
+    aspect-ratio: 4.6 / 1;
+  }
+  .nidus:last-child .pile {
+    --roll: 5%;
+  }
+}
+@media (min-width: 62rem) {
+  .armarium-shelves {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .nidus:last-child {
+    grid-column: auto;
+  }
+  .nidus:last-child .nidus-hole {
+    aspect-ratio: 1.62 / 1;
+  }
+  .nidus:last-child .pile {
+    --roll: calc(96% / var(--foot, 6));
+  }
+}
+.nidus {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1.5px solid var(--wood);
+  border-bottom: 1.5px solid var(--wood);
+}
+.nidus-hole {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* The least a pigeonhole is; a pile taller than that makes its whole shelf taller. */
+  aspect-ratio: 1.62 / 1;
+  padding: 0 3% 3%;
+  /* The inside of the cabinet: in shadow at the back and under the shelf above, hatched as Leonardo shaded. */
+  background:
+    linear-gradient(to bottom, var(--hole-shade), transparent 62%),
+    repeating-linear-gradient(135deg, var(--hole-hatch) 0 1px, transparent 1px 4.5px);
+}
+.pile {
+  /* --foot is how many rolls the foot of this pile may hold (six, or more and smaller for a large table). */
+  --roll: calc(96% / var(--foot, 6));
+  width: 100%;
+}
+.pile-row {
+  display: flex;
+  justify-content: center;
+}
+.pile-row + .pile-row {
+  /* Each row lies in the hollows of the row beneath, as logs do. */
+  margin-top: calc(var(--roll) * -0.134);
+}
+.roll {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--roll, 16%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+.roll svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.roll-end {
+  fill: var(--paper-2);
+  stroke: var(--ink-2);
+  stroke-width: 1.15;
+}
+.roll-wind {
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 0.75;
+  stroke-linecap: round;
+}
+.roll-boss {
+  fill: var(--ink-2);
+}
+.roll.cited .roll-boss,
+.roll-boss.gold {
+  fill: var(--gold);
+  stroke: var(--il-line);
+  stroke-width: 0.7;
+}
+.roll-tag {
+  fill: var(--sanguine-2);
+  stroke: var(--sanguine);
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.roll.recent {
+  z-index: 1;
+}
+a.roll:hover,
+a.roll:focus-visible {
+  z-index: 3;
+}
+a.roll:hover .roll-end,
+a.roll:focus-visible .roll-end {
+  fill: var(--paper);
+  stroke: var(--sanguine);
+}
+a.roll:hover .roll-wind,
+a.roll:focus-visible .roll-wind {
+  stroke: var(--sanguine);
+}
+a.roll:focus-visible {
+  outline-offset: 1px;
+  border-radius: 50%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .roll svg {
+    transition: transform 0.18s;
+  }
+  /* A roll drawn a little way out of its pigeonhole. */
+  a.roll:hover svg,
+  a.roll:focus-visible svg {
+    transform: scale(1.22);
+  }
+}
+.nidus-empty {
+  align-self: center;
+  margin: 0;
+  font-style: italic;
+  color: var(--ink-3);
+}
+.nidus-label {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  align-content: start;
+  gap: 0 0.5rem;
+  padding: 0.5rem 0.7rem 0.6rem;
+  border-top: 1.5px solid var(--wood);
+  color: var(--ink);
+  text-decoration: none;
+}
+.nidus-label .numeral {
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  color: var(--sanguine);
+}
+.nidus-label .name {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+}
+.nidus-label .about {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin-top: 0.1rem;
+  font-size: 0.93rem;
+  font-style: italic;
+  line-height: 1.3;
+  color: var(--ink-2);
+}
+.nidus-label .count {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+.nidus-label:hover .name {
+  color: var(--sanguine);
+}
+.armarium-key {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.2rem 0.45rem;
+  margin: 1.1rem auto 0;
+  font-size: 0.95rem;
+  font-style: italic;
+  color: var(--ink-2);
+}
+.armarium-key .roll {
+  display: inline-block;
+  width: 1.15rem;
+  height: 1.15rem;
+  aspect-ratio: auto;
+  overflow: visible;
+}
+.armarium-key .roll.recent {
+  width: 1.3rem;
+  height: 1.45rem;
+  margin-left: 1.2rem;
+}
+
+/* ── The plate of studies: each with the emblem of its Latin motto ─────────────────────────────────────────── */
+.plates {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.8rem 1rem;
+  max-width: 70rem;
+  margin: 2rem auto 0;
+  padding: 0;
+}
+@media (min-width: 40rem) {
+  .plates {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 64rem) {
+  .plates {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.plate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  text-align: center;
+  color: var(--ink);
+  text-decoration: none;
+}
+.plate svg {
+  width: min(6.6rem, 62%);
+  overflow: visible;
+  color: var(--ink-2);
+}
+.plate-motto {
+  margin-top: 0.15rem;
+  font-family: var(--font-hand);
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--sanguine-2);
+}
+.plate-name {
+  margin-top: 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+}
+.plate-note {
+  margin-top: 0.2rem;
+  max-width: 14rem;
+  font-size: 0.95rem;
+  font-style: italic;
+  line-height: 1.3;
+  color: var(--ink-2);
+}
+.plate-folio {
+  margin-top: 0.2rem;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+.plate:hover .plate-name {
+  color: var(--sanguine);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .plate svg {
+    transition: color 0.2s, transform 0.3s;
+  }
+  .plate:hover svg {
+    color: var(--sanguine);
+    transform: rotate(-2deg) scale(1.04);
+  }
+}
