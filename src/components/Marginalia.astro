@@ -1,32 +1,31 @@
 ---
 // Ornament only: lines from Leonardo's notebooks in his mirror-image hand, and small ink studies, in the outer
-// margin. Hidden from assistive technology and never used for content.
+// margin. Hidden from assistive technology and never used for content. Point at a line and it turns to face you,
+// and a tag gives its English (src/scripts/sillybos.ts reads the data-gloss attributes).
+import { LINES } from '../data/leonardo';
 import { emblem } from '../diagrams/emblems';
 
 interface Props {
   folio: number;
 }
 const { folio } = Astro.props;
-const lines = [
-  'Chi poco pensa, molto erra',
-  'Ogni nostra cognizione prencipia da sentimenti',
-  'La sapienza è figliola della sperienza',
-  'Ostinato rigore',
-  'Di mi se mai fu fatta alcuna cosa',
-  'O tempo, consumatore delle cose',
-  'Ogni impedimento è distrutto dal rigore',
-  'Studia prima la scienza, e poi seguita la pratica',
-  'Il ferro s’arrugginisce sanza esercizio',
-  'L’acqua che tocchi de’ fiumi è l’ultima di quella che andò',
-];
-const pick = (i: number) => lines[(folio * 7 + i * 3) % lines.length];
+const pick = (i: number) => LINES[(folio * 7 + i * 3) % LINES.length];
 // One of his studies, drawn in the same hand as the studies' emblems: water, wheels, a wing, dividers, the aerial screw.
 const studies = ['vortex', 'rotae', 'ala', 'circinus', 'cochlea'] as const;
 const study = studies[folio % studies.length];
+const source = (n?: number) => (n ? `Richter, § ${n}` : 'A plain rendering');
 ---
 <div class="marginalia" aria-hidden="true">
-  <p style="--tilt: -5deg">{pick(0)}</p>
-  <svg viewBox="-56 -56 112 112" focusable="false"><g class="emblem" set:html={emblem({ name: study, x: 0, y: 0, size: 100 }, `margin-${folio}`)} /></svg>
-  <p style="--tilt: 3deg">{pick(1)}</p>
-  <p style="--tilt: -2deg">{pick(2)}</p>
+  {[
+    { line: pick(0), tilt: '-5deg' },
+    null,
+    { line: pick(1), tilt: '3deg' },
+    { line: pick(2), tilt: '-2deg' },
+  ].map((m) =>
+    m ? (
+      <p style={`--tilt: ${m.tilt}`} data-gloss={m.line.it} data-gloss-en={m.line.en} data-gloss-source={source(m.line.richter)}>{m.line.it}</p>
+    ) : (
+      <svg viewBox="-56 -56 112 112" focusable="false"><g class="emblem" set:html={emblem({ name: study, x: 0, y: 0, size: 100 }, `margin-${folio}`)} /></svg>
+    ),
+  )}
 </div>

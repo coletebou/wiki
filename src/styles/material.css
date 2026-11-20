@@ -1,0 +1,195 @@
+/* The material of the book: a leaf of vellum, lying on a stone reading table, under real light. The textures
+   (--grain, --mottle, --follicles, --fibres, --stone, --veins) and the leaf's outline (--leaf-edge) are a few lines
+   of SVG each, computed in lib/materials.mjs and bundled with the rest of the styles; nothing is an image file. */
+
+:root {
+  /* Where the lamp stands: the theme switch at the right of the masthead. Its light is drawn from here. */
+  --lamp-x: calc(50% + min(39rem, 50%) - var(--gap) - 0.55rem);
+  --lamp-y: 2.1rem;
+}
+
+/* ── The reading table ─────────────────────────────────────────────────────────────────────────────────────── */
+body {
+  background-color: var(--desk);
+  background-image: var(--veins), var(--stone), var(--grain);
+  background-size: 1100px 1100px, 760px 760px, 260px 260px;
+}
+
+/* The light in the room. By day it comes through a window high on the left, the side Leonardo lit his drawings from,
+   and it stays where it is while the leaf moves under it. By night it is the lamp's: a pool of light around the lamp
+   in the masthead, on the stone and on the head of the leaf alike, which you leave behind as you read down the page.
+   Painted over the page and never in the way of it. */
+body {
+  position: relative;
+}
+.lumen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 90vmax 62vmax at 0% 0%, rgb(255 251 236 / 0.2), transparent 62%),
+    radial-gradient(ellipse 85vmax 60vmax at 100% 100%, rgb(46 34 18 / 0.13), transparent 66%);
+}
+:root[data-theme='lucerna'] .lumen {
+  position: absolute;
+  inset: 0 0 auto;
+  height: min(84rem, 100%);
+  background:
+    radial-gradient(ellipse 20rem 15rem at var(--lamp-x) var(--lamp-y), rgb(255 190 110 / 0.13), transparent 70%),
+    radial-gradient(ellipse 66rem 52rem at var(--lamp-x) var(--lamp-y), rgb(255 168 84 / 0.15), rgb(255 160 80 / 0.06) 48%, transparent 74%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* A flame is never still. The whole of its light breathes, a few parts in a hundred. */
+  :root[data-theme='lucerna'] .lumen {
+    animation: lamplight 7.3s linear infinite;
+  }
+  @keyframes lamplight {
+    0%, 100% { opacity: 1; }
+    7% { opacity: 0.9; }
+    11% { opacity: 0.98; }
+    23% { opacity: 0.93; }
+    26% { opacity: 1; }
+    48% { opacity: 0.96; }
+    52% { opacity: 0.87; }
+    57% { opacity: 0.99; }
+    74% { opacity: 0.94; }
+    81% { opacity: 1; }
+    90% { opacity: 0.91; }
+  }
+}
+@media print {
+  .lumen {
+    display: none;
+  }
+}
+
+/* ── The leaf ──────────────────────────────────────────────────────────────────────────────────────────────── */
+.leaf {
+  position: relative;
+  max-width: 78rem;
+  margin: 0 auto 3.5rem;
+}
+.leaf::before {
+  /* The shadow the book throws on the table. It is the leaf's own box, a little inside its edges, since the sheet's
+     outline is cut by a mask and a mask would cut its shadow too. */
+  content: '';
+  position: absolute;
+  inset: 1.4rem 0.7rem 0 0.5rem;
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+.leaf-sheet {
+  position: relative;
+  background-color: var(--paper);
+  background-image:
+    /* The gutter, where the leaf turns down into the binding and the light does not reach. */
+    linear-gradient(to right, var(--gutter-1), var(--gutter-2) 1.1rem, transparent 4.4rem),
+    /* The edges a reader's fingers have darkened: the fore-edge most, then the tail, then the head. */
+    linear-gradient(to left, var(--thumbed), transparent 3.4rem),
+    linear-gradient(to top, var(--thumbed), transparent 3.2rem),
+    linear-gradient(to bottom, color-mix(in srgb, var(--thumbed) 70%, transparent), transparent 2.4rem),
+    var(--follicles),
+    var(--mottle),
+    var(--grain);
+  background-size: auto, auto, auto, auto, 240px 240px, 980px 980px, 260px 260px;
+}
+.leaf-sheet::before {
+  /* Before a scribe writes he rules the leaf: two upright lines down each side of the text, one across at the head
+     and one at the tail, drawn from edge to edge so they cross at the corners; and down the fore-edge the row of
+     prickings he ruled them from. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --m: clamp(0.8rem, 1.8vw, 1.5rem);
+  --r: var(--ruling);
+  background:
+    linear-gradient(var(--r), var(--r)) var(--m) 0 / 1px 100% no-repeat,
+    linear-gradient(var(--r), var(--r)) calc(var(--m) + 4px) 0 / 1px 100% no-repeat,
+    linear-gradient(var(--r), var(--r)) calc(100% - var(--m)) 0 / 1px 100% no-repeat,
+    linear-gradient(var(--r), var(--r)) calc(100% - var(--m) - 4px) 0 / 1px 100% no-repeat,
+    linear-gradient(var(--r), var(--r)) 0 var(--m) / 100% 1px no-repeat,
+    linear-gradient(var(--r), var(--r)) 0 calc(100% - var(--m)) / 100% 1px no-repeat,
+    radial-gradient(circle, var(--prick) 0 0.85px, transparent 1.5px) calc(100% - var(--m) * 0.45) 0.4rem / 5px 1.62rem repeat-y;
+}
+.leaf-under {
+  display: none;
+}
+@media (max-width: 47.99rem) {
+  /* On a narrow screen the leaf covers the table and every layer is paid for on a slower machine: the stone keeps
+     only its grain, and the skin its mottle and its grain. */
+  body {
+    background-image: var(--grain);
+    background-size: 260px 260px;
+  }
+  .leaf-sheet {
+    background-image:
+      linear-gradient(to right, var(--gutter-2), transparent 2.2rem),
+      linear-gradient(to left, var(--thumbed), transparent 2.4rem),
+      var(--mottle),
+      var(--grain);
+    background-size: auto, auto, 980px 980px, 260px 260px;
+  }
+  :root:not([data-theme='lucerna']) .lumen {
+    display: none;
+  }
+}
+@media (max-width: 34rem) {
+  /* A phone shows no table around the leaf and has no room for a margin: one line down each side, close to the edge,
+     and the lines across. */
+  .leaf-sheet::before {
+    --m: 0.5rem;
+    background:
+      linear-gradient(var(--r), var(--r)) var(--m) 0 / 1px 100% no-repeat,
+      linear-gradient(var(--r), var(--r)) calc(100% - var(--m)) 0 / 1px 100% no-repeat,
+      linear-gradient(var(--r), var(--r)) 0 var(--m) / 100% 1px no-repeat,
+      linear-gradient(var(--r), var(--r)) 0 calc(100% - var(--m)) / 100% 1px no-repeat;
+  }
+}
+
+/* On a screen wide enough to show the table around it, the leaf keeps the outline the knife gave it, and the leaves
+   still to be read lie under its fore-edge and its tail. Where the nine-slice mask is not supported the leaf is a
+   plain rectangle, as it is on a phone. */
+@media (min-width: 48rem) {
+  .leaf {
+    margin-top: 0.4rem;
+  }
+  .leaf-under {
+    display: block;
+    position: absolute;
+    inset: 0;
+    transform: translate(4px, 5px);
+    background-color: var(--paper-3);
+    background-image:
+      linear-gradient(to left, var(--under-shade), transparent 1.1rem),
+      linear-gradient(to top, var(--under-shade), transparent 1.1rem),
+      var(--grain);
+  }
+  .leaf-under-2 {
+    transform: translate(8px, 10px);
+    filter: brightness(0.93);
+  }
+  @supports ((-webkit-mask-box-image: none) or (mask-border: none)) {
+    .leaf-sheet {
+      -webkit-mask-box-image: var(--leaf-edge) 60 fill / 60px round;
+      mask-border: var(--leaf-edge) 60 fill / 60px round;
+    }
+    .leaf-under {
+      -webkit-mask-box-image: var(--leaf-edge-under) 60 fill / 60px round;
+      mask-border: var(--leaf-edge-under) 60 fill / 60px round;
+    }
+  }
+}
+@media print {
+  .leaf::before,
+  .leaf-under {
+    display: none;
+  }
+  .leaf-sheet,
+  .leaf-sheet::before {
+    background: none !important;
+    -webkit-mask-box-image: none;
+    mask-border: none;
+  }
+}

@@ -19,11 +19,6 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: var(--desk);
-  background-image:
-    radial-gradient(ellipse at 20% 0%, rgb(255 245 220 / 0.35), transparent 55%),
-    radial-gradient(ellipse at 100% 100%, rgb(120 80 30 / 0.18), transparent 60%),
-    var(--grain);
   color: var(--ink);
   font-family: var(--font-text);
   font-size: var(--step-0);
@@ -34,20 +29,16 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
-:root {
-  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .42  0 0 0 0 .3  0 0 0 0 .16  0 0 0 .11 0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
-  --fibres: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='.006 .05' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .36  0 0 0 0 .18  0 0 0 .07 0'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>");
-}
-:root[data-theme='lucerna'] body {
-  background-image:
-    radial-gradient(ellipse at 50% -10%, rgb(255 170 80 / 0.1), transparent 60%),
-    var(--grain);
-}
 img,
 svg,
 video {
   max-width: 100%;
   height: auto;
+}
+a {
+  color: var(--sanguine);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.17em;
 }
 ::selection {
   background: var(--sanguine-wash);
@@ -81,7 +72,7 @@ video {
   transform: translateY(1rem);
 }
 
-/* ── Masthead ─────────────────────────────────────────────────────────────────────────────────────────────── */
+/* ── Masthead: cut into the stone of the table ───────────────────────────────────────────────────────────── */
 .masthead {
   display: flex;
   flex-wrap: wrap;
@@ -96,7 +87,7 @@ video {
   display: inline-flex;
   align-items: baseline;
   gap: 0.7rem;
-  color: var(--ink);
+  color: var(--desk-ink);
   text-decoration: none;
 }
 .wordmark b {
@@ -104,10 +95,12 @@ video {
   font-weight: 700;
   font-size: 1.28rem;
   letter-spacing: 0.16em;
+  /* Letters cut with a chisel catch the light on their lower edge. */
+  text-shadow: 0 1px 0 var(--chisel-light), 0 -1px 0 var(--chisel-dark);
 }
 .wordmark i {
   font-size: 1.05rem;
-  color: var(--ink-2);
+  color: var(--desk-ink-2);
 }
 .wordmark:hover b {
   color: var(--sanguine);
@@ -137,7 +130,7 @@ video {
 }
 .masthead nav a,
 .masthead nav button {
-  color: var(--ink-2);
+  color: var(--desk-ink-2);
   text-decoration: none;
   font: inherit;
   background: none;
@@ -159,58 +152,64 @@ video {
   margin-left: 0.35rem;
   font-size: 0.72rem;
 }
-.theme-toggle .sun,
-:root[data-theme='lucerna'] .theme-toggle .flame {
-  display: none;
+
+/* The lamp (a lucerna, the clay oil lamp of every Roman desk) is the theme switch: unlit by day, lit by night, and
+   by night the light on the page falls from it. */
+.masthead nav .lamp {
+  display: inline-flex;
+  padding: 0.1rem 0 0.1rem 0.1rem;
 }
-:root[data-theme='lucerna'] .theme-toggle .sun {
-  display: inline;
+.lamp svg {
+  width: 2.5rem;
+  height: 1.9rem;
+  overflow: visible;
 }
-.theme-toggle svg {
-  width: 1.15rem;
-  height: 1.15rem;
-  vertical-align: -0.2em;
+.lamp-flame,
+.lamp-glow {
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.lamp-flame {
+  fill: var(--gold-hi);
+  stroke: var(--sanguine);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.lamp-glow {
+  fill: rgb(255 190 110 / 0.5);
+}
+:root[data-theme='lucerna'] .lamp-flame {
+  opacity: 1;
+}
+:root[data-theme='lucerna'] .lamp-glow {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme='lucerna'] .lamp-flame {
+    animation: flame 2.9s ease-in-out infinite;
+  }
+  @keyframes flame {
+    0%, 100% { transform: scale(1, 1) skewX(0deg); }
+    18% { transform: scale(0.94, 1.07) skewX(-3deg); }
+    37% { transform: scale(1.04, 0.95) skewX(2deg); }
+    55% { transform: scale(0.97, 1.1) skewX(-1.5deg); }
+    78% { transform: scale(1.03, 0.97) skewX(3deg); }
+  }
 }
 
-/* ── The leaf (a sheet of parchment) ──────────────────────────────────────────────────────────────────────── */
-.leaf {
-  position: relative;
-  max-width: 78rem;
-  margin: 0 auto 3rem;
-  background-color: var(--paper);
-  background-image:
-    radial-gradient(ellipse at 50% 50%, transparent 62%, rgb(140 95 40 / 0.12) 100%),
-    radial-gradient(circle at 12% 18%, rgb(150 100 40 / 0.06), transparent 9%),
-    radial-gradient(circle at 86% 72%, rgb(150 100 40 / 0.05), transparent 7%),
-    var(--fibres),
-    var(--grain);
-  box-shadow: var(--shadow);
-  border-radius: 2px;
-}
-:root[data-theme='lucerna'] .leaf {
-  background-image:
-    radial-gradient(ellipse at 50% 30%, rgb(255 190 110 / 0.06), transparent 70%),
-    var(--fibres),
-    var(--grain);
-}
-.leaf::before {
-  /* A faint ruled frame, as a scribe pricks and rules the leaf before writing. */
-  content: '';
-  position: absolute;
-  inset: clamp(0.6rem, 1.4vw, 1.2rem);
-  border: 1px solid color-mix(in srgb, var(--rule) 55%, transparent);
-  pointer-events: none;
-}
+/* ── The head of the leaf (the leaf itself is in material.css) ─────────────────────────────────────────────── */
 .running-head {
   position: relative;
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 1rem;
   padding: clamp(1.4rem, 3vw, 2.2rem) clamp(1.6rem, 5vw, 4rem) 0;
-  font-family: var(--font-display);
-  font-size: 0.78rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  font-variant-caps: all-small-caps;
+  font-size: 1.04rem;
+  letter-spacing: 0.14em;
   color: var(--ink-3);
 }
 .running-head a {
@@ -223,9 +222,9 @@ video {
 .folio-no {
   font-family: var(--font-text);
   font-style: italic;
+  font-variant-caps: normal;
   font-size: 1.1rem;
   letter-spacing: 0.02em;
-  text-transform: none;
   color: var(--sanguine);
 }
 
@@ -264,12 +263,13 @@ video {
 }
 
 /* ── Article head ─────────────────────────────────────────────────────────────────────────────────────────── */
+/* Rubrics: what a scribe wrote in red to say where the reader is. They are set in the book hand's own small capitals,
+   as he wrote them, and the inscription capitals are kept for titles. */
 .kicker {
-  margin: 0 0 0.4rem;
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  margin: 0 0 0.3rem;
+  font-variant-caps: all-small-caps;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
   color: var(--sanguine);
 }
 .kicker a {
@@ -331,19 +331,6 @@ h1.title {
 .prose table,
 .prose pre {
   margin-bottom: 0;
-}
-.prose > p:first-child::first-letter,
-.prose > .lede::first-letter {
-  float: left;
-  margin: 0.08em 0.12em 0 0;
-  padding: 0.06em 0.12em 0;
-  font-family: var(--font-display);
-  font-size: 3.55em;
-  line-height: 0.82;
-  color: var(--sanguine);
-  border: 1px solid color-mix(in srgb, var(--sanguine) 45%, transparent);
-  background:
-    repeating-linear-gradient(135deg, color-mix(in srgb, var(--sanguine) 14%, transparent) 0 1px, transparent 1px 5px);
 }
 .prose h2,
 .prose h3,
@@ -548,12 +535,12 @@ kbd {
 .prose pre[data-language]::before {
   content: attr(data-language);
   position: absolute;
-  top: 0.3rem;
+  top: 0.2rem;
   right: 0.6rem;
-  font-family: var(--font-display);
-  font-size: 0.62rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-family: var(--font-text);
+  font-variant-caps: all-small-caps;
+  font-size: 0.86rem;
+  letter-spacing: 0.12em;
   color: var(--ink-3);
 }
 .copy-code {
@@ -601,11 +588,10 @@ kbd {
   border-bottom: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
 }
 .prose thead th {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 0.78rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-weight: 500;
+  font-variant-caps: all-small-caps;
+  font-size: 1.08em;
+  letter-spacing: 0.1em;
   color: var(--ink-2);
   border-bottom: 1.5px solid var(--ink-3);
 }
@@ -613,31 +599,54 @@ kbd {
   background: color-mix(in srgb, var(--paper-2) 60%, transparent);
 }
 
-/* ── Cole's take: a marginal note in red chalk ─────────────────────────────────────────────────────────────── */
+/* ── Cole's take: a reader's note, marked with a stroke of red chalk and a manicule ─────────────────────────── */
 .coles-take {
   position: relative;
-  margin: 1.8em 0 !important;
-  padding: 1.1rem 1.25rem 1rem 1.35rem;
-  background:
-    linear-gradient(var(--sanguine-wash), var(--sanguine-wash)),
-    repeating-linear-gradient(-45deg, transparent 0 7px, color-mix(in srgb, var(--sanguine) 5%, transparent) 7px 8px);
-  border-left: 3px solid var(--sanguine);
-  border-radius: 0 var(--radius) var(--radius) 0;
+  margin: 1.9em 0 !important;
+  padding: 0.15rem 0 0.25rem 1.35rem;
+}
+.coles-take::before {
+  /* The stroke down its side: red chalk, pressed harder in the middle, drawn through a mask so it takes each theme's
+     own red and stretches to the note's height. */
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0.55rem;
+  background: var(--sanguine-2);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 100' preserveAspectRatio='none'%3E%3Cpath d='M5.4 0.5C4.2 14 6.8 30 4.6 50C3.4 68 6.4 86 5 99.5C4.4 86 2.2 68 3 50C3.6 30 2.6 14 5.4 0.5Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 100' preserveAspectRatio='none'%3E%3Cpath d='M5.4 0.5C4.2 14 6.8 30 4.6 50C3.4 68 6.4 86 5 99.5C4.4 86 2.2 68 3 50C3.6 30 2.6 14 5.4 0.5Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+@media (forced-colors: active) {
+  .coles-take::before {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
 }
 .coles-take > .label {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  margin: 0 0 0.35rem;
-  font-family: var(--font-display);
-  font-size: 0.78rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  gap: 0.5rem;
+  margin: 0 0 0.2rem;
+  font-variant-caps: all-small-caps;
+  font-size: 1.08rem;
+  letter-spacing: 0.12em;
   color: var(--sanguine);
 }
-.coles-take > .label svg {
-  width: 1.3rem;
-  height: 1.3rem;
+.manicule {
+  flex: none;
+  width: 2.3rem;
+  height: 1.25rem;
+  stroke-width: 1.15;
+}
+@media (min-width: 72rem) {
+  /* Where the leaf has a margin, the hand stands in it and points at the note. */
+  .coles-take > .label .manicule {
+    position: absolute;
+    left: -2.75rem;
+    top: 0.42rem;
+  }
 }
 .coles-take > .body > :first-child {
   margin-top: 0;
@@ -646,7 +655,7 @@ kbd {
   margin-top: 0.75em;
 }
 .coles-take > .body {
-  font-size: 1.04em;
+  font-size: 1.06em;
 }
 
 /* ── Prices: amount, then when and where it was read ──────────────────────────────────────────────────────── */
@@ -682,13 +691,12 @@ kbd {
 }
 .capitula h2,
 .margin-head {
-  margin: 0 0 0.6rem;
-  font-family: var(--font-display);
+  margin: 0 0 0.5rem;
   font-weight: 400;
-  font-size: 0.75rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-variant-caps: all-small-caps;
+  font-size: 1.06rem;
+  letter-spacing: 0.14em;
+  color: var(--sanguine);
 }
 .capitula ol {
   list-style: none;
@@ -726,10 +734,9 @@ kbd {
 }
 .capitula-inline summary {
   cursor: pointer;
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-variant-caps: all-small-caps;
+  font-size: 1.08rem;
+  letter-spacing: 0.12em;
   color: var(--ink-2);
 }
 .capitula-inline ol {
@@ -745,7 +752,8 @@ kbd {
   }
 }
 
-/* Mirror-script marginalia: ornament only (aria-hidden), Leonardo's right-to-left hand. */
+/* Mirror-script marginalia: ornament only (aria-hidden), Leonardo's right-to-left hand. Point at a line and it turns
+   to face you, as it would in a mirror held to the page, and its tag gives the English. */
 .marginalia {
   position: sticky;
   top: 2rem;
@@ -764,6 +772,19 @@ kbd {
   opacity: 0.32;
   transform: scaleX(-1) rotate(var(--tilt, -4deg));
   text-align: right;
+  pointer-events: auto;
+  cursor: help;
+  transition: opacity 0.35s;
+}
+.marginalia p:hover {
+  opacity: 0.95;
+  transform: scaleX(1) rotate(var(--tilt, -4deg));
+  text-align: left;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .marginalia p {
+    transition: opacity 0.35s, transform 0.55s cubic-bezier(0.3, 0.1, 0.2, 1);
+  }
 }
 .marginalia svg {
   width: 100%;
@@ -805,13 +826,12 @@ kbd {
   font-size: 1.25rem;
 }
 .verso section h3 {
-  margin: 0 0 0.7rem;
-  font-family: var(--font-display);
+  margin: 0 0 0.6rem;
   font-weight: 400;
-  font-size: 0.8rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-variant-caps: all-small-caps;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+  color: var(--sanguine);
 }
 .verso ul {
   list-style: none;
@@ -861,10 +881,9 @@ kbd {
 }
 .turn small {
   display: block;
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  font-variant-caps: all-small-caps;
+  font-size: 0.98rem;
+  letter-spacing: 0.12em;
   color: var(--ink-3);
 }
 .turn .next {
@@ -910,11 +929,10 @@ kbd {
 }
 .sillybos .tag-table {
   display: block;
-  margin-bottom: 0.15rem;
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  margin-bottom: 0.1rem;
+  font-variant-caps: all-small-caps;
+  font-size: 0.98rem;
+  letter-spacing: 0.12em;
   color: var(--sanguine);
 }
 .sillybos .tag-title {
@@ -1087,7 +1105,7 @@ kbd {
   display: grid;
   gap: 1.2rem;
   font-size: 0.98rem;
-  color: var(--ink-2);
+  color: var(--desk-ink-2);
 }
 @media (min-width: 52rem) {
   .colophon {
@@ -1099,7 +1117,7 @@ kbd {
   margin: 0;
 }
 .colophon a {
-  color: var(--ink-2);
+  color: var(--desk-ink-2);
 }
 .colophon a:hover {
   color: var(--sanguine);
@@ -1115,17 +1133,16 @@ kbd {
 }
 .editions .label {
   margin-right: 0.3rem;
-  font-family: var(--font-display);
-  font-size: 0.74rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-variant-caps: all-small-caps;
+  font-size: 1.04rem;
+  letter-spacing: 0.12em;
+  color: var(--desk-ink-3);
 }
 .editions a,
 .editions span[aria-current] {
   display: inline-block;
   padding: 0.15rem 0.65rem;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--desk-rule);
   border-radius: 999px;
   text-decoration: none;
   font-size: 0.95rem;
@@ -1203,11 +1220,9 @@ kbd {
 .pinax .incipit i::before {
   content: 'inc. ';
   font-style: normal;
-  font-family: var(--font-display);
-  font-size: 0.66rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.08em;
+  color: var(--sanguine);
 }
 .pinax .stichoi {
   font-size: 0.85rem;
@@ -1367,10 +1382,8 @@ kbd {
 
 /* ── Print: the codex on real paper ───────────────────────────────────────────────────────────────────────── */
 @media print {
-  body,
-  .leaf {
+  body {
     background: #fff !important;
-    box-shadow: none;
   }
   .masthead nav,
   .colophon,

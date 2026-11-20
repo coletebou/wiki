@@ -1,5 +1,6 @@
 ---
 import { folioLabel } from '../../lib/schema.mjs';
+import Leaf from '../components/Leaf.astro';
 import Base from '../layouts/Base.astro';
 import { href, incipit, stichoi, wiki } from '../lib/wiki';
 
@@ -7,7 +8,7 @@ const { pages, tables } = await wiki();
 const total = pages.reduce((n, p) => n + stichoi(p.body ?? ''), 0);
 ---
 <Base title="The Pinakes" description="The catalogue of the wiki: every folio, table by table, with its opening words and its length." current="pinakes">
-  <main class="leaf" id="text">
+  <Leaf>
     <div class="running-head"><span>Bibliotheca · Catalogus</span><span class="folio-no">Πίνακες</span></div>
     <div class="folio">
       <div class="text-block" style="grid-column: 1 / -1; max-width: 56rem; margin-inline: auto; width: 100%">
@@ -47,5 +48,5 @@ const total = pages.reduce((n, p) => n + stichoi(p.body ?? ''), 0);
         ))}
       </div>
     </div>
-  </main>
+  </Leaf>
 </Base>

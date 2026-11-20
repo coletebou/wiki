@@ -1,10 +1,11 @@
-// Daylight (vellum) or candlelight (lucerna). A choice is remembered; without one the page follows the system.
+// Daylight (vellum) or lamplight (lucerna). The switch is the oil lamp in the masthead: lit by night, out by day.
+// A choice is remembered; without one the page follows the system.
 const root = document.documentElement;
 const button = document.querySelector<HTMLButtonElement>('[data-theme-toggle]');
 
 function label() {
   if (!button) return;
-  button.setAttribute('aria-label', root.dataset.theme === 'lucerna' ? 'Switch to daylight' : 'Switch to candlelight');
+  button.setAttribute('aria-label', root.dataset.theme === 'lucerna' ? 'Put out the lamp: switch to daylight' : 'Light the lamp: switch to lamplight');
 }
 
 button?.addEventListener('click', () => {
