@@ -1,0 +1,50 @@
+---
+import Leaf from '../components/Leaf.astro';
+import Planisphere from '../components/Planisphere.astro';
+import Base from '../layouts/Base.astro';
+import { wiki } from '../lib/wiki';
+import '../styles/planisphere.css';
+
+const { pages, tables, graph, bySlug } = await wiki();
+const links = [...graph.outlinks.values()].reduce((n: number, l: unknown[]) => n + l.length, 0);
+---
+<Base title="The Planisphere" description="The wiki drawn as a chart of the heavens: every folio a star, every table a constellation, and the citations between them." current="planisphere">
+  <Leaf>
+    <div class="running-head"><span>Bibliotheca · Planisphaerium</span><span class="folio-no">{pages.length} stellae</span></div>
+    <div class="folio">
+      <div class="text-block" style="grid-column: 1 / -1; max-width: 60rem; margin-inline: auto; width: 100%">
+        <p class="kicker">The heavens of the library</p>
+        <h1 class="title">The Planisphere</h1>
+        <p class="summary" style="margin-top: 1rem; max-width: 44rem">
+          The catalogue says what the library holds; this chart shows how it hangs together. Each of its {pages.length} folios
+          is a star, each of the ten tables a house of the sky with its folios strung into a constellation, and
+          the {links.toLocaleString('en-US')} citations between folios are there to be drawn.
+        </p>
+        <Planisphere tables={tables} graph={graph} bySlug={bySlug} />
+        <ul class="pl-key">
+          <li>
+            <svg viewBox="0 0 52 26" aria-hidden="true"><g transform="translate(9 13)"><circle class="pl-body dark" r="1.9" /></g><g transform="translate(24 13)"><circle class="pl-body dark" r="3.2" /><path d="M4.6 0H7.4M-4.6 0H-7.4M0 4.6V7.4M0 -4.6V-7.4" /></g><g transform="translate(42 13)"><circle class="gilt" r="4.5" /><path d="M6 0H10M-6 0H-10M0 6V10M0 -6V-10M4.3 4.3L7 7M-4.3 4.3L-7 7M4.3 -4.3L7 -7M-4.3 -4.3L-7 -7" /></g></svg>
+            <span>A star is a folio. The more folios cite it, the brighter it is drawn; the most cited are gilded.</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 52 26" aria-hidden="true"><path d="M4 19L16 8L28 17L40 6L49 14" stroke-width="0.9" /><g class="dark" stroke="none"><circle cx="4" cy="19" r="2" /><circle cx="16" cy="8" r="2" /><circle cx="28" cy="17" r="2" /><circle cx="40" cy="6" r="2" /><circle cx="49" cy="14" r="2" /></g></svg>
+            <span>The line through a house joins its table’s folios in their order: the way the leaves turn.</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 52 26" aria-hidden="true"><path d="M5 13H47" style="stroke: var(--sanguine)" stroke-width="1.3" /></svg>
+            <span>Point at a star, or come to it with Tab: red lines run to the folios it cites.</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 52 26" aria-hidden="true"><path d="M5 13H47" style="stroke: var(--lapis)" stroke-width="1.3" /></svg>
+            <span>Blue lines run in from the folios that cite it. Press the star to open its folio.</span>
+          </li>
+        </ul>
+        <p class="section-sub" style="margin-top: 1.8rem">The same folios in words, table by table, with their opening lines: <a href="/pinakes/">the Pinakes</a>.</p>
+      </div>
+    </div>
+  </Leaf>
+</Base>
+
+<script>
+  import '../scripts/planisphere';
+</script>

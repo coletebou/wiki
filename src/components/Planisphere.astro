@@ -1,0 +1,136 @@
+---
+// The planisphere: the library drawn as a chart of the heavens (lib/planisphere.mjs says where everything stands).
+// Every folio is a star and a link, so it carries the same hanging tag as any other link; the brighter the star, the
+// more folios cite it. The ten tables are ten houses round the pole, and a line through each house's stars, in the
+// order of their folios, makes of each table a constellation. Pointing at a star draws its citations.
+import { RADIUS, chart, magnitude, onCircle } from '../../lib/planisphere.mjs';
+import { folioLabel } from '../../lib/schema.mjs';
+import { href, type Wiki } from '../lib/wiki';
+
+interface Props {
+  tables: Wiki['tables'];
+  graph: Wiki['graph'];
+  bySlug: Wiki['bySlug'];
+}
+const { tables, graph, bySlug } = Astro.props;
+
+const { houses, stars, lines } = chart(tables.map((t) => ({ id: t.id, slugs: t.pages.map((p) => p.id) })));
+const citedBy = (slug: string): string[] => [...(graph.backlinks.get(slug) ?? [])].filter((s) => s !== slug);
+const cites = (slug: string): string[] => [...new Set((graph.outlinks.get(slug) ?? []).map((l: { to: string }) => l.to))].filter((s) => s !== slug && bySlug.has(s));
+const most = Math.max(1, ...stars.map((s) => citedBy(s.slug).length));
+
+// The chart's box: the rim stands outside the stars' circle, with the houses' names lettered in it.
+const RIM = RADIUS + 46;
+const BOX = RIM + 14;
+const pct = (v: number) => (((v + BOX) / (2 * BOX)) * 100).toFixed(3);
+const pt = (r: number, a: number) => onCircle(r, a).join(' ');
+const TAU = Math.PI * 2;
+
+// The limb: a tick for every two degrees, a longer one for every ten.
+const ticks = Array.from({ length: 180 }, (_, i) => {
+  const a = (i / 180) * TAU;
+  return `M${pt(RADIUS, a)}L${pt(RADIUS + (i % 5 === 0 ? 9 : 5), a)}`;
+}).join('');
+// Where one house ends and the next begins.
+const doors = houses.map((h, i) => {
+  const next = houses[(i + 1) % houses.length];
+  const a = (h.to + next.from + (i === houses.length - 1 ? TAU : 0)) / 2;
+  return `M${pt(RADIUS * 0.12, a)}L${pt(RIM, a)}`;
+}).join('');
+// Each house's name, lettered round the rim so that it reads upright: outward at the top of the chart, inward at
+// the foot of it.
+const names = houses.map((h, i) => {
+  const below = Math.sin(h.mid) > 0;
+  const r = below ? RIM - 13 : RADIUS + 19;
+  const d = below ? `M${pt(r, h.to)}A${r} ${r} 0 0 0 ${pt(r, h.from)}` : `M${pt(r, h.from)}A${r} ${r} 0 0 1 ${pt(r, h.to)}`;
+  return { id: `pl-name-${h.id}`, d, numeral: tables[i].numeral, title: tables[i].title, narrow: h.to - h.from < 0.42 };
+});
+// A star's rays: four for a bright star, eight for the brightest.
+const rays = (count: number, from: number, to: number) =>
+  Array.from({ length: count }, (_, i) => {
+    const a = (i / count) * TAU + (count === 4 ? 0 : Math.PI / 8);
+    return `M${(from * Math.cos(a)).toFixed(1)} ${(from * Math.sin(a)).toFixed(1)}L${(to * Math.cos(a)).toFixed(1)} ${(to * Math.sin(a)).toFixed(1)}`;
+  }).join('');
+// The brightest stars are named on the chart, as a chart names Sirius and Vega. Each name is set on whichever side of
+// its star stands clearest of the other stars, and inside the circle.
+const NAMED = 9;
+const named = [...stars]
+  .map((s) => ({ s, n: citedBy(s.slug).length }))
+  .sort((a, b) => b.n - a.n || bySlug.get(a.s.slug)!.data.folio - bySlug.get(b.s.slug)!.data.folio)
+  .slice(0, NAMED)
+  .map(({ s }) => {
+    const title = bySlug.get(s.slug)!.data.title;
+    const wide = title.length * 7.4;
+    const sides = [
+      { dx: 13, dy: 5, anchor: 'start', cx: 13 + wide / 2, cy: 0 },
+      { dx: -13, dy: 5, anchor: 'end', cx: -13 - wide / 2, cy: 0 },
+      { dx: 0, dy: -14, anchor: 'middle', cx: 0, cy: -19 },
+      { dx: 0, dy: 25, anchor: 'middle', cx: 0, cy: 20 },
+    ] as const;
+    const clearance = (side: (typeof sides)[number]) => {
+      const [cx, cy] = [s.x + side.cx, s.y + side.cy];
+      // The far end of the name must stay inside the circle of the stars.
+      if (Math.hypot(cx + Math.sign(side.cx) * (wide / 2), cy) > RADIUS - 10) return -1;
+      // How near any other star comes to the name's box.
+      return Math.min(...stars.filter((o) => o !== s).map((o) => Math.hypot(Math.max(0, Math.abs(o.x - cx) - wide / 2), Math.max(0, Math.abs(o.y - cy) - 9))));
+    };
+    const best = sides.reduce((a, b) => (clearance(b) > clearance(a) ? b : a));
+    return { x: s.x + best.dx, y: s.y + best.dy, anchor: best.anchor, title };
+  });
+const GLYPH = [
+  null,
+  { r: 1.9, rays: '' },
+  { r: 2.6, rays: '' },
+  { r: 3.2, rays: rays(4, 4.6, 7.4) },
+  { r: 3.8, rays: rays(8, 5.2, 8.4) },
+  { r: 4.5, rays: rays(8, 6, 10.8) },
+] as const;
+---
+<div class="planisphere" data-planisphere>
+  <svg class="pl-chart" viewBox={`${-BOX} ${-BOX} ${2 * BOX} ${2 * BOX}`} aria-hidden="true" focusable="false">
+    <defs>{names.map((n) => <path id={n.id} d={n.d} />)}</defs>
+    <circle class="pl-rim" r={RIM} />
+    <circle class="pl-rim" r={RADIUS} />
+    <path class="pl-tick" d={ticks} />
+    <circle class="pl-circle" r={RADIUS * 0.12} />
+    <circle class="pl-circle pl-ecliptic" r={RADIUS * 0.56} />
+    <path class="pl-door" d={doors} />
+    <path class="pl-pole" d="M-9 0H9M0 -9V9M-4 -4L4 4M-4 4L4 -4" />
+    {names.map((n) => (
+      <text class:list={['pl-name', { narrow: n.narrow }]}>
+        <textPath href={`#${n.id}`} startOffset="50%" text-anchor="middle"><tspan class="pl-numeral">{n.numeral}</tspan><tspan class="pl-title" dx="7">{n.title}</tspan></textPath>
+      </text>
+    ))}
+    {lines.map((l) => <path class="pl-line" d={l.d} data-table={l.table} />)}
+    {named.map((n) => <text class="pl-star-name" x={n.x} y={n.y} text-anchor={n.anchor}>{n.title}</text>)}
+    <g class="pl-links"></g>
+  </svg>
+  {stars.map((s) => {
+    const p = bySlug.get(s.slug)!;
+    const [out, back] = [cites(s.slug), citedBy(s.slug)];
+    const mag = magnitude(back.length, most);
+    const g = GLYPH[mag]!;
+    return (
+      <a
+        class={`pl-star mag-${mag}`}
+        href={href(s.slug)}
+        style={`left: ${pct(s.x)}%; top: ${pct(s.y)}%`}
+        aria-label={`${p.data.title}, ${folioLabel(p.data.folio)}: cites ${out.length}, cited by ${back.length}`}
+        data-slug={s.slug}
+        data-title={p.data.title}
+        data-x={s.x}
+        data-y={s.y}
+        data-cites={out.join(' ')}
+        data-cited={back.join(' ')}
+      >
+        <svg viewBox="-12 -12 24 24" aria-hidden="true" focusable="false">
+          {g.rays && <path class="pl-rays" d={g.rays} />}
+          <circle class="pl-body" r={g.r} />
+        </svg>
+      </a>
+    );
+  })}
+</div>
+<p class="pl-caption" data-planisphere-caption aria-live="polite">
+  Point at a star to draw its citations across the chart.
+</p>

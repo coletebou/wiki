@@ -1,0 +1,216 @@
+/* The planisphere (src/components/Planisphere.astro): ink on the leaf by day, and by lamplight the sky it stands
+   for. The chart is drawn in its own units and scales with the leaf; the stars are links laid over it. */
+
+.planisphere {
+  position: relative;
+  width: min(100%, 54rem);
+  aspect-ratio: 1;
+  margin: 1.6rem auto 0;
+  container-type: inline-size;
+}
+.pl-chart {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-linecap: round;
+}
+.pl-rim {
+  stroke-width: 1.3;
+}
+.pl-tick {
+  stroke-width: 0.8;
+}
+.pl-circle {
+  stroke: var(--ink-3);
+  stroke-width: 0.8;
+}
+.pl-ecliptic {
+  stroke-dasharray: 2 7;
+}
+.pl-door {
+  stroke: var(--ink-3);
+  stroke-width: 0.7;
+  stroke-dasharray: 1 5;
+}
+.pl-pole {
+  stroke-width: 0.9;
+}
+.pl-name {
+  fill: var(--ink-2);
+  stroke: none;
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.14em;
+}
+.pl-name .pl-numeral {
+  fill: var(--sanguine);
+}
+.pl-name.narrow .pl-title {
+  /* A house too narrow for its name keeps its number. */
+  display: none;
+}
+.pl-line {
+  /* The constellation: the table's folios, joined in their order. */
+  stroke: var(--ink-3);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+  opacity: 0.75;
+}
+.pl-star-name {
+  /* The brightest stars, named. */
+  fill: var(--ink-2);
+  stroke: var(--paper);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+  font-family: var(--font-text);
+  font-style: italic;
+  font-size: 15.5px;
+}
+.pl-pointing .pl-star-name {
+  opacity: 0.35;
+}
+.pl-link {
+  stroke-width: 1.15;
+}
+.pl-link.out {
+  stroke: var(--sanguine);
+}
+.pl-link.in {
+  stroke: var(--lapis);
+  opacity: 0.8;
+}
+
+.pl-star {
+  position: absolute;
+  /* Room for a finger, whatever the star's own size. */
+  width: max(1.15rem, 3.2cqw);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  color: var(--ink);
+}
+.pl-star svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.pl-body {
+  fill: currentColor;
+  stroke: var(--paper);
+  stroke-width: 0.9;
+}
+.pl-rays {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.85;
+  stroke-linecap: round;
+}
+.pl-star.mag-5 .pl-body,
+.pl-star.mag-4 .pl-body {
+  /* The brightest are gilded. */
+  fill: var(--gold);
+  stroke: var(--il-line);
+  stroke-width: 0.7;
+}
+.pl-star:hover,
+.pl-star:focus-visible,
+.pl-star.pl-here {
+  color: var(--sanguine);
+  z-index: 2;
+}
+.pl-star:focus-visible {
+  outline-offset: 0;
+}
+.pl-pointing .pl-star:not(.pl-here):not(.pl-lit) {
+  opacity: 0.32;
+}
+.pl-pointing .pl-line {
+  opacity: 0.25;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pl-star,
+  .pl-line {
+    transition: opacity 0.18s;
+  }
+  .pl-star svg {
+    transition: transform 0.18s;
+  }
+  .pl-star:hover svg,
+  .pl-star:focus-visible svg,
+  .pl-star.pl-here svg {
+    transform: scale(1.5);
+  }
+}
+@media (max-width: 40rem) {
+  /* On a phone the rim's lettering would be too small to read: the houses keep their numbers. */
+  .pl-name .pl-title {
+    display: none;
+  }
+  .pl-name {
+    font-size: 26px;
+  }
+  .pl-star-name {
+    display: none;
+  }
+}
+.pl-caption {
+  max-width: 40rem;
+  min-height: 2.9em;
+  margin: 1rem auto 0;
+  text-align: center;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-wrap: balance;
+}
+.pl-key {
+  max-width: 44rem;
+  margin: 1.6rem auto 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem 2rem;
+  font-size: 0.98rem;
+  color: var(--ink-2);
+}
+@media (min-width: 44rem) {
+  .pl-key {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.pl-key li {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: center;
+}
+.pl-key svg {
+  width: 2.6rem;
+  height: 1.3rem;
+  overflow: visible;
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-linecap: round;
+}
+.pl-key .pl-body {
+  stroke: var(--paper);
+}
+.pl-key .gilt {
+  fill: var(--gold);
+  stroke: var(--il-line);
+  stroke-width: 0.7;
+}
+.pl-key .dark {
+  fill: var(--ink);
+}
+@media print {
+  .pl-caption {
+    display: none;
+  }
+}
