@@ -17,7 +17,7 @@ People and agents edit it the same way: by pull request. An agent edit that pass
 | `src/data/prices.json` | Every price on the site, with the date it was read and the vendor page it was read on |
 | `lib/` | Shared, dependency-free code: wiki links, the link graph, validation, search, the public-safety lint, and the drawing of the materials (vellum, stone, the leaf's outline) and of each folio's illuminated initial |
 | `mcp/` | The MCP server for agents (stdio) |
-| `scripts/` | Checks: pages, links in the built site, public safety, the deny-list tool |
+| `scripts/` | Checks: pages, links in the built site, public safety, the deny-list tool; and the tracing of the frontispiece's drawing from a photograph of Leonardo's sheet |
 | `safety/denylist.json` | Salted hashes of phrases that must never be published |
 | `docs/` | The editing guide, design records and plans |
 | `.github/workflows/` | CI, agent auto-merge, the weekly external link check, the daily agent-branch cleanup |
@@ -88,4 +88,6 @@ learning which phrase it trips: `node scripts/denylist.mjs test "<text>"`.
 ## Licenses
 
 Code: [MIT](LICENSE). Words, drawings and data: [CC BY 4.0](LICENSE-CONTENT). Fonts (EB Garamond, Cinzel, Italianno,
-JetBrains Mono): SIL Open Font License 1.1, served from this site.
+JetBrains Mono): SIL Open Font License 1.1, served from this site. The Vitruvian Man on the frontispiece
+(`src/assets/vitruvian-man.svg`) is Leonardo da Vinci's drawing, in the public domain, traced from a photograph by
+Luc Viatour / [Lucnix.be](https://lucnix.be).
