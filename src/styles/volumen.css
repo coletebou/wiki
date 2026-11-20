@@ -1,0 +1,467 @@
+/* The catalogue's roll (src/components/Volumen.astro): a sheet of papyrus between two rods, lying on the reading
+   table. The sheet's frayed outline and its cross-laid fibres are computed in lib/materials.mjs. */
+
+.volumen {
+  position: relative;
+  max-width: 66rem;
+  margin: 0 auto 3.5rem;
+}
+.volumen::before {
+  /* The shadow the roll throws on the table: a box a little inside the sheet, since a mask would cut a shadow of the
+     sheet's own. */
+  content: '';
+  position: absolute;
+  inset: 2.6rem 0.8rem 1rem;
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+/* ── The two rolls ─────────────────────────────────────────────────────────────────────────────────────────── */
+.volumen-roll {
+  --thick: 2.7rem;
+  position: relative;
+  z-index: 2;
+  height: var(--thick);
+}
+.volumen-roll::before {
+  /* The wound sheet: a cylinder lit from above, bright along its shoulder, in shade beneath, with a little light
+     thrown back up at it from the table. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 0.3rem / 1rem;
+  background-color: var(--papyrus-2);
+  background-image:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--roll-shade) 45%, transparent) 0%,
+      transparent 11%,
+      var(--roll-light) 27%,
+      transparent 50%,
+      color-mix(in srgb, var(--roll-shade) 78%, transparent) 86%,
+      color-mix(in srgb, var(--roll-shade) 48%, transparent) 100%
+    ),
+    /* The turns of the sheet never wind quite true: their edges show as steps near each end. */
+    linear-gradient(var(--roll-ring), var(--roll-ring)),
+    linear-gradient(var(--roll-ring), var(--roll-ring)),
+    linear-gradient(var(--roll-ring), var(--roll-ring)),
+    linear-gradient(var(--roll-ring), var(--roll-ring)),
+    var(--fibres-v),
+    var(--grain);
+  background-position: 0 0, 0.4rem 0, 0.95rem 0, calc(100% - 0.55rem) 0, calc(100% - 1.3rem) 0, 0 0, 0 0;
+  background-size: auto, 1px 100%, 1px 100%, 1px 100%, 1px 100%, 600px 600px, 260px 260px;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat;
+  box-shadow:
+    inset 0 0 0 1px var(--roll-ring),
+    0 0.7rem 0.9rem -0.35rem var(--roll-shade);
+}
+.volumen-head {
+  margin-bottom: -0.85rem;
+}
+.volumen-foot {
+  /* The greater part of the roll is still to be read. */
+  --thick: 3.6rem;
+  margin-top: -1.2rem;
+}
+.volumen-foot::before {
+  border-radius: 0.35rem / 1.3rem;
+}
+/* The rod the sheet is wound on (the umbilicus), and the knobs at its ends. */
+.umbilicus {
+  display: none;
+}
+.volumen-tag {
+  /* The roll's title on its tag, hung from the head: how a roll said what it was without being opened. */
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 0.25rem);
+  right: clamp(1rem, 6%, 3.4rem);
+  padding: 0.05rem 0.75rem 0.15rem;
+  font-style: italic;
+  font-size: 1.12rem;
+  line-height: 1.5;
+  color: var(--sanguine);
+  background-color: var(--paper-2);
+  background-image: var(--fibres), var(--grain);
+  border: 1px solid var(--rule);
+  border-radius: 2px 2px 7px 7px;
+  box-shadow: 0 0.35rem 0.6rem -0.25rem var(--roll-shade);
+  transform: rotate(2.5deg);
+  transform-origin: 50% -0.6rem;
+}
+.volumen-tag::before {
+  /* Its thread. */
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 1px;
+  height: 0.6rem;
+  background: var(--ink-3);
+}
+
+/* ── The sheet ─────────────────────────────────────────────────────────────────────────────────────────────── */
+.volumen-sheet {
+  position: relative;
+  z-index: 1;
+  background-color: var(--papyrus);
+  background-image:
+    /* In the shade of the roll above, and turning down into the roll below. */
+    linear-gradient(to bottom, color-mix(in srgb, var(--roll-shade) 55%, transparent), transparent 2.4rem),
+    linear-gradient(to top, color-mix(in srgb, var(--roll-shade) 60%, transparent), transparent 3rem),
+    linear-gradient(to right, var(--thumbed), transparent 1.8rem),
+    linear-gradient(to left, var(--thumbed), transparent 1.8rem),
+    /* A roll is many sheets pasted end to end: each join is a lap of double thickness, a little darker. */
+    repeating-linear-gradient(to bottom, transparent 0 44rem, var(--papyrus-join) 44.05rem 45.1rem, transparent 45.2rem),
+    var(--fibres),
+    var(--fibres-v),
+    var(--grain);
+  background-size: auto, auto, auto, auto, auto, 600px 600px, 600px 600px, 260px 260px;
+}
+.volumen-text {
+  max-width: 58rem;
+  margin: 0 auto;
+  padding: clamp(3rem, 6vw, 4.4rem) clamp(1.2rem, 5vw, 3.6rem) clamp(3.2rem, 6vw, 4.6rem);
+}
+@media (max-width: 47.99rem) {
+  /* On a narrow screen the sheet covers the table: it keeps its grain and the fibres it is written along. */
+  .volumen-sheet {
+    background-image:
+      linear-gradient(to bottom, color-mix(in srgb, var(--roll-shade) 55%, transparent), transparent 2.2rem),
+      linear-gradient(to top, color-mix(in srgb, var(--roll-shade) 60%, transparent), transparent 2.6rem),
+      var(--fibres),
+      var(--grain);
+    background-size: auto, auto, 600px 600px, 260px 260px;
+  }
+}
+@media (min-width: 48rem) {
+  .volumen {
+    margin-top: 0.9rem;
+    padding: 0 2.9rem;
+  }
+  .volumen::before {
+    inset: 2.6rem 3.6rem 1rem;
+  }
+  .volumen-roll {
+    /* Wound, the sheet's frayed edges lie one over another and the roll stands a hair wider than the sheet. */
+    margin-inline: -0.2rem;
+  }
+  .umbilicus {
+    display: block;
+    position: absolute;
+    z-index: 0;
+    top: 50%;
+    left: -1.75rem;
+    right: -1.75rem;
+    height: 0.6rem;
+    transform: translateY(-50%);
+    border-radius: 0.3rem;
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--rod) 70%, var(--gold-hi)), var(--rod) 45%, var(--rod-shade));
+    box-shadow: 0 0.3rem 0.4rem -0.15rem var(--roll-shade);
+  }
+  .umbilicus::before,
+  .umbilicus::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 1.1rem;
+    height: 1.1rem;
+    transform: translateY(-50%);
+    border-radius: 50%;
+    background: radial-gradient(circle at 36% 30%, var(--gold-hi), var(--gold) 46%, var(--gold-lo));
+    box-shadow:
+      0 0 0 1px var(--il-line),
+      0 0.3rem 0.4rem -0.1rem var(--roll-shade);
+  }
+  .umbilicus::before {
+    left: -0.4rem;
+  }
+  .umbilicus::after {
+    right: -0.4rem;
+  }
+  @supports ((-webkit-mask-box-image: none) or (mask-border: none)) {
+    .volumen-sheet {
+      -webkit-mask-box-image: var(--volumen-edge) 60 fill / 60px round;
+      mask-border: var(--volumen-edge) 60 fill / 60px round;
+    }
+  }
+}
+@media print {
+  .volumen::before,
+  .volumen-roll {
+    display: none;
+  }
+  .volumen-sheet {
+    background: none !important;
+    -webkit-mask-box-image: none;
+    mask-border: none;
+  }
+}
+
+/* ── What is written on it ─────────────────────────────────────────────────────────────────────────────────── */
+.pinax-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+}
+/* The catalogue's own finder: a line to write on. */
+.pinax-find {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.9rem;
+  margin: 1.5rem 0 0;
+}
+.pinax-find[hidden] {
+  display: none;
+}
+.pinax-find label {
+  font-variant-caps: all-small-caps;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+  color: var(--sanguine);
+}
+.pinax-find input {
+  flex: 1 1 13rem;
+  max-width: 24rem;
+  min-width: 0;
+  padding: 0.15rem 0.1rem;
+  font: inherit;
+  font-style: italic;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px solid var(--ink-3);
+  border-radius: 0;
+  appearance: none;
+}
+.pinax-find input:focus-visible {
+  /* A line to write on keeps its shape when it is written on: the line itself takes the focus colour and thickens. */
+  outline: none;
+  border-bottom-color: var(--focus);
+  box-shadow: 0 1.5px 0 var(--focus);
+}
+.pinax-find input::-webkit-search-cancel-button {
+  /* The browser's own "clear" cross, redrawn in ink. */
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-left: 0.4rem;
+  background: var(--ink-2);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 2L10 10M10 2L2 10' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 2L10 10M10 2L2 10' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  cursor: pointer;
+}
+.pinax-find input::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
+}
+.pinax-find output {
+  font-size: 0.95rem;
+  font-style: italic;
+  color: var(--ink-2);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.pinax-none {
+  margin: 2.4rem 0 0;
+  font-style: italic;
+  color: var(--ink-2);
+}
+.pinax-none button {
+  font: inherit;
+  color: var(--sanguine);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.17em;
+  cursor: pointer;
+}
+
+.pinax {
+  margin-top: 2.6rem;
+}
+.paragraphos {
+  /* Between one subject and the next, the stroke a scribe drew at the start of the line: the paragraphos, forked. */
+  display: block;
+  width: 3.2rem;
+  height: 0.8rem;
+  margin: 0 0 1.1rem -0.2rem;
+  overflow: visible;
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pinax-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1.5px solid var(--ink-3);
+}
+.pinax-head .numeral {
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  line-height: 1;
+  color: var(--sanguine);
+}
+.pinax-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-2);
+  letter-spacing: 0.04em;
+}
+.pinax-head p {
+  grid-column: 2;
+  margin: 0;
+  font-style: italic;
+  color: var(--ink-2);
+}
+.pinax ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pinax li {
+  display: grid;
+  grid-template-columns: 4.2rem minmax(0, 1fr) auto;
+  gap: 0 1rem;
+  align-items: baseline;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 55%, transparent);
+}
+.pinax li[hidden] {
+  display: none;
+}
+.pinax .entry-folio {
+  font-style: italic;
+  color: var(--sanguine);
+}
+.pinax .entry-title {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  text-decoration: none;
+}
+.pinax .entry-title:hover {
+  color: var(--sanguine);
+}
+.pinax .incipit {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--ink-2);
+  font-size: 0.98rem;
+}
+.pinax .incipit i::before {
+  content: 'inc. ';
+  font-style: normal;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.08em;
+  color: var(--sanguine);
+}
+.pinax .stichoi {
+  font-size: 0.85rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.pinax-sum {
+  /* The table's own count, as each section of a catalogue closed. */
+  margin: 0.55rem 0 0;
+  text-align: right;
+  font-size: 0.92rem;
+  font-style: italic;
+  color: var(--ink-2);
+  font-variant-numeric: lining-nums;
+}
+:root[data-finding] .pinax-sum,
+:root[data-finding] .paragraphos {
+  /* While the catalogue is narrowed, the counts of whole tables and the marks between them would mislead. */
+  display: none;
+}
+@media (max-width: 36rem) {
+  .pinax li {
+    grid-template-columns: 3.2rem minmax(0, 1fr);
+  }
+  .pinax .stichoi {
+    grid-column: 2;
+  }
+}
+
+/* ── The end of the roll: the coronis, the title again, and the count of lines ─────────────────────────────── */
+.subscriptio {
+  margin: 4rem auto 0;
+  text-align: center;
+  color: var(--ink-2);
+}
+:root[data-finding] .subscriptio {
+  display: none;
+}
+.coronis {
+  display: block;
+  width: 4.6rem;
+  height: 5.9rem;
+  margin: 0 auto 0.8rem;
+  overflow: visible;
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.coronis .red {
+  stroke: var(--sanguine);
+}
+.sub-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  letter-spacing: 0.3em;
+  /* Letter-spacing leaves its last gap at the end of the line; this puts the word back in the middle. */
+  margin-right: -0.3em;
+  color: var(--ink);
+}
+.sub-attic {
+  margin: 0.5rem 0 0;
+  font-size: var(--step-2);
+  letter-spacing: 0.14em;
+  margin-right: -0.14em;
+  line-height: 1.2;
+  color: var(--sanguine);
+}
+.attic-five {
+  /* Five of a power of ten: a Π with that power's sign written small inside it. */
+  position: relative;
+  display: inline-block;
+}
+.attic-five small {
+  position: absolute;
+  left: 50%;
+  bottom: 0.2em;
+  font-size: 0.46em;
+  line-height: 1;
+  letter-spacing: 0;
+  transform: translateX(-56%);
+}
+.sub-count {
+  margin: 0.35rem 0 0;
+  font-size: var(--step-0);
+  font-variant-numeric: lining-nums;
+  color: var(--ink);
+}
+.sub-note {
+  max-width: 30rem;
+  margin: 0.5rem auto 0;
+  font-size: 0.95rem;
+  font-style: italic;
+  line-height: 1.4;
+  text-wrap: balance;
+}

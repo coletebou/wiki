@@ -2,12 +2,14 @@
 // A leaf of the codex: the sheet of vellum every page is written on, with the leaves still to be read stacked
 // beneath its fore-edge. The page's own markup goes in the slot.
 interface Props {
-  /** A class for the sheet, for leaves that differ (the catalogue, the frontispiece). */
+  /** A class for the sheet, for a leaf that differs. */
   sheet?: string;
+  /** A class for the whole leaf (the sheet, the leaves under it and its shadow). */
+  leaf?: string;
 }
-const { sheet = '' } = Astro.props;
+const { sheet = '', leaf = '' } = Astro.props;
 ---
-<main class="leaf" id="text">
+<main class:list={['leaf', leaf]} id="text">
   <div class="leaf-under leaf-under-2" aria-hidden="true"></div>
   <div class="leaf-under" aria-hidden="true"></div>
   <div class:list={['leaf-sheet', sheet]}>

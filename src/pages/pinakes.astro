@@ -1,52 +1,88 @@
 ---
+import { attic } from '../../lib/numerals.mjs';
 import { folioLabel } from '../../lib/schema.mjs';
-import Leaf from '../components/Leaf.astro';
+import Volumen from '../components/Volumen.astro';
 import Base from '../layouts/Base.astro';
 import { href, incipit, stichoi, wiki } from '../lib/wiki';
+import 'virtual:volumen.css';
+import '../styles/volumen.css';
 
 const { pages, tables } = await wiki();
-const total = pages.reduce((n, p) => n + stichoi(p.body ?? ''), 0);
+const lines = new Map(pages.map((p) => [p.id, stichoi(p.body ?? '')]));
+const total = [...lines.values()].reduce((n, l) => n + l, 0);
+const count = (n: number) => n.toLocaleString('en-US');
+const folios = (n: number) => `${n} ${n === 1 ? 'folio' : 'folios'}`;
+/** What the catalogue's finder matches an entry on: its title, other names, summary and folio, in plain lower case. */
+const fold = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 ---
 <Base title="The Pinakes" description="The catalogue of the wiki: every folio, table by table, with its opening words and its length." current="pinakes">
-  <Leaf>
-    <div class="running-head"><span>Bibliotheca · Catalogus</span><span class="folio-no">Πίνακες</span></div>
-    <div class="folio">
-      <div class="text-block" style="grid-column: 1 / -1; max-width: 56rem; margin-inline: auto; width: 100%">
-        <p class="kicker">The catalogue</p>
-        <h1 class="title">The Pinakes</h1>
-        <p class="summary" style="margin-top: 1rem">
-          Callimachus of Cyrene catalogued the Library of Alexandria in the <i>Pinakes</i>, “tables of those eminent in every
-          branch of learning, and what they wrote”: each work under its subject, with its first words (the incipit) and its
-          length in lines (stichoi), so a reader could know a scroll without unrolling it. This is that catalogue for this
-          library: {pages.length} folios, {total.toLocaleString('en-US')} stichoi.
-        </p>
-        <nav aria-label="Tables" style="display:flex; flex-wrap:wrap; gap: 0.3rem 1rem; margin: 0 0 1rem">
-          {tables.map((t) => <a href={`#table-${t.id}`} style="color: var(--sanguine)">{t.numeral}. {t.title}</a>)}
-        </nav>
-        {tables.map((t) => (
-          <section class="pinax" id={`table-${t.id}`} aria-labelledby={`h-${t.id}`}>
-            <div class="pinax-head">
-              <span class="numeral">{t.numeral}</span>
-              <h2 id={`h-${t.id}`}>{t.title}</h2>
-              <p>{t.subtitle}</p>
-            </div>
-            {t.pages.length ? (
+  <Volumen tag="Πίνακες" tagLang="grc">
+    <p class="kicker">The catalogue</p>
+    <h1 class="title">The Pinakes</h1>
+    <p class="summary" style="margin-top: 1rem">
+      Callimachus of Cyrene catalogued the Library of Alexandria in the <i>Pinakes</i>, “tables of those eminent in every
+      branch of learning, and what they wrote”: each work under its subject, with its first words (the incipit) and its
+      length in lines (stichoi), so a reader could know a scroll without unrolling it. This is that catalogue for this
+      library: {pages.length} folios, {count(total)} stichoi.
+    </p>
+    <nav class="pinax-nav" aria-label="Tables">
+      {tables.map((t) => <a href={`#table-${t.id}`}>{t.numeral}. {t.title}</a>)}
+    </nav>
+    <div class="pinax-find" role="search" aria-label="Find in the catalogue" hidden>
+      <label for="pinax-find">Find in the catalogue</label>
+      <input id="pinax-find" type="search" placeholder="a title, a tool, a folio…" autocomplete="off" spellcheck="false" />
+      <output for="pinax-find" aria-live="polite"></output>
+    </div>
+
+    {tables.map((t, i) => {
+      const sum = t.pages.reduce((n, p) => n + (lines.get(p.id) ?? 0), 0);
+      return (
+        <section class="pinax" id={`table-${t.id}`} aria-labelledby={`h-${t.id}`}>
+          {i > 0 && <svg class="paragraphos" viewBox="0 0 64 16" aria-hidden="true" focusable="false"><path d="M3 2 L13 8 L3 14 M13 8 H61" /></svg>}
+          <div class="pinax-head">
+            <span class="numeral">{t.numeral}</span>
+            <h2 id={`h-${t.id}`}>{t.title}</h2>
+            <p>{t.subtitle}</p>
+          </div>
+          {t.pages.length ? (
+            <>
               <ol>
                 {t.pages.map((p) => (
-                  <li>
+                  <li data-find={fold([p.data.title, ...(p.data.aliases ?? []), p.data.summary, folioLabel(p.data.folio), t.title].join(' | '))}>
                     <span class="entry-folio">{folioLabel(p.data.folio)}</span>
                     <span>
                       <a class="entry-title" href={href(p.id)}>{p.data.title}</a>
                       <span class="incipit"><i>{incipit(p.body ?? '')}</i></span>
                     </span>
-                    <span class="stichoi">{stichoi(p.body ?? '').toLocaleString('en-US')} stichoi</span>
+                    <span class="stichoi">{count(lines.get(p.id) ?? 0)} stichoi</span>
                   </li>
                 ))}
               </ol>
-            ) : <p class="empty" style="font-style: italic; color: var(--ink-3)">No folio in this table yet.</p>}
-          </section>
-        ))}
-      </div>
-    </div>
-  </Leaf>
+              <p class="pinax-sum">In this table {folios(t.pages.length)}, {count(sum)} stichoi.</p>
+            </>
+          ) : <p class="empty" style="font-style: italic; color: var(--ink-3)">No folio in this table yet.</p>}
+        </section>
+      );
+    })}
+    <p class="pinax-none" hidden>Nothing in the catalogue answers to that. <button type="button" data-seek>Seek it in the whole library</button>, which reads every folio’s text.</p>
+
+    <footer class="subscriptio">
+      <svg class="coronis" viewBox="0 0 72 92" aria-hidden="true" focusable="false">
+        <path d="M36 6 C 24 12, 46 22, 36 32 C 26 42, 46 50, 36 60 C 28 68, 42 78, 34 88" />
+        <path d="M36 6 C 41 2, 47 4, 46 10 M34 88 C 29 91, 24 88, 26 83" />
+        <path class="red" d="M26 32 H46 M24 46 H48 M26 60 H46" />
+        <path d="M8 40 L18 46 L8 52 M18 46 H24 M48 46 H66" />
+      </svg>
+      <p class="sub-name" lang="grc">ΠΙΝΑΚΕΣ</p>
+      <p class="sub-attic" lang="grc" role="img" aria-label={`${count(total)}, written in Attic numerals`}>
+        {attic(total).map(({ sign, five }) => (five && sign !== 'Ι' ? <span class="attic-five">Π<small>{sign}</small></span> : five ? 'Π' : sign))}
+      </p>
+      <p class="sub-count">{pages.length} folios, {count(total)} stichoi</p>
+      <p class="sub-note">The count of lines stands at the foot of the roll, where a scribe left it, in the old numerals of Athens.</p>
+    </footer>
+  </Volumen>
 </Base>
+
+<script>
+  import '../scripts/pinakes';
+</script>

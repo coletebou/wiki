@@ -1,0 +1,24 @@
+---
+// A volumen: a roll of papyrus, the book Alexandria's library was made of. The catalogue is written on one, opened
+// downward as a rotulus is, since a screen is read that way: the part already read is wound on the rod at the head,
+// the part to come on the rod at the foot, and the page's own markup is the sheet between them.
+interface Props {
+  /** What the roll's title tag says (its sillybos, the label that hung from a roll so it need not be opened). */
+  tag?: string;
+  /** The language of the tag, when it is not the page's. */
+  tagLang?: string;
+}
+const { tag, tagLang } = Astro.props;
+---
+<main class="volumen" id="text">
+  <div class="volumen-roll volumen-head" aria-hidden="true">
+    <span class="umbilicus"></span>
+    {tag && <span class="volumen-tag" lang={tagLang}>{tag}</span>}
+  </div>
+  <div class="volumen-sheet">
+    <div class="volumen-text">
+      <slot />
+    </div>
+  </div>
+  <div class="volumen-roll volumen-foot" aria-hidden="true"><span class="umbilicus"></span></div>
+</main>
