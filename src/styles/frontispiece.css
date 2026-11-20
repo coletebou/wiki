@@ -152,6 +152,76 @@
   }
 }
 
+/* The reader's own table: what was lately read, in this browser. Shown only when something lies on it. */
+.lately {
+  max-width: 52rem;
+  margin: 2.2rem auto 0;
+  text-align: center;
+}
+.lately[hidden] {
+  display: none;
+}
+.lately-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-weight: 400;
+  font-variant-caps: all-small-caps;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+  color: var(--sanguine);
+}
+.lately-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.2rem 1.5rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+}
+.lately-list a {
+  color: var(--ink);
+  text-decoration-color: var(--rule);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+.lately-list a:hover {
+  color: var(--sanguine);
+}
+.lately-list .r-meta {
+  margin-left: 0.4rem;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: var(--ink-3);
+}
+.lately-note {
+  margin: 0.45rem 0 0;
+  font-size: 0.88rem;
+  font-style: italic;
+  color: var(--ink-3);
+}
+.lately-note button {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.17em;
+  cursor: pointer;
+}
+.lately-note button:hover {
+  color: var(--sanguine);
+}
+.sortes-line {
+  margin: 0.5rem auto 0;
+  text-align: center;
+  font-size: 0.95rem;
+  font-style: italic;
+  color: var(--ink-2);
+}
+
 /* ── The armarium: a pigeonhole for each table, a roll for each folio ──────────────────────────────────────── */
 .armarium {
   --wood: var(--ink-2);

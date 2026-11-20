@@ -1,0 +1,58 @@
+---
+// Sortes: the library opened at a leaf drawn by lot. The page draws at once and sends the reader on; what is written
+// here is what a reader without scripts sees, or one who came back to draw again.
+import Leaf from '../components/Leaf.astro';
+import Base from '../layouts/Base.astro';
+import { wiki } from '../lib/wiki';
+
+const { pages } = await wiki();
+const slugs = pages.map((p) => p.id);
+---
+<Base title="Sortes" description="Open the library at a leaf drawn by lot." noindex>
+  <Leaf>
+    <div class="running-head"><span>Bibliotheca · Sortes</span><span class="folio-no">f. ?</span></div>
+    <div class="folio">
+      <div class="text-block sortes" style="grid-column: 1 / -1">
+        <p class="kicker">Sortes</p>
+        <h1 class="title">A leaf drawn by lot</h1>
+        <p class="summary" style="margin-top: 1rem">
+          The Romans asked Virgil for counsel by opening him wherever the roll fell and reading the line the eye lit on:
+          the <i lang="la">sortes Vergilianae</i>. This library answers the same way, with one of its {pages.length} folios.
+        </p>
+        <p class="sortes-draw"><a href="/pinakes/" data-sortes-draw>Draw a leaf</a></p>
+        <noscript><p>Drawing a lot needs scripts. The <a href="/pinakes/">Pinakes</a> lists every folio.</p></noscript>
+      </div>
+    </div>
+  </Leaf>
+</Base>
+
+<script is:inline define:vars={{ slugs }}>
+  // Not the leaf the reader has just come from, if there is another.
+  const from = (() => {
+    try {
+      const u = new URL(document.referrer);
+      return u.origin === location.origin ? u.pathname.replace(/^\/|\/$/g, '') : '';
+    } catch {
+      return '';
+    }
+  })();
+  const lots = slugs.filter((s) => s !== from);
+  const draw = () => `/${(lots.length ? lots : slugs)[Math.floor(Math.random() * (lots.length || slugs.length))]}/`;
+  const link = document.querySelector('[data-sortes-draw]');
+  if (link) link.href = draw();
+  // Arriving here is asking: the lot is drawn at once, and Back returns to where the reader was. "#stay" keeps the page.
+  if (location.hash !== '#stay' && slugs.length) location.replace(draw());
+</script>
+
+<style>
+  .sortes {
+    max-width: 38rem;
+    margin-inline: auto;
+    padding: 1.5rem 0 3rem;
+    text-align: center;
+  }
+  .sortes-draw {
+    margin: 0;
+    font-size: var(--step-1);
+  }
+</style>

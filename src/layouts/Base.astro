@@ -20,10 +20,12 @@ interface Props {
   ogType?: 'website' | 'article';
   /** The not-found page: served at every missing address, so it names no address of its own and is not indexed. */
   notFound?: boolean;
+  /** A page that is a tool and not a text (the lot-drawing page): not indexed. */
+  noindex?: boolean;
 }
-const { title, description, current, ogType = 'website', notFound = false } = Astro.props;
+const { title, description, current, ogType = 'website', notFound = false, noindex = false } = Astro.props;
 const site = Astro.site!;
-const canonical = notFound ? null : new URL(Astro.url.pathname, site).href;
+const canonical = notFound || noindex ? null : new URL(Astro.url.pathname, site).href;
 const fullTitle = current === 'home' ? 'Codex Tebou · How to Be a Beast' : `${title} · Codex Tebou`;
 
 // The other editions of coletebou.com. ?from=wiki tells each one where the reader came from.
@@ -109,6 +111,7 @@ const withFrom = (h: string) => {
           Callimachus. Text <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener">CC BY 4.0</a>,
           code <a href="https://github.com/coletebou/wiki/blob/master/LICENSE" rel="noopener">MIT</a>, fonts SIL Open Font License.
           Agents keep it through an <a href="/wiki-mcp/">MCP</a>; every emendation is a <a href="https://github.com/coletebou/wiki" rel="noopener">pull request</a>.
+          <button type="button" class="keys-button" data-keys aria-haspopup="dialog">The keys <kbd>?</kbd></button>
         </p>
       </div>
       <ul class="editions" aria-label="Editions of coletebou.com">
@@ -130,6 +133,24 @@ const withFrom = (h: string) => {
       <p class="seek-hint"><span><kbd>↑</kbd> <kbd>↓</kbd> to choose</span><span><kbd>Enter</kbd> to open</span><span><kbd>Esc</kbd> to close</span></p>
     </dialog>
 
+    <dialog class="keys-dialog" aria-labelledby="keys-title">
+      <form method="dialog">
+        <h2 id="keys-title">The keys</h2>
+        <dl class="keys-list">
+          <div><dt><kbd>/</kbd></dt><dd>Seek in the library</dd></div>
+          <div><dt><kbd>n</kbd> <kbd>p</kbd></dt><dd>The next leaf, the leaf before</dd></div>
+          <div><dt><kbd>v</kbd></dt><dd>The back of this leaf: who cites it, its sources</dd></div>
+          <div><dt><kbd>c</kbd></dt><dd>The catalogue</dd></div>
+          <div><dt><kbd>h</kbd></dt><dd>The frontispiece</dd></div>
+          <div><dt><kbd>s</kbd></dt><dd>Sortes: a leaf drawn by lot</dd></div>
+          <div><dt><kbd>l</kbd></dt><dd>Light the lamp, or put it out</dd></div>
+          <div><dt><kbd>?</kbd></dt><dd>These keys</dd></div>
+        </dl>
+        <p class="keys-note">A study that reads the keyboard itself, like the tmux keymap, keeps its keys while you are in it.</p>
+        <button type="submit" class="keys-close">Close <kbd>Esc</kbd></button>
+      </form>
+    </dialog>
+
     <div class="sillybos" role="tooltip" id="sillybos" hidden></div>
     <div class="lumen" aria-hidden="true"></div>
 
@@ -138,6 +159,8 @@ const withFrom = (h: string) => {
       import '../scripts/seek';
       import '../scripts/sillybos';
       import '../scripts/folio';
+      import '../scripts/lately';
+      import '../scripts/keys';
     </script>
   </body>
 </html>

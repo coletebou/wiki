@@ -54,9 +54,15 @@ const cited = [...pages]
         {start && (
           <section class="incipit-liber">
             <p>{start.data.summary}</p>
-            <a class="begin" href={href(start.id)}><Manicule />Begin with “{start.data.title}”<span class="folio-no">{folioLabel(start.data.folio)}</span></a>
+            <a class="begin" href={href(start.id)} data-first-leaf><Manicule />Begin with “{start.data.title}”<span class="folio-no">{folioLabel(start.data.folio)}</span></a>
           </section>
         )}
+
+        <section class="lately" data-lately hidden aria-labelledby="lately-title">
+          <h2 class="lately-title" id="lately-title">Lately on your table</h2>
+          <ol class="lately-list"></ol>
+          <p class="lately-note">Kept in this browser and nowhere else. <button type="button" data-lately-clear>Clear the table</button></p>
+        </section>
 
         <section aria-labelledby="tables-title">
           <h2 class="section-title" id="tables-title">The Ten Tables</h2>
@@ -71,6 +77,7 @@ const cited = [...pages]
             <svg class="roll recent" viewBox="-20 -16 36 40" aria-hidden="true"><circle class="roll-end" r="14" /><circle class="roll-boss" r="2.7" /><path class="roll-tag" d="M-9.5 9.5L-13 15.5M-15.6 14.4L-10.6 17.4L-13.4 22L-18.4 19Z" /></svg>
             a red tag: among the eight most lately emended
           </p>
+          <p class="sortes-line">Or let the library choose: <a href="/sortes/">open it at a leaf drawn by lot</a>.</p>
         </section>
 
         {studies.length > 0 && (

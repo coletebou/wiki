@@ -12,7 +12,7 @@ import Price from '../components/Price.astro';
 import Verso from '../components/Verso.astro';
 import Leaf from '../components/Leaf.astro';
 import Base from '../layouts/Base.astro';
-import { stichoi, tableOf, wiki } from '../lib/wiki';
+import { href, incipit, stichoi, tableOf, wiki } from '../lib/wiki';
 
 export async function getStaticPaths() {
   const { pages } = await wiki();
@@ -37,6 +37,10 @@ const cites = [...new Set((graph.outlinks.get(page.id) ?? []).map((l: { to: stri
 const lines = stichoi(page.body ?? '');
 const initial = initialOf(page.body ?? '');
 const emended = updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+// The catchword: the first words of the leaf that follows, written at the foot of this one, as binders had it done
+// so that the leaves of a book were gathered in their order.
+const next = pages[index + 1];
+const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
 ---
 <Base title={title} description={summary} ogType="article">
   <Leaf>
@@ -47,7 +51,7 @@ const emended = updated.toLocaleDateString('en-US', { month: 'short', day: 'nume
     </div>
     <div class="folio">
       <aside class="margin-inner"><Capitula variant="margin" headings={headings} /></aside>
-      <article class="text-block" data-pagefind-body data-pagefind-filter={`table:${table.title}`}>
+      <article class="text-block" data-pagefind-body data-pagefind-filter={`table:${table.title}`} data-folio-slug={page.id} data-folio-title={title} data-folio-label={folioLabel(folio)}>
         <header>
           <p class="kicker"><a href={`/pinakes/#table-${table.id}`}>Table {table.numeral} · {table.title}</a></p>
           <h1 class="title" data-pagefind-meta="title">{title}</h1>
@@ -65,6 +69,11 @@ const emended = updated.toLocaleDateString('en-US', { month: 'short', day: 'nume
           {initial && <Initial letter={initial} seed={folio} room={sprayRoom(page.body ?? '')} />}
           <Content components={{ ColesTake, Price, Diagram }} />
         </div>
+        {next && catchword && (
+          <p class="catchword" data-pagefind-ignore>
+            <a href={href(next.id)} aria-label={`The next leaf: ${next.data.title}`}>{catchword}</a>
+          </p>
+        )}
       </article>
       <aside class="margin-outer" data-pagefind-ignore><Marginalia folio={folio} /></aside>
       <div data-pagefind-ignore style="display:contents">
