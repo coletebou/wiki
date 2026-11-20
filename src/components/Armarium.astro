@@ -1,0 +1,74 @@
+---
+// The armarium: the Romans kept their rolls in cupboards they called armaria. This one is drawn with a pigeonhole for
+// each table of the Pinakes, and every roll in it is a folio: a link, with the same hanging tag every other link
+// carries. A gold boss marks a roll among the most cited; a red tag, one among the most lately emended.
+import { footOf, pile } from '../../lib/armarium.mjs';
+import { rng } from '../../lib/materials.mjs';
+import { folioLabel } from '../../lib/schema.mjs';
+import { href, type Wiki } from '../lib/wiki';
+
+interface Props {
+  tables: Wiki['tables'];
+  /** Slugs of the most cited folios, and of the most lately emended. */
+  cited: Set<string>;
+  recent: Set<string>;
+}
+const { tables, cited, recent } = Astro.props;
+
+const f = (n: number) => Math.round(n * 10) / 10;
+/** The end of a roll: the layers of the papyrus wound round its rod, each roll wound a little differently. */
+function spiral(seed: number) {
+  const r = rng(seed * 7919 + 3);
+  const turns = 2.1 + r() * 0.7;
+  const phase = r() * Math.PI * 2;
+  const pts = Array.from({ length: 40 }, (_, i) => {
+    const t = i / 39;
+    const rad = 11.6 - t * 8.2;
+    const a = phase + t * turns * Math.PI * 2;
+    return `${f(rad * Math.cos(a))} ${f(rad * Math.sin(a))}`;
+  });
+  return `M${pts.join('L')}`;
+}
+---
+<div class="armarium">
+  <div class="armarium-cornice" aria-hidden="true"></div>
+  <div class="armarium-shelves">
+    {tables.map((t) => (
+      <section class="nidus" aria-labelledby={`nidus-${t.id}`}>
+        <div class="nidus-hole">
+          {t.pages.length ? (
+            <div class="pile" style={`--foot: ${footOf(t.pages.length)}`}>
+              {pile(t.pages, footOf(t.pages.length)).map((row: typeof t.pages) => (
+                <div class="pile-row">
+                  {row.map((p) => (
+                    <a
+                      class:list={['roll', { cited: cited.has(p.id), recent: recent.has(p.id) }]}
+                      href={href(p.id)}
+                      aria-label={`${p.data.title}, ${folioLabel(p.data.folio)}`}
+                    >
+                      <svg viewBox="-16 -16 32 32" aria-hidden="true" focusable="false">
+                        <circle class="roll-end" r="14" />
+                        <path class="roll-wind" d={spiral(p.data.folio)} />
+                        <circle class="roll-boss" r="2.7" />
+                        {recent.has(p.id) && <path class="roll-tag" d="M-9.5 9.5L-13 15.5M-15.6 14.4L-10.6 17.4L-13.4 22L-18.4 19Z" />}
+                      </svg>
+                    </a>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p class="nidus-empty">No roll here yet.</p>
+          )}
+        </div>
+        <a class="nidus-label" href={`/pinakes/#table-${t.id}`}>
+          <span class="numeral">{t.numeral}</span>
+          <span class="name" id={`nidus-${t.id}`}>{t.title}</span>
+          <span class="count">{t.pages.length} folio{t.pages.length === 1 ? '' : 's'}</span>
+          <span class="about">{t.subtitle}</span>
+        </a>
+      </section>
+    ))}
+  </div>
+  <div class="armarium-plinth" aria-hidden="true"></div>
+</div>

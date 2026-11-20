@@ -44,6 +44,8 @@
   --gutter-2: rgb(74 48 18 / 0.1);
   --thumbed: rgb(134 92 40 / 0.17);
   --under-shade: rgb(70 46 16 / 0.42);
+  --hole-shade: rgb(70 46 18 / 0.34);
+  --hole-hatch: rgb(70 46 18 / 0.2);
   /* Red chalk, and green from copper. */
   --sanguine: #93361c;
   --sanguine-2: #b8552f;
@@ -99,6 +101,8 @@
   --gutter-2: rgb(0 0 0 / 0.18);
   --thumbed: rgb(0 0 0 / 0.22);
   --under-shade: rgb(0 0 0 / 0.6);
+  --hole-shade: rgb(0 0 0 / 0.6);
+  --hole-hatch: rgb(0 0 0 / 0.42);
   --sanguine: #ee9a72;
   --sanguine-2: #f2b08e;
   --sanguine-wash: rgb(238 154 114 / 0.14);
