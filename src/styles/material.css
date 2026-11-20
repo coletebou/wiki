@@ -116,6 +116,25 @@ body {
 .leaf-under {
   display: none;
 }
+@media (max-width: 47.99rem) {
+  /* On a narrow screen the leaf covers the table and every layer is paid for on a slower machine: the stone keeps
+     only its grain, and the skin its mottle and its grain. */
+  body {
+    background-image: var(--grain);
+    background-size: 260px 260px;
+  }
+  .leaf-sheet {
+    background-image:
+      linear-gradient(to right, var(--gutter-2), transparent 2.2rem),
+      linear-gradient(to left, var(--thumbed), transparent 2.4rem),
+      var(--mottle),
+      var(--grain);
+    background-size: auto, auto, 980px 980px, 260px 260px;
+  }
+  :root:not([data-theme='lucerna']) .lumen {
+    display: none;
+  }
+}
 @media (max-width: 34rem) {
   /* A phone shows no table around the leaf and has no room for a margin: one line down each side, close to the edge,
      and the lines across. */
