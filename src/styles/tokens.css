@@ -1,5 +1,8 @@
-/* Design tokens. Two themes: "vellum" (parchment by daylight) and "lucerna" (the same leaves by candlelight).
-   Body text holds at least 10:1 contrast and every accent used for text at least 4.5:1, in both themes. */
+/* Design tokens. Two themes: "vellum" (the leaf by daylight) and "lucerna" (the same leaf by lamplight).
+   The colours are a humanist scribe's: iron-gall ink, red chalk for the rubrics, and for the illumination the
+   white-vine palette of Leonardo's Florence, which is gold leaf, lapis, verdigris and bare vellum.
+   Body text holds at least 10:1 contrast and every colour used for text at least 4.5:1 on the surface it is written
+   on, in both themes. test/tokens.test.mjs holds the file to that. */
 
 :root {
   --font-text: 'EB Garamond Variable', 'EB Garamond', Garamond, 'Times New Roman', serif;
@@ -19,23 +22,46 @@
   --gap: clamp(1rem, 0.6rem + 1.6vw, 2rem);
 
   color-scheme: light;
-  --desk: #e2cfa4;
-  --paper: #f4ead2;
-  --paper-2: #ecdfc0;
-  --paper-3: #e3d2aa;
+  /* The reading table: limestone, and what is cut or written on it. */
+  --desk: #d3cbbb;
+  --desk-ink: #2a1c12;
+  --desk-ink-2: #4a3828;
+  --desk-ink-3: #5c4835;
+  --desk-rule: #a89c86;
+  --chisel-light: rgb(255 255 255 / 0.62);
+  --chisel-dark: rgb(70 52 30 / 0.24);
+  /* The leaf. */
+  --paper: #f3e8cf;
+  --paper-2: #ebdebf;
+  --paper-3: #e0d0aa;
   --ink: #2a1c12;
   --ink-2: #4e3b2a;
   --ink-3: #634e3a;
   --rule: #b49a74;
+  --ruling: rgb(120 96 66 / 0.3);
+  --prick: rgb(84 60 34 / 0.5);
+  --gutter-1: rgb(74 48 18 / 0.3);
+  --gutter-2: rgb(74 48 18 / 0.1);
+  --thumbed: rgb(134 92 40 / 0.17);
+  --under-shade: rgb(70 46 16 / 0.42);
+  /* Red chalk, and green from copper. */
   --sanguine: #93361c;
   --sanguine-2: #b8552f;
   --sanguine-wash: rgb(184 85 47 / 0.12);
   --verdigris: #2b5d4c;
   --verdigris-wash: rgb(43 93 76 / 0.1);
-  --shadow: 0 1px 0 rgb(255 250 235 / 0.6) inset, 0 18px 48px -18px rgb(70 45 20 / 0.45), 0 2px 6px rgb(70 45 20 / 0.18);
+  /* The illuminator's two: lapis from beyond the sea, and gold. --gold-ink is gold dark enough to read; the rest
+     are the lights and shades of a burnished leaf. */
+  --lapis: #27407f;
+  --lapis-2: #3f60ab;
+  --lapis-wash: rgb(39 64 127 / 0.1);
+  --gold-ink: #7a5a12;
+  --gold: #c39a32;
+  --gold-hi: #f4dd94;
+  --gold-lo: #8c6519;
+  --shadow: 0 2.4rem 4.2rem -1.3rem rgb(44 32 14 / 0.6), 0 0.5rem 1rem rgb(44 32 14 / 0.26);
   --code-bg: #eadcbb;
   --focus: #93361c;
-  --grain-opacity: 0.55;
 
   /* Shiki css-variables theme, tuned to iron-gall ink and red chalk. */
   --astro-code-foreground: #2a1c12;
@@ -53,23 +79,41 @@
 
 :root[data-theme='lucerna'] {
   color-scheme: dark;
-  --desk: #120c07;
-  --paper: #1f160e;
-  --paper-2: #2a1f14;
-  --paper-3: #35281a;
+  --desk: #0e0a07;
+  --desk-ink: #eadcbc;
+  --desk-ink-2: #cdb994;
+  --desk-ink-3: #a8926e;
+  --desk-rule: #4a3a26;
+  --chisel-light: rgb(255 214 150 / 0.14);
+  --chisel-dark: rgb(0 0 0 / 0.85);
+  --paper: #211810;
+  --paper-2: #2b2015;
+  --paper-3: #36291b;
   --ink: #f0e2c2;
   --ink-2: #d9c6a1;
   --ink-3: #b9a37f;
   --rule: #6b5638;
+  --ruling: rgb(214 176 122 / 0.16);
+  --prick: rgb(0 0 0 / 0.55);
+  --gutter-1: rgb(0 0 0 / 0.5);
+  --gutter-2: rgb(0 0 0 / 0.18);
+  --thumbed: rgb(0 0 0 / 0.22);
+  --under-shade: rgb(0 0 0 / 0.6);
   --sanguine: #ee9a72;
   --sanguine-2: #f2b08e;
   --sanguine-wash: rgb(238 154 114 / 0.14);
   --verdigris: #8cc7b2;
   --verdigris-wash: rgb(140 199 178 / 0.12);
-  --shadow: 0 0 0 1px rgb(255 220 160 / 0.05) inset, 0 24px 60px -20px rgb(0 0 0 / 0.8), 0 0 90px -30px rgb(255 170 80 / 0.12);
+  --lapis: #9db4ee;
+  --lapis-2: #5f7fcf;
+  --lapis-wash: rgb(157 180 238 / 0.12);
+  --gold-ink: #e3bb63;
+  --gold: #d2a23c;
+  --gold-hi: #ffe7a0;
+  --gold-lo: #8a621a;
+  --shadow: 0 2.6rem 4.6rem -1.2rem rgb(0 0 0 / 0.9), 0 0.5rem 1rem rgb(0 0 0 / 0.6);
   --code-bg: #2b2016;
   --focus: #f2b08e;
-  --grain-opacity: 0.35;
 
   --astro-code-foreground: #f0e2c2;
   --astro-code-token-constant: #f0b67f;

@@ -1,8 +1,9 @@
 ---
+import Leaf from '../components/Leaf.astro';
 import Base from '../layouts/Base.astro';
 ---
 <Base title="Seek" description="Search every folio of the wiki." current="search">
-  <main class="leaf" id="text">
+  <Leaf>
     <div class="running-head"><span>Codex Tebou</span><span class="folio-no">Seek</span></div>
     <div class="folio">
       <div class="text-block" style="grid-column: 1 / -1; max-width: 46rem; margin-inline: auto; width: 100%">
@@ -18,5 +19,5 @@ import Base from '../layouts/Base.astro';
         <noscript><p>Searching needs JavaScript. The <a href="/pinakes/">Pinakes</a> lists every folio.</p></noscript>
       </div>
     </div>
-  </main>
+  </Leaf>
 </Base>

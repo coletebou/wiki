@@ -8,6 +8,7 @@ import InkStroke from '../components/InkStroke.astro';
 import Marginalia from '../components/Marginalia.astro';
 import Price from '../components/Price.astro';
 import Verso from '../components/Verso.astro';
+import Leaf from '../components/Leaf.astro';
 import Base from '../layouts/Base.astro';
 import { stichoi, tableOf, wiki } from '../lib/wiki';
 
@@ -35,7 +36,7 @@ const lines = stichoi(page.body ?? '');
 const emended = updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 ---
 <Base title={title} description={summary} ogType="article">
-  <main class="leaf" id="text">
+  <Leaf>
     <div class="running-head">
       <a href="/">Codex Tebou</a>
       <a href={`/pinakes/#table-${table.id}`} class="wide-only">{table.title}</a>
@@ -66,5 +67,5 @@ const emended = updated.toLocaleDateString('en-US', { month: 'short', day: 'nume
         <Verso page={page} citedBy={citedBy} cites={cites} prev={pages[index - 1]} next={pages[index + 1]} stichoi={lines} />
       </div>
     </div>
-  </main>
+  </Leaf>
 </Base>

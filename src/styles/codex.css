@@ -19,11 +19,6 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: var(--desk);
-  background-image:
-    radial-gradient(ellipse at 20% 0%, rgb(255 245 220 / 0.35), transparent 55%),
-    radial-gradient(ellipse at 100% 100%, rgb(120 80 30 / 0.18), transparent 60%),
-    var(--grain);
   color: var(--ink);
   font-family: var(--font-text);
   font-size: var(--step-0);
@@ -34,20 +29,16 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
-:root {
-  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .42  0 0 0 0 .3  0 0 0 0 .16  0 0 0 .11 0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
-  --fibres: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='.006 .05' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .36  0 0 0 0 .18  0 0 0 .07 0'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>");
-}
-:root[data-theme='lucerna'] body {
-  background-image:
-    radial-gradient(ellipse at 50% -10%, rgb(255 170 80 / 0.1), transparent 60%),
-    var(--grain);
-}
 img,
 svg,
 video {
   max-width: 100%;
   height: auto;
+}
+a {
+  color: var(--sanguine);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.17em;
 }
 ::selection {
   background: var(--sanguine-wash);
@@ -81,7 +72,7 @@ video {
   transform: translateY(1rem);
 }
 
-/* ── Masthead ─────────────────────────────────────────────────────────────────────────────────────────────── */
+/* ── Masthead: cut into the stone of the table ───────────────────────────────────────────────────────────── */
 .masthead {
   display: flex;
   flex-wrap: wrap;
@@ -96,7 +87,7 @@ video {
   display: inline-flex;
   align-items: baseline;
   gap: 0.7rem;
-  color: var(--ink);
+  color: var(--desk-ink);
   text-decoration: none;
 }
 .wordmark b {
@@ -104,10 +95,12 @@ video {
   font-weight: 700;
   font-size: 1.28rem;
   letter-spacing: 0.16em;
+  /* Letters cut with a chisel catch the light on their lower edge. */
+  text-shadow: 0 1px 0 var(--chisel-light), 0 -1px 0 var(--chisel-dark);
 }
 .wordmark i {
   font-size: 1.05rem;
-  color: var(--ink-2);
+  color: var(--desk-ink-2);
 }
 .wordmark:hover b {
   color: var(--sanguine);
@@ -137,7 +130,7 @@ video {
 }
 .masthead nav a,
 .masthead nav button {
-  color: var(--ink-2);
+  color: var(--desk-ink-2);
   text-decoration: none;
   font: inherit;
   background: none;
@@ -159,48 +152,54 @@ video {
   margin-left: 0.35rem;
   font-size: 0.72rem;
 }
-.theme-toggle .sun,
-:root[data-theme='lucerna'] .theme-toggle .flame {
-  display: none;
+
+/* The lamp (a lucerna, the clay oil lamp of every Roman desk) is the theme switch: unlit by day, lit by night, and
+   by night the light on the page falls from it. */
+.masthead nav .lamp {
+  display: inline-flex;
+  padding: 0.1rem 0 0.1rem 0.1rem;
 }
-:root[data-theme='lucerna'] .theme-toggle .sun {
-  display: inline;
+.lamp svg {
+  width: 2.5rem;
+  height: 1.9rem;
+  overflow: visible;
 }
-.theme-toggle svg {
-  width: 1.15rem;
-  height: 1.15rem;
-  vertical-align: -0.2em;
+.lamp-flame,
+.lamp-glow {
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.lamp-flame {
+  fill: var(--gold-hi);
+  stroke: var(--sanguine);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.lamp-glow {
+  fill: rgb(255 190 110 / 0.5);
+}
+:root[data-theme='lucerna'] .lamp-flame {
+  opacity: 1;
+}
+:root[data-theme='lucerna'] .lamp-glow {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme='lucerna'] .lamp-flame {
+    animation: flame 2.9s ease-in-out infinite;
+  }
+  @keyframes flame {
+    0%, 100% { transform: scale(1, 1) skewX(0deg); }
+    18% { transform: scale(0.94, 1.07) skewX(-3deg); }
+    37% { transform: scale(1.04, 0.95) skewX(2deg); }
+    55% { transform: scale(0.97, 1.1) skewX(-1.5deg); }
+    78% { transform: scale(1.03, 0.97) skewX(3deg); }
+  }
 }
 
-/* ── The leaf (a sheet of parchment) ──────────────────────────────────────────────────────────────────────── */
-.leaf {
-  position: relative;
-  max-width: 78rem;
-  margin: 0 auto 3rem;
-  background-color: var(--paper);
-  background-image:
-    radial-gradient(ellipse at 50% 50%, transparent 62%, rgb(140 95 40 / 0.12) 100%),
-    radial-gradient(circle at 12% 18%, rgb(150 100 40 / 0.06), transparent 9%),
-    radial-gradient(circle at 86% 72%, rgb(150 100 40 / 0.05), transparent 7%),
-    var(--fibres),
-    var(--grain);
-  box-shadow: var(--shadow);
-  border-radius: 2px;
-}
-:root[data-theme='lucerna'] .leaf {
-  background-image:
-    radial-gradient(ellipse at 50% 30%, rgb(255 190 110 / 0.06), transparent 70%),
-    var(--fibres),
-    var(--grain);
-}
-.leaf::before {
-  /* A faint ruled frame, as a scribe pricks and rules the leaf before writing. */
-  content: '';
-  position: absolute;
-  inset: clamp(0.6rem, 1.4vw, 1.2rem);
-  border: 1px solid color-mix(in srgb, var(--rule) 55%, transparent);
-  pointer-events: none;
-}
+/* ── The head of the leaf (the leaf itself is in material.css) ─────────────────────────────────────────────── */
 .running-head {
   position: relative;
   display: flex;
@@ -1087,7 +1086,7 @@ kbd {
   display: grid;
   gap: 1.2rem;
   font-size: 0.98rem;
-  color: var(--ink-2);
+  color: var(--desk-ink-2);
 }
 @media (min-width: 52rem) {
   .colophon {
@@ -1099,7 +1098,7 @@ kbd {
   margin: 0;
 }
 .colophon a {
-  color: var(--ink-2);
+  color: var(--desk-ink-2);
 }
 .colophon a:hover {
   color: var(--sanguine);
@@ -1119,13 +1118,13 @@ kbd {
   font-size: 0.74rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--desk-ink-3);
 }
 .editions a,
 .editions span[aria-current] {
   display: inline-block;
   padding: 0.15rem 0.65rem;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--desk-rule);
   border-radius: 999px;
   text-decoration: none;
   font-size: 0.95rem;
@@ -1367,10 +1366,8 @@ kbd {
 
 /* ── Print: the codex on real paper ───────────────────────────────────────────────────────────────────────── */
 @media print {
-  body,
-  .leaf {
+  body {
     background: #fff !important;
-    box-shadow: none;
   }
   .masthead nav,
   .colophon,

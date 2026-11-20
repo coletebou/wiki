@@ -1,8 +1,9 @@
 ---
+import Leaf from '../components/Leaf.astro';
 import Base from '../layouts/Base.astro';
 ---
 <Base title="A lost scroll" description="No folio lives at this address." notFound>
-  <main class="leaf" id="text">
+  <Leaf>
     <div class="running-head"><span>Codex Tebou</span><span class="folio-no">f. —</span></div>
     <div class="folio">
       <div class="text-block" style="grid-column: 1 / -1; text-align: center; padding: 2rem 0 3rem">
@@ -13,5 +14,5 @@ import Base from '../layouts/Base.astro';
         <p style="margin-top: 1.6rem"><a href="/pinakes/">Browse the Pinakes</a> · <a href="/">Return to the frontispiece</a></p>
       </div>
     </div>
-  </main>
+  </Leaf>
 </Base>

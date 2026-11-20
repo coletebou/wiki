@@ -1,6 +1,7 @@
 ---
 import { folioLabel } from '../../lib/schema.mjs';
 import Vitruvian from '../components/Vitruvian.astro';
+import Leaf from '../components/Leaf.astro';
 import Base from '../layouts/Base.astro';
 import { href, incipit, tableOf, wiki } from '../lib/wiki';
 
@@ -21,7 +22,7 @@ const cited = [...pages]
   .slice(0, 8);
 ---
 <Base title="How to Be a Beast" description="Cole Tebou’s wiki of the whole workflow: terminals, tmux, agents and their hooks, worktrees, Cloudflare, Vercel, Langfuse, apps, desk gear and what it all costs." current="home">
-  <main class="leaf" id="text">
+  <Leaf>
     <div class="running-head"><span>Bibliotheca · Frontispiece</span><span class="folio-no">f. i r</span></div>
     <div class="folio">
       <div class="text-block" style="grid-column: 1 / -1">
@@ -108,5 +109,5 @@ const cited = [...pages]
         </div>
       </div>
     </div>
-  </main>
+  </Leaf>
 </Base>
