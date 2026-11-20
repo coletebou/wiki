@@ -204,12 +204,12 @@ a {
   position: relative;
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 1rem;
   padding: clamp(1.4rem, 3vw, 2.2rem) clamp(1.6rem, 5vw, 4rem) 0;
-  font-family: var(--font-display);
-  font-size: 0.78rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  font-variant-caps: all-small-caps;
+  font-size: 1.04rem;
+  letter-spacing: 0.14em;
   color: var(--ink-3);
 }
 .running-head a {
@@ -222,9 +222,9 @@ a {
 .folio-no {
   font-family: var(--font-text);
   font-style: italic;
+  font-variant-caps: normal;
   font-size: 1.1rem;
   letter-spacing: 0.02em;
-  text-transform: none;
   color: var(--sanguine);
 }
 
@@ -263,12 +263,13 @@ a {
 }
 
 /* ── Article head ─────────────────────────────────────────────────────────────────────────────────────────── */
+/* Rubrics: what a scribe wrote in red to say where the reader is. They are set in the book hand's own small capitals,
+   as he wrote them, and the inscription capitals are kept for titles. */
 .kicker {
-  margin: 0 0 0.4rem;
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  margin: 0 0 0.3rem;
+  font-variant-caps: all-small-caps;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
   color: var(--sanguine);
 }
 .kicker a {
@@ -330,19 +331,6 @@ h1.title {
 .prose table,
 .prose pre {
   margin-bottom: 0;
-}
-.prose > p:first-child::first-letter,
-.prose > .lede::first-letter {
-  float: left;
-  margin: 0.08em 0.12em 0 0;
-  padding: 0.06em 0.12em 0;
-  font-family: var(--font-display);
-  font-size: 3.55em;
-  line-height: 0.82;
-  color: var(--sanguine);
-  border: 1px solid color-mix(in srgb, var(--sanguine) 45%, transparent);
-  background:
-    repeating-linear-gradient(135deg, color-mix(in srgb, var(--sanguine) 14%, transparent) 0 1px, transparent 1px 5px);
 }
 .prose h2,
 .prose h3,
@@ -547,12 +535,12 @@ kbd {
 .prose pre[data-language]::before {
   content: attr(data-language);
   position: absolute;
-  top: 0.3rem;
+  top: 0.2rem;
   right: 0.6rem;
-  font-family: var(--font-display);
-  font-size: 0.62rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-family: var(--font-text);
+  font-variant-caps: all-small-caps;
+  font-size: 0.86rem;
+  letter-spacing: 0.12em;
   color: var(--ink-3);
 }
 .copy-code {
@@ -600,11 +588,10 @@ kbd {
   border-bottom: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
 }
 .prose thead th {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 0.78rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-weight: 500;
+  font-variant-caps: all-small-caps;
+  font-size: 1.08em;
+  letter-spacing: 0.1em;
   color: var(--ink-2);
   border-bottom: 1.5px solid var(--ink-3);
 }
@@ -612,31 +599,54 @@ kbd {
   background: color-mix(in srgb, var(--paper-2) 60%, transparent);
 }
 
-/* ── Cole's take: a marginal note in red chalk ─────────────────────────────────────────────────────────────── */
+/* ── Cole's take: a reader's note, marked with a stroke of red chalk and a manicule ─────────────────────────── */
 .coles-take {
   position: relative;
-  margin: 1.8em 0 !important;
-  padding: 1.1rem 1.25rem 1rem 1.35rem;
-  background:
-    linear-gradient(var(--sanguine-wash), var(--sanguine-wash)),
-    repeating-linear-gradient(-45deg, transparent 0 7px, color-mix(in srgb, var(--sanguine) 5%, transparent) 7px 8px);
-  border-left: 3px solid var(--sanguine);
-  border-radius: 0 var(--radius) var(--radius) 0;
+  margin: 1.9em 0 !important;
+  padding: 0.15rem 0 0.25rem 1.35rem;
+}
+.coles-take::before {
+  /* The stroke down its side: red chalk, pressed harder in the middle, drawn through a mask so it takes each theme's
+     own red and stretches to the note's height. */
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0.55rem;
+  background: var(--sanguine-2);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 100' preserveAspectRatio='none'%3E%3Cpath d='M5.4 0.5C4.2 14 6.8 30 4.6 50C3.4 68 6.4 86 5 99.5C4.4 86 2.2 68 3 50C3.6 30 2.6 14 5.4 0.5Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 100' preserveAspectRatio='none'%3E%3Cpath d='M5.4 0.5C4.2 14 6.8 30 4.6 50C3.4 68 6.4 86 5 99.5C4.4 86 2.2 68 3 50C3.6 30 2.6 14 5.4 0.5Z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+@media (forced-colors: active) {
+  .coles-take::before {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
 }
 .coles-take > .label {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  margin: 0 0 0.35rem;
-  font-family: var(--font-display);
-  font-size: 0.78rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  gap: 0.5rem;
+  margin: 0 0 0.2rem;
+  font-variant-caps: all-small-caps;
+  font-size: 1.08rem;
+  letter-spacing: 0.12em;
   color: var(--sanguine);
 }
-.coles-take > .label svg {
-  width: 1.3rem;
-  height: 1.3rem;
+.manicule {
+  flex: none;
+  width: 2.3rem;
+  height: 1.25rem;
+  stroke-width: 1.15;
+}
+@media (min-width: 72rem) {
+  /* Where the leaf has a margin, the hand stands in it and points at the note. */
+  .coles-take > .label .manicule {
+    position: absolute;
+    left: -2.75rem;
+    top: 0.42rem;
+  }
 }
 .coles-take > .body > :first-child {
   margin-top: 0;
@@ -645,7 +655,7 @@ kbd {
   margin-top: 0.75em;
 }
 .coles-take > .body {
-  font-size: 1.04em;
+  font-size: 1.06em;
 }
 
 /* ── Prices: amount, then when and where it was read ──────────────────────────────────────────────────────── */
@@ -681,13 +691,12 @@ kbd {
 }
 .capitula h2,
 .margin-head {
-  margin: 0 0 0.6rem;
-  font-family: var(--font-display);
+  margin: 0 0 0.5rem;
   font-weight: 400;
-  font-size: 0.75rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-variant-caps: all-small-caps;
+  font-size: 1.06rem;
+  letter-spacing: 0.14em;
+  color: var(--sanguine);
 }
 .capitula ol {
   list-style: none;
@@ -725,10 +734,9 @@ kbd {
 }
 .capitula-inline summary {
   cursor: pointer;
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-variant-caps: all-small-caps;
+  font-size: 1.08rem;
+  letter-spacing: 0.12em;
   color: var(--ink-2);
 }
 .capitula-inline ol {
@@ -744,7 +752,8 @@ kbd {
   }
 }
 
-/* Mirror-script marginalia: ornament only (aria-hidden), Leonardo's right-to-left hand. */
+/* Mirror-script marginalia: ornament only (aria-hidden), Leonardo's right-to-left hand. Point at a line and it turns
+   to face you, as it would in a mirror held to the page, and its tag gives the English. */
 .marginalia {
   position: sticky;
   top: 2rem;
@@ -763,6 +772,19 @@ kbd {
   opacity: 0.32;
   transform: scaleX(-1) rotate(var(--tilt, -4deg));
   text-align: right;
+  pointer-events: auto;
+  cursor: help;
+  transition: opacity 0.35s;
+}
+.marginalia p:hover {
+  opacity: 0.95;
+  transform: scaleX(1) rotate(var(--tilt, -4deg));
+  text-align: left;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .marginalia p {
+    transition: opacity 0.35s, transform 0.55s cubic-bezier(0.3, 0.1, 0.2, 1);
+  }
 }
 .marginalia svg {
   width: 100%;
@@ -804,13 +826,12 @@ kbd {
   font-size: 1.25rem;
 }
 .verso section h3 {
-  margin: 0 0 0.7rem;
-  font-family: var(--font-display);
+  margin: 0 0 0.6rem;
   font-weight: 400;
-  font-size: 0.8rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-variant-caps: all-small-caps;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+  color: var(--sanguine);
 }
 .verso ul {
   list-style: none;
@@ -860,10 +881,9 @@ kbd {
 }
 .turn small {
   display: block;
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  font-variant-caps: all-small-caps;
+  font-size: 0.98rem;
+  letter-spacing: 0.12em;
   color: var(--ink-3);
 }
 .turn .next {
@@ -909,11 +929,10 @@ kbd {
 }
 .sillybos .tag-table {
   display: block;
-  margin-bottom: 0.15rem;
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  margin-bottom: 0.1rem;
+  font-variant-caps: all-small-caps;
+  font-size: 0.98rem;
+  letter-spacing: 0.12em;
   color: var(--sanguine);
 }
 .sillybos .tag-title {
@@ -1114,10 +1133,9 @@ kbd {
 }
 .editions .label {
   margin-right: 0.3rem;
-  font-family: var(--font-display);
-  font-size: 0.74rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  font-variant-caps: all-small-caps;
+  font-size: 1.04rem;
+  letter-spacing: 0.12em;
   color: var(--desk-ink-3);
 }
 .editions a,
@@ -1202,11 +1220,9 @@ kbd {
 .pinax .incipit i::before {
   content: 'inc. ';
   font-style: normal;
-  font-family: var(--font-display);
-  font-size: 0.66rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.08em;
+  color: var(--sanguine);
 }
 .pinax .stichoi {
   font-size: 0.85rem;

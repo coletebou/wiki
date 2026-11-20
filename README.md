@@ -15,7 +15,7 @@ People and agents edit it the same way: by pull request. An agent edit that pass
 | `content/*.mdx` | One page per file. Format: [docs/EDITING.md](docs/EDITING.md) |
 | `src/` | The Astro site: layouts, components, the interactive studies (`src/diagrams`), styles, routes |
 | `src/data/prices.json` | Every price on the site, with the date it was read and the vendor page it was read on |
-| `lib/` | Shared, dependency-free code: wiki links, the link graph, validation, search, the public-safety lint |
+| `lib/` | Shared, dependency-free code: wiki links, the link graph, validation, search, the public-safety lint, and the drawing of the materials (vellum, stone, the leaf's outline) and of each folio's illuminated initial |
 | `mcp/` | The MCP server for agents (stdio) |
 | `scripts/` | Checks: pages, links in the built site, public safety, the deny-list tool |
 | `safety/denylist.json` | Salted hashes of phrases that must never be published |

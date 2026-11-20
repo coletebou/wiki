@@ -1,0 +1,24 @@
+---
+// The illuminated initial that opens a folio: a capital of gold on a white-vine panel (lib/illumination.mjs).
+// Ornament only. The letter itself stays in the text; this is drawn where its ink would be.
+import { letterFit, whiteVine } from '../../lib/illumination.mjs';
+
+interface Props {
+  letter: string;
+  /** The folio number: each folio's vine grows its own way. */
+  seed: number;
+  /** How far below the panel the margin stays clear, in panel units: the spray runs no further. */
+  room?: number;
+}
+const { letter, seed, room } = Astro.props;
+const v = whiteVine({ seed, id: `f${seed}`, room });
+const fit = letterFit(letter);
+---
+<svg class="initial" viewBox="0 0 100 100" aria-hidden="true" focusable="false" data-pagefind-ignore>
+  <defs set:html={v.defs} />
+  <g clip-path={`url(#${v.clip})`} set:html={v.panel} />
+  <rect class="il-frame-line" x="2" y="2" width="96" height="96" />
+  <rect class="il-frame-gold" x="3.4" y="3.4" width="93.2" height="93.2" />
+  <text class="il-letter" x="50" y={fit.y} font-size={fit.size} text-anchor="middle" fill={`url(#${v.gold})`}>{letter}</text>
+  <g class="il-spray" set:html={v.spray} />
+</svg>

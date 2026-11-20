@@ -1,9 +1,10 @@
 // Sillyboi: in the Library of Alexandria each scroll carried a parchment tag, a sillybos, naming the work, so a reader
 // could find it without unrolling it. Here every link carries one: hover or focus it and its tag swings down on a
-// string. A touch screen has no hover, so a tap just follows the link.
+// string. A touch screen has no hover, so a tap just follows the link. The lines in Leonardo's mirror hand in the
+// margin carry one too (a gloss: the line the right way round, and its English).
 
 type Preview = { t: string; s: string; f: number; n: string; tb: string; h: Record<string, string> };
-type Tag = { kicker: string; title: string; section?: string | null; summary?: string; foot?: string; folio?: string };
+type Tag = { kicker: string; title?: string; section?: string | null; summary?: string; foot?: string; folio?: string };
 
 const tag = document.getElementById('sillybos') as HTMLDivElement | null;
 const ROUTES: Record<string, { title: string; summary: string }> = {
@@ -15,19 +16,25 @@ const ROUTES: Record<string, { title: string; summary: string }> = {
 let previews: Promise<Record<string, Preview>> | null = null;
 const load = () => (previews ??= fetch('/previews.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
 
-let current: HTMLAnchorElement | null = null;
+let current: HTMLElement | null = null;
 let showTimer = 0;
 let hideTimer = 0;
 let string: SVGSVGElement | null = null;
 
-function eligible(a: Element | null): a is HTMLAnchorElement {
-  if (!(a instanceof HTMLAnchorElement) || !tag) return false;
+function eligible(a: Element | null): a is HTMLElement {
+  if (!(a instanceof HTMLElement) || !tag) return false;
+  if ('gloss' in a.dataset) return true;
+  if (!(a instanceof HTMLAnchorElement)) return false;
   if (a.closest('.sillybos, .capitula, .capitula-inline, .skip, .seek-dialog') || 'noPreview' in a.dataset) return false;
   const raw = a.getAttribute('href');
   return Boolean(raw) && !raw!.startsWith('javascript:');
 }
 
-async function describe(a: HTMLAnchorElement): Promise<Tag | null> {
+async function describe(a: HTMLElement): Promise<Tag | null> {
+  if (!(a instanceof HTMLAnchorElement)) {
+    const { gloss, glossEn, glossSource } = a.dataset;
+    return gloss ? { kicker: 'Leonardo, in his mirror hand', summary: glossEn, foot: glossSource } : null;
+  }
   const url = new URL(a.href, location.href);
   if (url.origin === location.origin) {
     const slug = url.pathname.replace(/^\/+|\/+$/g, '');
@@ -66,7 +73,8 @@ function el<K extends keyof HTMLElementTagNameMap>(name: K, cls: string, text?: 
 function render(t: Tag) {
   if (!tag) return;
   tag.replaceChildren();
-  tag.append(el('span', 'tag-table', t.kicker), el('span', 'tag-title', t.title));
+  tag.append(el('span', 'tag-table', t.kicker));
+  if (t.title) tag.append(el('span', 'tag-title', t.title));
   if (t.section) tag.append(el('span', 'tag-table', `§ ${t.section}`));
   if (t.summary) tag.append(el('span', 'tag-summary', t.summary));
   const foot = el('span', 'tag-foot');
@@ -100,7 +108,7 @@ function drawString(link: DOMRect, box: { left: number; top: number; height: num
   string.style.display = 'block';
 }
 
-function place(a: HTMLAnchorElement) {
+function place(a: HTMLElement) {
   if (!tag) return;
   const r = a.getClientRects()[0] ?? a.getBoundingClientRect();
   const w = tag.offsetWidth;
@@ -116,7 +124,7 @@ function place(a: HTMLAnchorElement) {
   drawString(r, { left, top, height: h }, above);
 }
 
-async function show(a: HTMLAnchorElement) {
+async function show(a: HTMLElement) {
   if (!tag) return;
   const t = await describe(a);
   if (!t) return;
@@ -127,7 +135,7 @@ async function show(a: HTMLAnchorElement) {
   tag.classList.remove('swing');
   void tag.offsetWidth; // restart the swing
   tag.classList.add('swing');
-  a.setAttribute('aria-describedby', 'sillybos');
+  if (a instanceof HTMLAnchorElement) a.setAttribute('aria-describedby', 'sillybos');
   place(a);
 }
 
@@ -150,7 +158,7 @@ if (tag) {
   document.addEventListener('pointerover', (e) => {
     if (e.pointerType !== 'mouse') return;
     void load();
-    const a = (e.target as Element).closest('a');
+    const a = (e.target as Element).closest<HTMLElement>('a, [data-gloss]');
     if (a && tag.contains(a)) return;
     if (!eligible(a)) return;
     clearTimeout(hideTimer);
@@ -160,7 +168,7 @@ if (tag) {
   });
   document.addEventListener('pointerout', (e) => {
     if (e.pointerType !== 'mouse') return;
-    const a = (e.target as Element).closest('a');
+    const a = (e.target as Element).closest<HTMLElement>('a, [data-gloss]');
     if (!eligible(a)) return;
     const to = e.relatedTarget as Node | null;
     if (to && (a.contains(to) || tag.contains(to))) return;

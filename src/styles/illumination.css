@@ -1,0 +1,139 @@
+/* Illumination: the white-vine initial that opens each folio (lib/illumination.mjs draws it). The colours are the
+   illuminator's: gold leaf, lapis, a green from copper, a rose from brazilwood, and the bare vellum of the vine. */
+
+:root {
+  --il-lapis: #2c4a97;
+  --il-green: #2f7059;
+  --il-rose: #b0473f;
+  --il-vine: #f8f0dc;
+  --il-line: #3a2716;
+  --il-dot: #f6ecd2;
+  --il-hair: #3a2716;
+}
+:root[data-theme='lucerna'] {
+  /* By lamplight the pigments deepen and the vine is the brightest thing on the leaf after the gold. */
+  --il-lapis: #25407f;
+  --il-green: #235a47;
+  --il-rose: #8f3a33;
+  --il-vine: #e6d5ae;
+  --il-line: #160e07;
+  --il-dot: #e9d9b4;
+  --il-hair: #b9a37f;
+}
+
+.il-lapis {
+  fill: var(--il-lapis);
+}
+.il-green {
+  fill: var(--il-green);
+}
+.il-rose {
+  fill: var(--il-rose);
+}
+.il-dots {
+  fill: var(--il-dot);
+}
+.il-line {
+  fill: none;
+  stroke: var(--il-line);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+circle.il-line {
+  fill: var(--il-line);
+}
+.il-vine {
+  fill: none;
+  stroke: var(--il-vine);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.il-bud {
+  fill: var(--il-vine);
+}
+.il-frame-line {
+  fill: none;
+  stroke: var(--il-line);
+  stroke-width: 1.1;
+}
+.il-frame-gold {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 1.5;
+}
+.il-letter {
+  font-family: var(--font-display);
+  font-weight: 700;
+  stroke: var(--il-line);
+  stroke-width: 2.6px;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+}
+.il-stop-hi {
+  stop-color: var(--gold-hi);
+}
+.il-stop {
+  stop-color: var(--gold);
+}
+.il-stop-lo {
+  stop-color: var(--gold-lo);
+}
+.il-hair {
+  fill: none;
+  stroke: var(--il-hair);
+  stroke-width: 0.6;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+.il-bezant {
+  fill: var(--gold);
+  stroke: var(--il-hair);
+  stroke-width: 0.55;
+}
+.il-leaf-green,
+.il-leaf-lapis,
+.il-leaf-rose {
+  stroke: var(--il-hair);
+  stroke-width: 0.5;
+  stroke-linejoin: round;
+}
+.il-leaf-green {
+  fill: var(--il-green);
+}
+.il-leaf-lapis {
+  fill: var(--il-lapis);
+}
+.il-leaf-rose {
+  fill: var(--il-rose);
+}
+
+/* The initial in its place: floated at the head of the text, four lines deep, the text running round it. The letter
+   it stands for is still the first letter of the paragraph (for a screen reader, a search, a copy); only its ink is
+   withheld. */
+.initial {
+  float: left;
+  width: 6.1em;
+  height: 6.1em;
+  margin: 0.3em 0.8em 0.08em 0;
+  overflow: visible;
+}
+.prose > .initial + p {
+  margin-top: 0;
+}
+.prose > .initial + p::first-letter {
+  font-size: 0;
+}
+@media (max-width: 40rem) {
+  /* Three lines deep on a phone. */
+  .initial {
+    width: 4.5em;
+    height: 4.5em;
+    margin-right: 0.6em;
+  }
+}
+@media (max-width: 71.99rem) {
+  /* The spray needs the clear margin that only the three-column leaf has. */
+  .il-spray {
+    display: none;
+  }
+}
