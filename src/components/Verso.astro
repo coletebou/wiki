@@ -1,5 +1,6 @@
 ---
 // The back of the leaf: who cites this folio, what it rests on, and how to emend it.
+import { romanDate } from '../../lib/dates.mjs';
 import { folioLabel } from '../../lib/schema.mjs';
 import { href, tableOf, type Page } from '../lib/wiki';
 
@@ -50,7 +51,7 @@ const emended = updated.toLocaleDateString('en-US', { month: 'long', day: 'numer
     ) : <p class="empty">Drawn from Cole’s own setup.</p>}
     <h3 style="margin-top:1.6rem">Colophon of this leaf</h3>
     <ul>
-      <li>Last emended <time datetime={updated.toISOString().slice(0, 10)}>{emended}</time><small><a href={historyUrl} rel="noopener">every emendation</a></small></li>
+      <li>Last emended <time datetime={updated.toISOString().slice(0, 10)}>{emended}</time><small><span class="roman-date" title="The same day as a scribe would have dated it">{romanDate(updated)}</span> · <a href={historyUrl} rel="noopener">every emendation</a></small></li>
       <li>{stichoi.toLocaleString('en-US')} stichoi<small>lines of 36 letters, as Alexandria counted</small></li>
       <li><a class="emend" href={editUrl} rel="noopener">Emend this folio</a><small>on GitHub, or by an agent through the <a href="/wiki-mcp/">wiki’s MCP</a></small></li>
     </ul>

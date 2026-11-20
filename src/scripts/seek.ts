@@ -1,5 +1,7 @@
 // The seeker: full-text search over every folio, from the Pagefind index built alongside the site.
 // The dialog opens with "/", Ctrl-K or Cmd-K, or any [data-seek] button; the search page runs the same engine inline.
+import { lately, readLink } from './lately';
+
 type PagefindData = { url: string; excerpt: string; meta: { title?: string; folio?: string; table?: string } };
 type PagefindResult = { id: string; data: () => Promise<PagefindData> };
 type Pagefind = {
@@ -42,7 +44,27 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
 
   const run = async (q: string) => {
     if (!q.trim()) {
-      empty('Seek by word or phrase: tmux, Langfuse, worktrees, what Vercel costs…');
+      // Before a word is typed, the leaves lately read: most often the reader is going back to one of them.
+      const reads = lately().slice(0, 8);
+      if (!reads.length) {
+        empty('Seek by word or phrase: tmux, Langfuse, worktrees, what Vercel costs…');
+        return;
+      }
+      const head = document.createElement('li');
+      head.className = 'seek-head';
+      head.setAttribute('role', 'presentation');
+      head.textContent = 'Lately read';
+      const rows = reads.map((r) => {
+        const li = document.createElement('li');
+        li.setAttribute('role', 'presentation');
+        const a = readLink(r);
+        a.setAttribute('role', 'option');
+        a.dataset.noPreview = '';
+        li.append(a);
+        return li;
+      });
+      list.replaceChildren(head, ...rows);
+      selected = -1;
       return;
     }
     const pf = await load();

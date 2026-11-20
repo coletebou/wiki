@@ -22,7 +22,8 @@ export default defineConfig({
   site: 'https://wiki.coletebou.com',
   trailingSlash: 'always',
   build: { format: 'directory' },
-  integrations: [mdx(), sitemap()],
+  // The lot-drawing page sends its reader on at once: it is a tool, not a text, and stays out of the sitemap.
+  integrations: [mdx(), sitemap({ filter: (page) => !page.endsWith('/sortes/') })],
   markdown: {
     processor: satteri({ mdastPlugins: [wikiLinks({ contentDir })] }),
     shikiConfig: { theme: 'css-variables', wrap: false },

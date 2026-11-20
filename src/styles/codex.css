@@ -1087,6 +1087,17 @@ kbd {
   color: var(--ink-3);
   font-style: italic;
 }
+.seek-head {
+  padding: 0.5rem 1.1rem 0.15rem;
+  font-variant-caps: all-small-caps;
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  color: var(--sanguine);
+}
+.seek-head ~ li .r-title {
+  display: inline;
+  margin-right: 0.6rem;
+}
 .seek-hint {
   display: flex;
   flex-wrap: wrap;
@@ -1095,6 +1106,150 @@ kbd {
   border-top: 1px solid color-mix(in srgb, var(--rule) 60%, transparent);
   font-size: 0.82rem;
   color: var(--ink-3);
+}
+
+/* ── The keys ("?") ───────────────────────────────────────────────────────────────────────────────────────── */
+.keys-dialog {
+  width: min(30rem, calc(100vw - 1.5rem));
+  padding: 1.3rem 1.5rem 1.2rem;
+  color: var(--ink);
+  background: var(--paper);
+  background-image: var(--fibres), var(--grain);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  box-shadow: 0 30px 80px -20px rgb(40 20 5 / 0.65);
+}
+.keys-dialog::backdrop {
+  background: rgb(40 25 10 / 0.45);
+  backdrop-filter: blur(2px);
+}
+.keys-dialog h2 {
+  margin: 0 0 0.7rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-1);
+  letter-spacing: 0.05em;
+}
+.keys-list {
+  margin: 0;
+}
+.keys-list div {
+  display: grid;
+  grid-template-columns: 4.6rem minmax(0, 1fr);
+  gap: 0 0.8rem;
+  align-items: baseline;
+  padding: 0.32rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 45%, transparent);
+}
+.keys-list dt {
+  white-space: nowrap;
+}
+.keys-list dd {
+  margin: 0;
+}
+.keys-note {
+  margin: 0.8rem 0 0;
+  font-size: 0.95rem;
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.keys-close {
+  display: block;
+  margin: 1rem 0 0 auto;
+  padding: 0.25rem 0.8rem;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--ink-2);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.keys-close:hover {
+  color: var(--sanguine);
+  border-color: var(--sanguine);
+}
+.keys-button {
+  margin-left: 0.3rem;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.17em;
+  cursor: pointer;
+}
+.keys-button:hover {
+  color: var(--sanguine);
+}
+.keys-button kbd {
+  margin-left: 0.15rem;
+}
+@media (hover: none) {
+  /* No keyboard to speak of: the keys are not offered. */
+  .keys-button {
+    display: none;
+  }
+}
+
+/* ── The catchword: the next leaf's first words, at the foot of this one ───────────────────────────────────── */
+.catchword {
+  margin: 2.2rem 0 0;
+  text-align: right;
+  font-style: italic;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+.catchword a {
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.catchword a::after {
+  /* The stroke a scribe ended a catchword with. */
+  content: '';
+  display: inline-block;
+  width: 1.6rem;
+  height: 1px;
+  margin-left: 0.5rem;
+  vertical-align: 0.3em;
+  background: currentColor;
+}
+.catchword a:hover {
+  color: var(--sanguine);
+}
+.roman-date {
+  font-variant-numeric: lining-nums;
+  letter-spacing: 0.02em;
+}
+
+/* ── Turning a leaf: the page that is left fades, the one come to takes its place; the head of the library holds
+   still above them ──────────────────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+  .masthead {
+    view-transition-name: masthead;
+  }
+  ::view-transition-old(root) {
+    animation: leaf-away 0.14s ease-in both;
+  }
+  ::view-transition-new(root) {
+    animation: leaf-come 0.26s ease-out both;
+  }
+  @keyframes leaf-away {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes leaf-come {
+    from {
+      opacity: 0;
+    }
+  }
 }
 
 /* ── Footer and edition switcher ──────────────────────────────────────────────────────────────────────────── */
