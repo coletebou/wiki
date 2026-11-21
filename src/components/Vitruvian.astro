@@ -1,9 +1,14 @@
 ---
 // The frontispiece: Leonardo's Vitruvian man himself, traced from the sheet in Venice (scripts/trace-vitruvian.mjs
 // made src/assets/vitruvian-man.svg from a public-domain photograph of it): the man in his two poses, the circle and
-// the square, Leonardo's own mirror writing above and his scale beneath. Nothing is drawn over him. His instruments
-// stand round him in the margins, old and new: dividers, a terminal, wheels in mesh, and a cord that runs from the
-// corner of his square to a plug. Ornament only: hidden from assistive technology.
+// the square, Leonardo's own mirror writing above and his scale beneath. Nothing is drawn over him. In the margins
+// round him stand four of his machines, traced the same way from his notebooks (scripts/trace-leonardo.mjs): a
+// geometric game of circles in a hexagon, the flying machine a man stands in, the winch's wheels in mesh, and the
+// spit that the smoke of a fire turns by itself. Ornament only: hidden from assistive technology.
+import geometria from '../assets/leonardo/geometria.svg?url';
+import rotae from '../assets/leonardo/rotae.svg?url';
+import veru from '../assets/leonardo/veru.svg?url';
+import volatus from '../assets/leonardo/volatus.svg?url';
 import sheet from '../assets/vitruvian-man.svg?url';
 
 type P = [number, number];
@@ -19,123 +24,16 @@ const NAVEL: P = [CX, FOOT - R];
 const SHEET = { w: 1056, h: 1180, navel: [529.8, 608.7] as P, radius: 484.2 };
 const K = SHEET.radius / R;
 
-function add(a: P, b: P): P {
-  return [a[0] + b[0], a[1] + b[1]];
-}
-function sub(a: P, b: P): P {
-  return [a[0] - b[0], a[1] - b[1]];
-}
-function mul(a: P, k: number): P {
-  return [a[0] * k, a[1] * k];
-}
-function len(a: P) {
-  return Math.hypot(a[0], a[1]);
-}
-function unit(a: P): P {
-  return mul(a, 1 / (len(a) || 1));
-}
-const dot = (a: P, b: P) => a[0] * b[0] + a[1] * b[1];
 const r1 = (n: number) => Math.round(n * 10) / 10;
-const xy = (p: P) => `${r1(p[0])} ${r1(p[1])}`;
-const poly = (pts: P[]) => `M${pts.map(xy).join('L')}Z`;
-const along = (p: P, q: P, t: number): P => add(p, mul(sub(q, p), t));
 const frame = `translate(${r1(SHEET.navel[0] - NAVEL[0] * K)} ${r1(SHEET.navel[1] - NAVEL[1] * K)}) scale(${K.toFixed(3)})`;
-const SQ = { x: CX - S / 2, y: TOP, s: S };
-
-/** Parallel strokes across a box, at an angle: the hatching a shaded side is clipped out of. */
-function strokes(box: [number, number, number, number], gap: number, deg: number, jitter = 0.3) {
-  const a = (deg * Math.PI) / 180;
-  const v: P = [Math.cos(a), Math.sin(a)];
-  const u: P = [-v[1], v[0]];
-  const [x0, y0, x1, y1] = box;
-  const corners: P[] = [[x0, y0], [x1, y0], [x0, y1], [x1, y1]];
-  const cs = corners.map((c) => dot(c, u));
-  const ls = corners.map((c) => dot(c, v));
-  const [cmin, cmax, lmin, lmax] = [Math.min(...cs), Math.max(...cs), Math.min(...ls), Math.max(...ls)];
-  let d = '';
-  let i = 0;
-  for (let c = cmin; c <= cmax; c += gap, i++) {
-    const cc = c + Math.sin(i * 1.7) * jitter;
-    const p = add(mul(u, cc), mul(v, lmin));
-    const q = add(mul(u, cc), mul(v, lmax));
-    d += `M${xy(p)}L${xy(q)}`;
-  }
-  return d;
-}
-
-/** A toothed wheel, as Leonardo drew them: a rim of square teeth, a hub, spokes. */
-function wheel(c: P, r: number, teeth: number, phase = 0, th = 3.4) {
-  const pts: P[] = [];
-  for (let i = 0; i < teeth; i++) {
-    const a0 = phase + (i / teeth) * Math.PI * 2;
-    const w = (Math.PI * 2) / teeth;
-    for (const [f, rr] of [[0, r], [0.12, r + th], [0.45, r + th], [0.57, r]] as const) pts.push(add(c, [Math.cos(a0 + f * w) * rr, Math.sin(a0 + f * w) * rr]));
-  }
-  const spokes = Array.from({ length: 4 }, (_, i) => {
-    const a = phase + (i * Math.PI) / 2 + 0.3;
-    return `M${xy(add(c, [Math.cos(a) * 3.2, Math.sin(a) * 3.2]))}L${xy(add(c, [Math.cos(a) * (r - 3.4), Math.sin(a) * (r - 3.4)]))}`;
-  }).join('');
-  // The inner ring as two half circles: an arc that ends where it starts is not drawn at all.
-  return { rim: poly(pts), inner: `M${xy(add(c, [r - 3, 0]))}A${r - 3} ${r - 3} 0 0 1 ${xy(add(c, [3 - r, 0]))}A${r - 3} ${r - 3} 0 0 1 ${xy(add(c, [r - 3, 0]))}`, spokes, hub: c };
-}
-// In mesh: the centres a pitch radius apart (each wheel's root plus half its teeth).
-const bigWheel = wheel([33, 338], 17, 16, 0.1);
-const smallWheel = wheel([33 + 30 * Math.cos((-76 * Math.PI) / 180), 338 + 30 * Math.sin((-76 * Math.PI) / 180)], 9.6, 9, 0.45);
-// A coiled cord from the square's corner, as a spring is drawn, ending in a plug.
-const coil = (() => {
-  const start: P = [SQ.x + S + 0.5, 336];
-  const end: P = [372, 382];
-  const d0 = sub(end, start);
-  const L = len(d0);
-  const v = unit(d0);
-  const n: P = [-v[1], v[0]];
-  const turns = 9;
-  const pts: P[] = [];
-  for (let i = 0; i <= turns * 12; i++) {
-    const t = i / (turns * 12);
-    const ph = t * turns * Math.PI * 2;
-    const env = Math.min(1, t * 8, (1 - t) * 8);
-    const base = add(start, mul(v, t * L));
-    pts.push(add(base, add(mul(n, Math.sin(ph) * 4.2 * env), mul(v, -Math.cos(ph) * 2.6 * env))));
-  }
-  return { d: `M${pts.map(xy).join('L')}`, end, v, n };
-})();
-const plug = (() => {
-  const { end, v, n } = coil;
-  const q = (a: number, b: number): P => add(end, add(mul(v, a), mul(n, b)));
-  return {
-    body: poly([q(0, -3.4), q(10, -4), q(10, 4), q(0, 3.4)]),
-    pins: `M${xy(q(10, -2))}L${xy(q(15.5, -2))}M${xy(q(10, 2))}L${xy(q(15.5, 2))}M${xy(q(3, -3.6))}L${xy(q(3, 3.6))}`,
-    shade: poly([q(0.6, 1), q(9.6, 1.2), q(9.6, 3.6), q(0.6, 3)]),
-  };
-})();
-// Dividers, opened to the circle's radius scaled down, as if just lifted from the sheet.
-const dividers = (() => {
-  const hinge: P = [44, 60];
-  const tipA: P = [22, 126];
-  const tipB: P = [68, 120];
-  const leg = (tip: P, s: 1 | -1) => {
-    const d = unit(sub(tip, hinge));
-    const n: P = mul([-d[1], d[0]], s);
-    const a = add(hinge, mul(n, 2.6));
-    const b = add(hinge, mul(n, -2.6));
-    const m = along(hinge, tip, 0.82);
-    return { outline: poly([a, add(m, mul(n, 1.4)), tip, add(m, mul(n, -1.4)), b]), center: `M${xy(along(hinge, tip, 0.12))}L${xy(along(hinge, tip, 0.8))}`, shade: poly([hinge, add(m, mul(n, s === 1 ? -1.3 : 1.3)), tip, m]) };
-  };
-  return { hinge, tipA, tipB, legs: [leg(tipA, 1), leg(tipB, -1)], scribe: `M${xy(add(tipA, [-1, 2]))}A70 70 0 0 0 ${xy(add(tipB, [2, 2.5]))}` };
-})();
-// A little terminal, drawn in perspective in the upper margin, its screen lit with the same prompt.
-const crt = {
-  front: 'M338 74.5C338 72.5 339.5 71 341.5 71H378.5C380.5 71 382 72.5 382 74.5V104.5C382 106.5 380.5 108 378.5 108H341.5C339.5 108 338 106.5 338 104.5Z',
-  screen: 'M343.2 77.4C350 76.2 370 76.2 376.8 77.4C377.8 84 377.8 95 376.8 101.6C370 102.8 350 102.8 343.2 101.6C342.2 95 342.2 84 343.2 77.4Z',
-  side: 'M382 74.5L392.5 68.2V98.6L382 104.5',
-  top: 'M341.5 71L352.4 65.2H389.8C391.6 65.2 392.6 66.4 392.5 68.2L382 74.5',
-  stand: 'M355 108L353.4 113.4H366.6L365 108M347 116.6C347 114.6 351 113.4 360 113.4S373 114.6 373 116.6C373 118.2 368 119 360 119S347 118.2 347 116.6Z',
-  sideShade: 'M382.4 75L392.1 69V98.4L382.4 104Z',
-  prompt: 'M347.6 85.4L352 88.8L347.6 92.2',
-  cursor: 'M354.2 92.6H359.4',
-  rows: 'M347.6 96.6H366.2M347.6 81.2H360',
-};
+// The four machines, each in a box in the frame's units (x, y, width, height), clear of Leonardo's handwriting and of
+// the circle, with its name beneath. The traced drawings are masks the ink shows through, as the sheet is.
+const MACHINES = [
+  { name: 'geometria', url: geometria, box: [-26, 106, 64, 64] },
+  { name: 'volatus', url: volatus, box: [356, 106, 76, 68] },
+  { name: 'rotae', url: rotae, box: [-30, 284, 74, 69] },
+  { name: 'veru', url: veru, box: [356, 292, 40, 94] },
+] as const;
 ---
 <script is:inline>
   // The drawing draws itself on the first visit of a session; after that it is simply there.
@@ -146,55 +44,22 @@ const crt = {
 </script>
 <div class="vitruvian" aria-hidden="true">
   <div class="vt-sheet" style={`--sheet: url("${sheet}")`}></div>
-  <svg class="vt-over" viewBox={`0 0 ${SHEET.w} ${SHEET.h}`} fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+  <svg class="vt-over" viewBox={`0 0 ${SHEET.w} ${SHEET.h}`} focusable="false">
     <defs>
-      <clipPath id="vt-instruments">
-        {dividers.legs.map((l) => <path d={l.shade} />)}
-        <path d={crt.sideShade} />
-        <path d={plug.shade} />
-      </clipPath>
+      {MACHINES.map(({ name, url, box: [x, y, w, h] }) => (
+        <mask id={`vt-${name}`} maskUnits="userSpaceOnUse" x={x} y={y} width={w} height={h} style="mask-type: alpha">
+          <image href={url} x={x} y={y} width={w} height={h} preserveAspectRatio="xMidYMid meet" />
+        </mask>
+      ))}
     </defs>
     <g transform={frame}>
-      <!-- The instruments stand in the margins of the sheet, clear of Leonardo's handwriting. -->
       <g class="vt-margin" style="--d: 2.2s">
-        <g class="instrument" transform="translate(-34 52) translate(45 95) scale(0.74) translate(-45 -95)">
-          <path class="shade-fill" clip-path="url(#vt-instruments)" d={strokes([14, 54, 74, 130], 1.6, 58, 0)} />
-          {dividers.legs.map((l) => <path d={l.outline} />)}
-          {dividers.legs.map((l) => <path class="fine" d={l.center} />)}
-          <circle cx={dividers.hinge[0]} cy={dividers.hinge[1]} r="4.4" class="paper" />
-          <circle cx={dividers.hinge[0]} cy={dividers.hinge[1]} r="1.3" />
-          <path d={`M${dividers.hinge[0]} ${dividers.hinge[1] - 4.4}V${dividers.hinge[1] - 11}M${dividers.hinge[0] - 2.4} ${dividers.hinge[1] - 11}h4.8`} />
-          <path class="chalk" d={dividers.scribe} />
-          <text class="label" x="45" y="140" text-anchor="middle">circinus</text>
-        </g>
-        <g class="instrument" transform="translate(22 52) translate(365 92) scale(0.74) translate(-365 -92)">
-          <path class="shade-fill" clip-path="url(#vt-instruments)" d={strokes([380, 64, 395, 108], 1.6, 58, 0)} />
-          <path class="paper" d={crt.front} />
-          <path d={crt.top} />
-          <path d={crt.side} />
-          <path d={crt.screen} />
-          <path d={crt.stand} />
-          <path class="prompt" d={crt.prompt} />
-          <path class="prompt cursor" d={crt.cursor} />
-          <path class="fine" d={crt.rows} />
-          <text class="label" x="362" y="131" text-anchor="middle">speculum</text>
-        </g>
-        <g class="instrument" transform="translate(-22 -10) translate(35 335) scale(0.74) translate(-35 -335)">
-          <path class="paper" d={bigWheel.rim} />
-          <path class="fine" d={bigWheel.inner + bigWheel.spokes} />
-          <circle cx={bigWheel.hub[0]} cy={bigWheel.hub[1]} r="3" />
-          <path class="paper" d={smallWheel.rim} />
-          <path class="fine" d={smallWheel.inner + smallWheel.spokes} />
-          <circle cx={smallWheel.hub[0]} cy={smallWheel.hub[1]} r="2.4" />
-          <text class="label" x="33" y="371" text-anchor="middle">rotae</text>
-        </g>
-        <g class="instrument" transform="translate(0.8 -16)">
-          <path class="shade-fill" clip-path="url(#vt-instruments)" d={strokes([360, 360, 396, 396], 1.6, 58, 0)} />
-          <path class="fine" d={coil.d} />
-          <path class="paper" d={plug.body} />
-          <path d={plug.pins} />
-          <text class="label" x="352" y="398" text-anchor="middle">nervus</text>
-        </g>
+        {MACHINES.map(({ name, box: [x, y, w, h] }) => (
+          <g class="instrument">
+            <rect x={x} y={y} width={w} height={h} mask={`url(#vt-${name})`} />
+            <text class="label" x={x + w / 2} y={y + h + 9} text-anchor="middle">{name}</text>
+          </g>
+        ))}
       </g>
     </g>
   </svg>
@@ -230,15 +95,10 @@ const crt = {
     height: 100%;
     overflow: visible;
   }
-  .vt-over text {
+  .vt-over text,
+  .vt-over rect {
     fill: currentColor;
     stroke: none;
-  }
-  .vt-margin .chalk {
-    stroke: var(--sanguine-2);
-    stroke-width: 0.6;
-    stroke-dasharray: 1.6 2.2;
-    opacity: 0.85;
   }
   .vitruvian .label {
     font-family: var(--font-text);
@@ -246,26 +106,7 @@ const crt = {
     font-size: 7.5px;
     opacity: 0.8;
   }
-  .vt-margin .prompt {
-    stroke: var(--sanguine);
-    stroke-width: 1;
-  }
-  .vt-margin path,
-  .vt-margin circle {
-    stroke-width: 0.75;
-  }
-  .vt-margin .fine {
-    stroke-width: 0.45;
-  }
-  .vt-margin .shade-fill {
-    stroke-width: 0.38;
-  }
-  .vt-margin .paper {
-    fill: var(--paper);
-  }
-  .vt-margin .instrument {
-    opacity: 0.85;
-  }
+
   @media (max-width: 63.99rem) {
     /* A narrow screen has no margin for the instruments to stand in: they need the drawing's width and half as
        much again, or the edge of the leaf cuts them. */
@@ -291,10 +132,6 @@ const crt = {
       opacity: 0;
       animation: vt-fade 1.1s ease var(--d, 1.2s) forwards;
     }
-    .vt-margin .cursor {
-      /* A few blinks, then still: nothing on the page keeps blinking. */
-      animation: vt-blink 1.1s steps(1) 3.6s 4;
-    }
     @keyframes vt-unveil {
       from {
         clip-path: circle(0% at 50.2% 51.6%);
@@ -306,11 +143,6 @@ const crt = {
     @keyframes vt-fade {
       to {
         opacity: 1;
-      }
-    }
-    @keyframes vt-blink {
-      50% {
-        opacity: 0;
       }
     }
   }
