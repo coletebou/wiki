@@ -5,6 +5,12 @@ import '@fontsource/cinzel/400.css';
 import '@fontsource/cinzel/700.css';
 import '@fontsource/italianno/400.css';
 import '@fontsource-variable/jetbrains-mono/wght.css';
+// The four faces every page shows at its head (the wordmark, the navigation, the title), fetched at once and not
+// after the stylesheet that names them has been read.
+import garamond from '@fontsource-variable/eb-garamond/files/eb-garamond-latin-wght-normal.woff2?url';
+import garamondItalic from '@fontsource-variable/eb-garamond/files/eb-garamond-latin-wght-italic.woff2?url';
+import cinzel from '@fontsource/cinzel/files/cinzel-latin-400-normal.woff2?url';
+import cinzelBold from '@fontsource/cinzel/files/cinzel-latin-700-normal.woff2?url';
 import '../styles/tokens.css';
 import 'virtual:materials.css';
 import '../styles/material.css';
@@ -49,6 +55,7 @@ const withFrom = (h: string) => {
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     {canonical ? <link rel="canonical" href={canonical} /> : <meta name="robots" content="noindex" />}
+    {[garamond, garamondItalic, cinzel, cinzelBold].map((font) => <link rel="preload" as="font" type="font/woff2" href={font} crossorigin />)}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
