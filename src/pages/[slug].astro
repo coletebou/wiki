@@ -55,7 +55,7 @@ const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
       <div class="margin-inner"><Capitula variant="margin" headings={headings} /></div>
       <article class="text-block" data-pagefind-body data-pagefind-filter={`table:${table.title}`} data-folio-slug={page.id} data-folio-title={title} data-folio-label={folioLabel(folio)}>
         <header>
-          <p class="kicker"><a href={`/pinakes/#table-${table.id}`}><Device table={table.id} />Table {table.numeral} · {table.title}</a></p>
+          <p class="kicker" data-pagefind-ignore><a href={`/pinakes/#table-${table.id}`}><Device table={table.id} />Table {table.numeral} · {table.title}</a></p>
           <h1 class="title" data-pagefind-meta="title">{title}</h1>
           <InkStroke seed={folio} />
           <p class="summary">{summary}</p>
@@ -64,8 +64,10 @@ const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
             {citedBy.length > 0 && <a href="#cited-by">cited by {citedBy.length}</a>}
             <button type="button" class="resume" data-resume hidden></button>
           </p>
-          <span hidden data-pagefind-meta="folio">{folioLabel(folio)}</span>
-          <span hidden data-pagefind-meta="table">{table.title}</span>
+          {/* The seeker's labels for a result, as attributes: text here would be indexed as part of the folio. */}
+          <span hidden data-pagefind-meta={`folio:${folioLabel(folio)}`}></span>
+          <span hidden data-pagefind-meta={`table:${table.title}`}></span>
+          <span hidden data-pagefind-meta={`device:${table.id}`}></span>
         </header>
         <Capitula variant="inline" headings={headings} />
         <div class="prose">
