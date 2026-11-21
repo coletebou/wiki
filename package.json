@@ -20,6 +20,7 @@
     "e2e": "node test/e2e/run.mjs",
     "audit:a11y": "node test/e2e/a11y.mjs",
     "audit:contrast": "node test/e2e/contrast.mjs",
+    "audit:overflow": "node test/e2e/overflow.mjs",
     "check": "npm run check:content && npm run check:safety && npm test"
   },
   "dependencies": {
