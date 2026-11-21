@@ -19,8 +19,12 @@ const state = () =>
     search: location.search,
     offered: !document.querySelector('.pinax-find').hidden,
   }));
-// The address is written when the typing pauses.
-const settle = () => p.waitForTimeout(450);
+// The address is written when the typing pauses: wait until it says what the box says (a fixed pause lost the
+// race on a loaded machine), and give up after a few seconds so a finder that never writes it fails the check.
+const settle = () =>
+  p
+    .waitForFunction(() => (new URLSearchParams(location.search).get('find') ?? '') === document.querySelector('#pinax-find').value, null, { timeout: 4000 })
+    .catch(() => {});
 
 await p.goto(`${base}/pinakes/`, { waitUntil: 'networkidle' });
 let s = await state();

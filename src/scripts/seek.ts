@@ -1,8 +1,9 @@
 // The seeker: full-text search over every folio, from the Pagefind index built alongside the site.
 // The dialog opens with "/", Ctrl-K or Cmd-K, or any [data-seek] button; the search page runs the same engine inline.
+import { fold, titleFit } from '../../lib/fit.mjs';
 import { lately, readLink } from './lately';
 
-type PagefindData = { url: string; excerpt: string; meta: { title?: string; folio?: string; table?: string } };
+type PagefindData = { url: string; excerpt: string; meta: { title?: string; folio?: string; table?: string; device?: string } };
 type PagefindResult = { id: string; data: () => Promise<PagefindData> };
 type Pagefind = {
   options: (o: Record<string, unknown>) => Promise<void>;
@@ -21,6 +22,64 @@ function load(): Promise<Pagefind | null> {
     })
     .catch(() => null);
   return pagefind;
+}
+
+// The tables' devices, drawn once at build time; fetched on the first search and set beside each result's folio.
+let devices: Promise<Record<string, string>> | null = null;
+const loadDevices = () => (devices ??= fetch('/devices.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
+
+function device(markup: string | undefined): SVGSVGElement | null {
+  if (!markup) return null;
+  const holder = document.createElement('span');
+  // The drawings are the site's own build output, never anything a reader typed.
+  holder.innerHTML = `<svg class="device" viewBox="-56 -56 112 112" aria-hidden="true" focusable="false"><g class="emblem">${markup}</g></svg>`;
+  return holder.querySelector('svg');
+}
+
+/**
+ * The excerpt as it is to be read under its title. The index reads a folio from its title down, so an excerpt near
+ * the top opens by repeating the title just shown above it: that is cut. An excerpt that starts or stops in the
+ * middle of a sentence is marked so with an ellipsis.
+ */
+function excerpt(html: string, title: string): HTMLSpanElement {
+  const span = document.createElement('span');
+  span.className = 'r-excerpt';
+  // Pagefind builds the excerpt from page text it has already escaped, adding only <mark> around matches.
+  span.innerHTML = html;
+  const text = span.textContent ?? '';
+  const head = text.match(/^\s*/)![0].length;
+  let cut = head;
+  if (title && fold(text.slice(head, head + title.length)) === fold(title)) {
+    cut = head + title.length;
+    cut += text.slice(cut).match(/^[\s.:;,·]*/)![0].length;
+  }
+  if (cut > 0) drop(span, cut);
+  const rest = (span.textContent ?? '').trimEnd();
+  if (/^[a-z,;:)]/.test(rest)) span.prepend('…');
+  if (rest && !/[.!?:”)]$/.test(rest)) span.append('…');
+  return span;
+}
+
+/** Removes the first n characters of an element's text, across its text nodes, and any element they leave empty. */
+function drop(el: Element, n: number) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let left = n;
+  const emptied: Node[] = [];
+  for (let node = walker.nextNode(); node && left > 0; node = walker.nextNode()) {
+    const len = node.nodeValue?.length ?? 0;
+    if (len <= left) {
+      emptied.push(node);
+      left -= len;
+    } else {
+      node.nodeValue = node.nodeValue!.slice(left);
+      left = 0;
+    }
+  }
+  for (const node of emptied) {
+    const parent = node.parentNode;
+    node.parentNode?.removeChild(node);
+    if (parent && parent !== el && !parent.textContent) (parent as Element).remove();
+  }
 }
 
 /** Wire a query box to a results list. Returns a function that runs a query. */
@@ -105,8 +164,13 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
       empty(`Nothing in the library matches “${q}”.`);
       return;
     }
-    const items = await Promise.all(search.results.slice(0, 12).map((r) => r.data()));
+    const [found, drawings] = await Promise.all([Promise.all(search.results.slice(0, 20).map((r) => r.data())), loadDevices()]);
     if (mine !== asked) return;
+    const items = found
+      .map((d, i) => ({ d, i, fit: titleFit(d.meta.title ?? '', q) }))
+      .sort((a, b) => b.fit - a.fit || a.i - b.i)
+      .slice(0, 12)
+      .map(({ d }) => d);
     const nodes = items.map((d) => {
       const a = document.createElement('a');
       a.href = d.url;
@@ -115,12 +179,10 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
       title.textContent = d.meta.title ?? d.url;
       const meta = document.createElement('span');
       meta.className = 'r-meta';
-      meta.textContent = [d.meta.folio, d.meta.table].filter(Boolean).join(' · ');
-      const excerpt = document.createElement('span');
-      excerpt.className = 'r-excerpt';
-      // Pagefind builds the excerpt from page text it has already escaped, adding only <mark> around matches.
-      excerpt.innerHTML = d.excerpt;
-      a.append(title, meta, excerpt);
+      const mark = device(d.meta.device && drawings[d.meta.device]);
+      if (mark) meta.append(mark);
+      meta.append([d.meta.table, d.meta.folio].filter(Boolean).join(', '));
+      a.append(title, meta, excerpt(d.excerpt, d.meta.title ?? ''));
       return row(a);
     });
     show('Results', nodes);
