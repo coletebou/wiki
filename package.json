@@ -17,6 +17,9 @@
     "check:links": "node scripts/check-links.mjs dist",
     "safety:denylist": "node scripts/denylist.mjs",
     "test": "node --test test/*.test.mjs",
+    "e2e": "node test/e2e/run.mjs",
+    "audit:a11y": "node test/e2e/a11y.mjs",
+    "audit:contrast": "node test/e2e/contrast.mjs",
     "check": "npm run check:content && npm run check:safety && npm test"
   },
   "dependencies": {
@@ -33,7 +36,9 @@
   },
   "devDependencies": {
     "@mdx-js/mdx": "3.1.1",
+    "axe-core": "4.14.1",
     "github-slugger": "2.0.0",
+    "playwright-core": "1.65.1",
     "satteri": "0.10.5"
   }
 }
