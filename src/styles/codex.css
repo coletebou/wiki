@@ -907,6 +907,46 @@ kbd {
   text-decoration-thickness: 1px;
   text-underline-offset: 0.16em;
 }
+/* Citations, table by table: the table's device and name, then its folios run on in a line. */
+.verso .by-table > li {
+  margin: 0 0 0.85rem;
+}
+.verso .verso-table {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.1rem;
+  font-variant-caps: all-small-caps;
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+.verso .verso-table .device {
+  width: 1.5em;
+  height: 1.5em;
+  flex: none;
+  overflow: visible;
+  color: var(--ink-2);
+}
+.verso .verso-table .device :is(path, circle) {
+  stroke-width: 1.35;
+}
+.verso .verso-table .device :is(.fine, .sand, .shine) {
+  stroke-width: 0.85;
+}
+.verso .by-table ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.1rem 1.1rem;
+}
+.verso .by-table ul li {
+  margin: 0;
+}
+.verso .by-table ul small {
+  display: inline;
+  font-style: italic;
+  white-space: nowrap;
+}
 .verso .empty {
   color: var(--ink-3);
   font-style: italic;
