@@ -5,22 +5,29 @@ import Leaf from '../components/Leaf.astro';
 import Manicule from '../components/Manicule.astro';
 import Vitruvian from '../components/Vitruvian.astro';
 import Wordmark from '../components/Wordmark.astro';
-import { emblem } from '../diagrams/emblems';
+import clavis from '../assets/leonardo/clavis.svg?url';
+import flumen from '../assets/leonardo/flumen.svg?url';
+import geometria from '../assets/leonardo/geometria.svg?url';
+import porta from '../assets/leonardo/porta.svg?url';
+import veru from '../assets/leonardo/veru.svg?url';
+import volano from '../assets/leonardo/volano.svg?url';
 import Base from '../layouts/Base.astro';
 import { href, incipit, tableOf, wiki } from '../lib/wiki';
 import '../styles/frontispiece.css';
 
 const { pages, tables, graph, bySlug } = await wiki();
 const start = bySlug.get('how-to-be-a-beast');
-// Each study with the emblem of its own Latin motto: of keys, of machines, of trees, of rivers, of gates, of the balance.
+// Each study with one of Leonardo's own drawings for its Latin motto, traced from his notebooks
+// (scripts/trace-leonardo.mjs): the keyboard of his viola organista, the spit that turns itself, a press whose arms all
+// run from one spindle, water running past an obstacle, a door's lock, and a game of equal areas.
 const studies = (
   [
-    { slug: 'tmux-keymap', name: 'The tmux keymap', note: 'Every binding on a drawn keyboard, prefix and Alt layers.', emblem: 'clavis', motto: 'de clavibus' },
-    { slug: 'agent-fleet', name: 'The agent fleet', note: 'Hooks, messages, handoffs, parking and the shared brain.', emblem: 'rotae', motto: 'de machinis' },
-    { slug: 'parallel-worktrees', name: 'Worktree fan-out', note: 'One repository, many branches, an agent in each.', emblem: 'arbor', motto: 'de arboribus' },
-    { slug: 'observability', name: 'The observability path', note: 'Where every trace, error, log and archive flows.', emblem: 'vortex', motto: 'de fluminibus' },
-    { slug: 'cloudflare-front-door', name: 'The Cloudflare front door', note: 'A request’s passage from DNS to origin.', emblem: 'porta', motto: 'de portis' },
-    { slug: 'what-it-costs', name: 'What it costs', note: 'A calculator over every price, each with its date.', emblem: 'libra', motto: 'de sumptibus' },
+    { slug: 'tmux-keymap', name: 'The tmux keymap', note: 'Every binding on a drawn keyboard, prefix and Alt layers.', sketch: clavis, motto: 'de clavibus' },
+    { slug: 'agent-fleet', name: 'The agent fleet', note: 'Hooks, messages, handoffs, parking and the shared brain.', sketch: veru, motto: 'de machinis' },
+    { slug: 'parallel-worktrees', name: 'Worktree fan-out', note: 'One repository, many branches, an agent in each.', sketch: volano, motto: 'de arboribus' },
+    { slug: 'observability', name: 'The observability path', note: 'Where every trace, error, log and archive flows.', sketch: flumen, motto: 'de fluminibus' },
+    { slug: 'cloudflare-front-door', name: 'The Cloudflare front door', note: 'A request’s passage from DNS to origin.', sketch: porta, motto: 'de portis' },
+    { slug: 'what-it-costs', name: 'What it costs', note: 'A calculator over every price, each with its date.', sketch: geometria, motto: 'de sumptibus' },
   ] as const
 ).filter((s) => bySlug.has(s.slug));
 const recent = [...pages].sort((a, b) => b.data.updated.valueOf() - a.data.updated.valueOf() || a.data.folio - b.data.folio).slice(0, 8);
@@ -89,7 +96,7 @@ const cited = [...pages]
                 return (
                   <li>
                     <a class="plate" href={href(s.slug)}>
-                      <svg viewBox="-56 -56 112 112" aria-hidden="true" focusable="false"><g class="emblem" set:html={emblem({ name: s.emblem, x: 0, y: 0, size: 100 }, `plate-${s.slug}`)} /></svg>
+                      <span class="plate-sketch" aria-hidden="true" style={`--m: url("${s.sketch}")`}></span>
                       <span class="plate-motto" aria-hidden="true">{s.motto}</span>
                       <span class="plate-name">{s.name}</span>
                       <span class="plate-note">{s.note}</span>
