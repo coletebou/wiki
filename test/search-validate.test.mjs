@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createProcessor } from '@mdx-js/mdx';
 import { buildIndex, search } from '../lib/search.mjs';
-import { incipit, stichoi } from '../lib/text.mjs';
+import { incipit, plainText, stichoi } from '../lib/text.mjs';
 import { validatePages } from '../lib/validate.mjs';
 
 const pages = [
@@ -21,7 +21,16 @@ test('search ranks title matches first and completes the last word', () => {
 
 test('incipit and stichoi', () => {
   assert.equal(incipit('First words of the lede, which go on and on for a while longer than eleven.\n\n## Next', 5), 'First words of the lede…');
-  assert.equal(stichoi('x'.repeat(72)), 2);
+  assert.equal(stichoi('x'.repeat(72)), 2);});
+
+test('inline code keeps its words; code blocks and comments do not', () => {
+  // A lede that opens with a command name keeps it, as the reader sees it.
+  assert.equal(incipit('`tm` is the way back into a session.', 4), 'tm is the way…');
+  assert.equal(incipit('{/* note */}\n\n``yu`` starts Claude.'), 'yu starts Claude');
+  // Nothing inside code is read as a link or as markup.
+  assert.equal(plainText('Run `[[not-a-link]]` and `a|b` or `*x*`.'), 'Run [[not-a-link]] and a|b or *x*.');
+  assert.equal(plainText('Before.\n\n```sh\necho hidden\n```\n\nAfter.'), 'Before. After.');
+  assert.equal(plainText('Words. {/* a comment */} More.'), 'Words. More.');
 });
 
 test('validatePages enforces the rules CI enforces', async () => {
