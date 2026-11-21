@@ -1,24 +1,31 @@
 ---
-// The illuminated initial that opens a folio: a capital of gold on a white-vine panel (lib/illumination.mjs).
-// Ornament only. The letter itself stays in the text; this is drawn where its ink would be.
-import { letterFit, whiteVine } from '../../lib/illumination.mjs';
+// The initial that opens a folio: the letter as Luca Pacioli built it with compass and ruler for De divina
+// proportione (1509), in its square, with the circles and ruled lines that made it drawn lighter behind it. Traced from
+// the woodcuts (scripts/trace-pacioli.mjs, scripts/set-pacioli.mjs) and shown as masks the page's own ink shows
+// through, like the name on the frontispiece and Leonardo's man beneath it. Pacioli has no J, U or W: I and V serve,
+// as Renaissance printers set them, and W is two V's crossed. Ornament only. The letter itself stays in the text;
+// this is drawn where its ink would be.
+import boxes from '../assets/pacioli/initials/index.json';
 
 interface Props {
   letter: string;
-  /** The folio number: each folio's vine grows its own way. */
-  seed: number;
-  /** How far below the panel the margin stays clear, in panel units: the spray runs no further. */
-  room?: number;
 }
-const { letter, seed, room } = Astro.props;
-const v = whiteVine({ seed, id: `f${seed}`, room });
-const fit = letterFit(letter);
+const files = import.meta.glob<string>('../assets/pacioli/initials/*.svg', { query: '?url', import: 'default', eager: true });
+const { letter } = Astro.props;
+const name = ({ J: 'I', U: 'V' } as Record<string, string>)[letter] ?? letter;
+const box = (boxes as Record<string, number[]>)[name];
+const url = (layer: string) => files[`../assets/pacioli/initials/${name}-${layer}.svg`];
+// The square and its margin are 896 units across: the initial is as wide as that, and wider where the letter is.
+const SQUARE = 896;
 ---
-<svg class="initial" viewBox="0 0 100 100" aria-hidden="true" focusable="false" data-pagefind-ignore>
-  <defs set:html={v.defs} />
-  <g clip-path={`url(#${v.clip})`} set:html={v.panel} />
-  <rect class="il-frame-line" x="2" y="2" width="96" height="96" />
-  <rect class="il-frame-gold" x="3.4" y="3.4" width="93.2" height="93.2" />
-  <text class="il-letter" x="50" y={fit.y} font-size={fit.size} text-anchor="middle" fill={`url(#${v.gold})`}>{letter}</text>
-  <g class="il-spray" set:html={v.spray} />
-</svg>
+{box && (
+  <span
+    class="initial"
+    aria-hidden="true"
+    data-pagefind-ignore
+    style={`--w: ${(box[2] / SQUARE).toFixed(4)}; --ar: ${box[2]} / ${box[3]}; --lead: ${((-box[1] - 48) / SQUARE).toFixed(4)}`}
+  >
+    <span class="initial-construction" style={`--m: url("${url('construction')}")`}></span>
+    <span class="initial-letter" style={`--m: url("${url('letter')}")`}></span>
+  </span>
+)}

@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { footOf, pile, pileRows } from '../lib/armarium.mjs';
-import { headpiece } from '../lib/illumination.mjs';
 
 test('a pile holds every roll once, in order', () => {
   for (let n = 0; n <= 60; n++) {
@@ -51,12 +50,4 @@ test('a table with more folios gets a wider foot of smaller rolls, up to nine', 
   assert.equal(footOf(500), 9);
   // With the foot it is given, a pile of up to forty-five rolls is still a triangle.
   for (let n = 1; n <= 45; n++) assert.ok(pileRows(n, footOf(n)).length <= footOf(n), `${n} rolls`);
-});
-
-test('a headpiece is whole and as long as its curls', () => {
-  const band = headpiece({ seed: 1, count: 22 });
-  assert.equal(band.width, 22 * 74);
-  assert.ok(!/NaN|undefined|Infinity/.test(band.markup));
-  assert.equal((band.markup.match(/class="il-(rose|green)"/g) ?? []).length, 22);
-  assert.equal(headpiece({ seed: 1, count: 22 }).markup, band.markup);
 });

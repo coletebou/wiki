@@ -121,5 +121,21 @@ const path = (p) => new URL(p.url()).pathname;
   ok('a second touch opens it', path(p) === '/tmux/', path(p));
   await p.context().close();
 }
+// 8. A folio's initial is Pacioli's letter, drawn in both layers and hidden from assistive technology, and the text
+// still begins with the letter it stands for. WSL opens on a W, which Pacioli never drew: it is made of two V's.
+{
+  const p = await open();
+  await p.goto(`${base}/wsl/`, { waitUntil: 'networkidle' });
+  const s = await p.evaluate(() => {
+    const i = document.querySelector('.prose > .initial');
+    const layers = [...(i?.children ?? [])].map((e) => getComputedStyle(e).maskImage || getComputedStyle(e).webkitMaskImage || '');
+    const box = i?.getBoundingClientRect();
+    return { hidden: i?.getAttribute('aria-hidden'), layers: layers.map((m) => /W-(letter|construction)/.test(m)), w: Math.round(box?.width ?? 0), h: Math.round(box?.height ?? 0), text: i?.nextElementSibling?.textContent?.slice(0, 3) };
+  });
+  ok('the initial is drawn, letter and construction, and hidden', s.hidden === 'true' && s.layers.length === 2 && s.layers.every(Boolean) && s.w > 40 && s.h > 40, JSON.stringify(s));
+  ok('and the text still begins with its letter', s.text === 'WSL', JSON.stringify(s));
+  await p.context().close();
+}
+
 console.log('page errors:', errs);
 await b.close();

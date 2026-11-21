@@ -1,6 +1,6 @@
 ---
 import { render } from 'astro:content';
-import { initialOf, sprayRoom } from '../../lib/illumination.mjs';
+import { initialOf } from '../../lib/illumination.mjs';
 import { folioLabel } from '../../lib/schema.mjs';
 import Capitula from '../components/Capitula.astro';
 import Device from '../components/Device.astro';
@@ -71,7 +71,7 @@ const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
         </header>
         <Capitula variant="inline" headings={headings} />
         <div class="prose">
-          {initial && <Initial letter={initial} seed={folio} room={sprayRoom(page.body ?? '')} />}
+          {initial && <Initial letter={initial} />}
           <Content components={{ ColesTake, Price, Diagram, table: Table }} />
         </div>
         {next && catchword && (
