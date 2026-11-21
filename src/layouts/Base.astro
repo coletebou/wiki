@@ -82,6 +82,18 @@ const withFrom = (h: string) => {
         } catch {}
         document.documentElement.dataset.theme = t;
       })();
+      // Turning a leaf cross-fades. A turn cut short is simply not faded: the reader turned again before the leaf
+      // had come up, or came to the lot-drawing page, which sends its reader on before it is ever shown. The
+      // browser reports a fade cut short as an error on the page, which it is not; such reports, and only those,
+      // are taken here.
+      addEventListener('pageswap', (e) => {
+        const to = e.activation && e.activation.entry && e.activation.entry.url ? new URL(e.activation.entry.url).pathname : '';
+        if (e.viewTransition && (to === '/sortes/' || location.pathname === '/sortes/')) e.viewTransition.skipTransition();
+      });
+      addEventListener('unhandledrejection', (e) => {
+        const why = e.reason;
+        if (why && /^(AbortError|InvalidStateError|TimeoutError)$/.test(why.name) && /transition/i.test(why.message || '')) e.preventDefault();
+      });
     </script>
   </head>
   <body>

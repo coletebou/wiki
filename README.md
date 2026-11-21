@@ -17,7 +17,8 @@ People and agents edit it the same way: by pull request. An agent edit that pass
 | `src/data/prices.json` | Every price on the site, with the date it was read and the vendor page it was read on |
 | `lib/` | Shared, dependency-free code: wiki links, the link graph, validation, search, the public-safety lint, and the drawing of the materials (vellum, stone, papyrus, the outlines of the leaf and the roll, the burnt edge), of each folio's illuminated initial, of Attic numerals and Roman dates, and the layout of the planisphere |
 | `mcp/` | The MCP server for agents (stdio) |
-| `scripts/` | Checks: pages, links in the built site, public safety, the deny-list tool; and the tracing of the frontispiece's drawing from a photograph of Leonardo's sheet |
+| `scripts/` | Checks: pages, links in the built site, public safety, the deny-list tool; and how the two committed pictures were made (the frontispiece's drawing, traced from a photograph of Leonardo's sheet, and the share card) |
+| `test/` | Unit tests for `lib/` (`npm test`), and in `test/e2e/` the browser suites and audits |
 | `safety/denylist.json` | Salted hashes of phrases that must never be published |
 | `docs/` | The editing guide, design records and plans |
 | `.github/workflows/` | CI, agent auto-merge, the weekly external link check, the daily agent-branch cleanup |
@@ -35,6 +36,21 @@ npm run build              # the site and its Pagefind index, in dist/
 npm run check:links        # every internal link and anchor in dist/
 node scripts/safety-lint.mjs --dist dist
 ```
+
+The built site can also be driven in real browsers. These checks are not part of CI: they need browsers, which
+`npx playwright-core install chromium webkit firefox` fetches once.
+
+```sh
+npx astro preview --port 4391 &                       # serve dist/
+npm run e2e -- http://127.0.0.1:4391                  # every suite in test/e2e/, in Chromium
+npm run e2e -- http://127.0.0.1:4391 --engine=all     # in Chromium, WebKit and Firefox
+npm run audit:a11y -- http://127.0.0.1:4391           # axe-core, by day and by lamplight
+npm run audit:contrast -- http://127.0.0.1:4391       # every text against the surface as it is painted
+```
+
+The suites cover the reader's keys, the catalogue's finder, the planisphere, the reading ribbon, and the defects found
+after the redesign shipped. The contrast audit matters because the surfaces are textured: a colour that passes
+against the flat paper can fail on its darkest patch, and only the painted page shows that.
 
 ## Agents: the MCP server
 
