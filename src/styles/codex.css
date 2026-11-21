@@ -841,15 +841,21 @@ kbd {
     transition: opacity 0.35s, transform 0.55s cubic-bezier(0.3, 0.1, 0.2, 1);
   }
 }
-.marginalia svg {
+.marginalia .margin-sketch {
+  /* One of Leonardo's machines, traced (Marginalia.astro): a mask the margin's faint ink shows through. */
+  display: block;
   width: 100%;
   max-width: 11rem;
-  overflow: visible;
-  color: var(--ink-3);
-  opacity: 0.5;
+  aspect-ratio: 1;
+  background: var(--ink-3);
+  opacity: 0.55;
+  -webkit-mask: var(--m) center / contain no-repeat;
+  mask: var(--m) center / contain no-repeat;
 }
-.marginalia .emblem .paper {
-  fill: var(--paper);
+@media (forced-colors: active) {
+  .marginalia .margin-sketch {
+    display: none;
+  }
 }
 
 /* ── The verso: back matter of the folio ──────────────────────────────────────────────────────────────────── */
