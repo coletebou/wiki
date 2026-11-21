@@ -1,18 +1,39 @@
 ---
-// Ornament only: lines from Leonardo's notebooks in his mirror-image hand, and small ink studies, in the outer
-// margin. Hidden from assistive technology and never used for content. Point at a line and it turns to face you,
-// and a tag gives its English (src/scripts/sillybos.ts reads the data-gloss attributes).
+// Ornament only: lines from Leonardo's notebooks in his mirror-image hand, and one of his own sketches of a machine,
+// traced from his notebooks (scripts/trace-leonardo.mjs), in the outer margin. Hidden from assistive technology and
+// never used for content. Point at a line and it turns to face you, and a tag gives its English
+// (src/scripts/sillybos.ts reads the data-gloss attributes).
+import cochlea from '../assets/leonardo/cochlea.svg?url';
+import geometria from '../assets/leonardo/geometria.svg?url';
+import rotae from '../assets/leonardo/rotae.svg?url';
+import veru from '../assets/leonardo/veru.svg?url';
+import volano from '../assets/leonardo/volano.svg?url';
+import volatus from '../assets/leonardo/volatus.svg?url';
 import { LINES } from '../data/leonardo';
-import { emblem } from '../diagrams/emblems';
 
 interface Props {
   folio: number;
+  /** The folio's table: each table keeps a sketch of its own kind. */
+  table: string;
 }
-const { folio } = Astro.props;
+const { folio, table } = Astro.props;
 const pick = (i: number) => LINES[(folio * 7 + i * 3) % LINES.length];
-// One of his studies, drawn in the same hand as the studies' emblems: water, wheels, a wing, dividers, the aerial screw.
-const studies = ['vortex', 'rotae', 'ala', 'circinus', 'cochlea'] as const;
-const study = studies[folio % studies.length];
+// Each table's sketch: the aerial screw for the Shell (a shell's own spiral), the spit that turns itself for the
+// Automata, wheels in mesh for the Workshop, the great press for the Works, the flying machine for the Atelier, the
+// game of circles for the Observatory, and so on.
+const SKETCHES = {
+  desk: rotae,
+  shell: cochlea,
+  automata: veru,
+  workshop: rotae,
+  works: volano,
+  observatory: geometria,
+  atelier: volatus,
+  mint: geometria,
+  ledger: volano,
+  library: cochlea,
+} as Record<string, string>;
+const sketch = SKETCHES[table] ?? [cochlea, geometria, rotae, veru, volano, volatus][folio % 6];
 const source = (n?: number) => (n ? `Richter, § ${n}` : 'A plain rendering');
 ---
 <div class="marginalia" aria-hidden="true">
@@ -25,7 +46,7 @@ const source = (n?: number) => (n ? `Richter, § ${n}` : 'A plain rendering');
     m ? (
       <p style={`--tilt: ${m.tilt}`} data-gloss={m.line.it} data-gloss-en={m.line.en} data-gloss-source={source(m.line.richter)}>{m.line.it}</p>
     ) : (
-      <svg viewBox="-56 -56 112 112" focusable="false"><g class="emblem" set:html={emblem({ name: study, x: 0, y: 0, size: 100 }, `margin-${folio}`)} /></svg>
+      <span class="margin-sketch" style={`--m: url("${sketch}")`}></span>
     ),
   )}
 </div>

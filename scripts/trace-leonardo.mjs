@@ -1,5 +1,5 @@
-// Trace one of Leonardo's pen sketches into vector ink: the machines in the frontispiece's margins
-// (src/assets/leonardo/). The way the Vitruvian man was traced (scripts/trace-vitruvian.mjs), for any sheet: crop to
+// Trace one of Leonardo's pen sketches into vector ink: the machines in the frontispiece's margins and in the outer
+// margin of every folio (src/assets/leonardo/). The way the Vitruvian man was traced (scripts/trace-vitruvian.mjs), for any sheet: crop to
 // the sketch, flatten the paper, find the ink at two thresholds, drop the paper's flecks, trace with potrace.
 //
 // The sheets are the Biblioteca Ambrosiana's scans of the Codex Atlanticus and the Institut de France's of Manuscript
@@ -7,6 +7,8 @@
 //   https://commons.wikimedia.org/wiki/File:Leonardo_da_Vinci_-_Ambrosiana-Codice-Atlantico-Codex-Atlanticus-f-21-recto.jpg
 //   https://commons.wikimedia.org/wiki/File:Leonardo_da_Vinci_-_Ambrosiana-Codice-Atlantico-Codex-Atlanticus-f-272-verso.jpg
 //   https://commons.wikimedia.org/wiki/File:Leonardo_da_vinci,_Flying_machine.jpg
+//   https://commons.wikimedia.org/wiki/File:Vinci,_Leonardo_Da_-_Volano_(meccanica).jpg
+//   https://commons.wikimedia.org/wiki/File:Leonardo_da_Vinci_helicopter_and_lifting_wing.jpg
 //
 // Not part of the build: the traced files are committed, and this is how they were made (each at 1920 pixels wide,
 // the size Commons serves; the crops below are on that size). To make them again:
@@ -16,6 +18,8 @@
 //   veru       Codex Atlanticus f. 21r, the smoke-jack   --crop=790,880,560,1360 --size=520
 //   volatus    Manuscript B, the vertical flying machine (804 wide)   --crop=20,200,780,700 --size=520
 //   geometria  Codex Atlanticus f. 272v   --crop=240,370,290,290 --size=520 --thresh=20 --lo=9 --blur=10 --area=40 --long=14
+//   volano     the flywheel press, Codex Atlanticus   --crop=30,20,1860,1700 --size=520 --thresh=26 --lo=12
+//   cochlea    the aerial screw, Manuscript B (364 wide)   --crop=15,5,335,240 --size=520 --thresh=30 --lo=14 --blur=8
 import { execFileSync } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

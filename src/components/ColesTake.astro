@@ -3,7 +3,9 @@
 // Used in MDX as <ColesTake>...</ColesTake>.
 import Manicule from './Manicule.astro';
 ---
-<aside class="coles-take" aria-label="Cole's take">
+{/* A note in the text, not a region of the page: a folio can hold several, and landmarks of one name would be
+    indistinguishable. */}
+<div class="coles-take" role="note" aria-label="Cole's take">
   <p class="label"><Manicule />Cole’s take</p>
   <div class="body"><slot /></div>
-</aside>
+</div>

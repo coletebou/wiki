@@ -80,7 +80,7 @@ const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
           </p>
         )}
       </article>
-      <div class="margin-outer" data-pagefind-ignore><Marginalia folio={folio} /></div>
+      <div class="margin-outer" data-pagefind-ignore><Marginalia folio={folio} table={table.id} /></div>
       <div data-pagefind-ignore style="display:contents">
         <Verso page={page} citedBy={citedBy} cites={cites} prev={pages[index - 1]} next={pages[index + 1]} stichoi={lines} />
       </div>
