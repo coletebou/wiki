@@ -1,0 +1,91 @@
+---
+import { nundinal, roman, romanDay } from '../../lib/dates.mjs';
+import { folioLabel } from '../../lib/schema.mjs';
+import Device from '../components/Device.astro';
+import Leaf from '../components/Leaf.astro';
+import Base from '../layouts/Base.astro';
+import { href, tableOf, wiki } from '../lib/wiki';
+import '../styles/fasti.css';
+
+const { pages } = await wiki();
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const pad = (n: number) => String(n).padStart(2, '0');
+const folios = (n: number) => `${n} ${n === 1 ? 'folio' : 'folios'}`;
+
+// The days that have folios, grouped by month, newest first. Every date on the site is read in UTC.
+const byDay = new Map<string, typeof pages>();
+for (const p of pages) {
+  const d = p.data.updated;
+  const key = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  byDay.set(key, [...(byDay.get(key) ?? []), p]);
+}
+const months = new Map<string, { year: number; month: number; days: { key: string; day: number; pages: typeof pages }[]; count: number }>();
+for (const key of [...byDay.keys()].sort().reverse()) {
+  const [year, month, day] = key.split('-').map(Number);
+  const id = key.slice(0, 7);
+  const entry = months.get(id) ?? { year, month, days: [], count: 0 };
+  const list = byDay.get(key)!.sort((a, b) => a.data.folio - b.data.folio);
+  entry.days.push({ key, day, pages: list });
+  entry.count += list.length;
+  months.set(id, entry);
+}
+// The Kalends, Nones and Ides are the days the fasti set apart: a row for one stands out.
+const fixed = (name: string) => /^(Kal|Non|Id)\./.test(name);
+---
+<Base title="The Fasti" description="The wiki's calendar of emendations: every folio under the day it was last emended, dated the Roman way.">
+  <Leaf>
+    <div class="running-head"><span>Bibliotheca · Fasti</span><span class="folio-no">{pages.length} folia</span></div>
+    <div class="folio">
+      <div class="text-block fasti" style="grid-column: 1 / -1; max-width: 60rem; margin-inline: auto; width: 100%">
+        <p class="kicker">The calendar of emendations</p>
+        <h1 class="title">The Fasti</h1>
+        <p class="summary" style="margin-top: 1rem; max-width: 44rem">
+          The <i>fasti</i> were the Romans’ calendar: a list of the days of the year, each with its place in the count to
+          the Kalends, Nones or Ides, and a letter from A to H for its place in the eight-day market week. This page is
+          the wiki’s own: every folio stands under the day it was last emended, newest first, with the letter counted
+          on from A on the first of January without a break.
+        </p>
+
+        <div class="fasti-body">
+          {[...months.values()].map(({ year, month, days, count }) => (
+            <section class="fasti-month" aria-labelledby={`fm-${year}-${month}`}>
+              <h2 id={`fm-${year}-${month}`}>{MONTHS[month - 1]} {roman(year)}</h2>
+              <p class="fasti-note">{folios(count)} emended</p>
+              <ol class="fasti-days">
+                {days.map(({ key, day, pages: list }) => {
+                  const rd = romanDay(year, month, day);
+                  return (
+                    <li class:list={['fasti-day', { 'is-fixed': fixed(rd) }]}>
+                      <span class="fasti-letter"><span class="visually-hidden">Nundinal letter </span>{nundinal(year, month, day)}</span>
+                      <span class="fasti-roman"><span class="visually-hidden">Roman date </span>{rd}</span>
+                      <time class="fasti-plain" datetime={key}>{day} {MONTHS_SHORT[month - 1]} {year}</time>
+                      <ul class="fasti-folios">
+                        {list.map((p) => {
+                          const t = tableOf(p.data.table);
+                          return (
+                            <li>
+                              <a href={href(p.id)}>{p.data.title}</a>
+                              <span class="fasti-folio">{folioLabel(p.data.folio)}</span>
+                              <span class="fasti-table"><Device table={t.id} uid={`fasti-${p.id}`} />{t.title}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          ))}
+        </div>
+
+        <p class="section-sub fasti-foot">
+          Follow the emendations in a feed reader: <a href="/emendations.xml">the feed</a>. The folios by table, with their
+          opening lines: <a href="/pinakes/">the Pinakes</a>.
+        </p>
+      </div>
+    </div>
+  </Leaf>
+</Base>
