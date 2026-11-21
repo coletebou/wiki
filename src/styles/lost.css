@@ -76,12 +76,12 @@
   margin: 1.4rem 0 0;
 }
 .lost-ways {
-  margin: 1.5rem 0 0;
+  /* One under another, so that none of them runs out toward the scorched part of the leaf. */
+  margin: 1.4rem 0 0;
   padding: 0;
   list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem 1.6rem;
+  display: grid;
+  gap: 0.15rem;
 }
 @media (min-width: 76rem) {
   .lost .folio {

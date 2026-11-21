@@ -103,12 +103,12 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
         if (k.id === 'lshift' || k.id === 'rshift') classes.push('m-shift');
         const bound = classes.some((c) => c.startsWith('b-'));
         return (
-          <g class={classes.join(' ')} data-key={k.id} transform={`translate(${k.x} ${k.y})`} tabindex={bound ? '-1' : undefined} role={bound ? 'button' : undefined} aria-label={bound ? `Key ${k.legend || 'space'}` : undefined}>
+          <g class={classes.join(' ')} data-key={k.id} transform={`translate(${k.x} ${k.y})`} tabindex={bound ? '-1' : undefined} role={bound ? 'button' : undefined}>
             <rect class="box" width={k.w} height={U} rx="5" filter="url(#tk-ink)" />
             <rect class="skirt" x="1.5" y={U - 7.4} width={k.w - 3} height="6" rx="2.5" fill="url(#tk-hatch-ink)" />
             <rect class="fill" x="3.2" y="1.8" width={k.w - 6.4} height={U - 7} rx="3.6" />
             <rect class="cap" x="3.2" y="1.8" width={k.w - 6.4} height={U - 7} rx="3.6" />
-            <text class="legend" x="7" y="16">{k.legend}</text>
+            <text class="legend" x="7" y="16">{k.legend || (k.id === 'space' ? 'space' : '')}</text>
             {layerIds.map((l) => {
               const bs = on(l, k.id);
               if (!bs.length) return null;
@@ -127,7 +127,7 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
     </svg>
   </div>
   <div class="study-note tk-note-panel" aria-live="polite">
-    <h4>Point at a key</h4>
+    <p class="note-head">Point at a key</p>
     <p>Sanguine keys do something in this layer. On a Mac, Alt is the Option key: Cole’s Ghostty makes the left Option key act as Alt (<code>macos-option-as-alt = left</code>), and Termius has the same switch on the phone.</p>
   </div>
   <div class="tk-mouse" hidden>
@@ -333,7 +333,7 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
       for (const b of fig.querySelectorAll<HTMLButtonElement>('[data-set-layer]')) b.setAttribute('aria-pressed', String(b.dataset.setLayer === id));
       mouse.hidden = id !== 'mouse';
       const l = data.layers.find((x) => x.id === id)!;
-      panel.innerHTML = `<h4>${esc(l.label)}</h4><p>${esc(l.note)}</p>`;
+      panel.innerHTML = `<p class="note-head">${esc(l.label)}</p><p>${esc(l.note)}</p>`;
       for (const k of board.querySelectorAll<SVGGElement>('.key')) {
         const bound = k.classList.contains(`b-${id}`);
         k.setAttribute('tabindex', bound ? '0' : '-1');
@@ -345,7 +345,7 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
       const l = layer();
       let list = data.bindings.filter((b) => b.layer === l && b.key === key);
       if (!list.length) {
-        panel.innerHTML = `<h4>Nothing here</h4><p>That key has no binding in this layer.</p>`;
+        panel.innerHTML = `<p class="note-head">Nothing here</p><p>That key has no binding in this layer.</p>`;
         return;
       }
       if (opts.shift !== undefined || opts.ctrl !== undefined) {
@@ -357,7 +357,7 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
       for (const k of board.querySelectorAll('.m-shift')) k.classList.toggle('lit', list.some((b) => b.shift));
       panel.innerHTML = list
         .map(
-          (b) => `<div class="alt-line"><h4>${chordHtml(b.chord)} &nbsp;${esc(b.action)}${b.stock ? ' <small>(tmux default)</small>' : ''}</h4><p>${esc(b.why)}</p>${b.stock ? '' : `<span class="where"><code>${esc(b.conf)}</code></span>`}</div>`,
+          (b) => `<div class="alt-line"><p class="note-head">${chordHtml(b.chord)} &nbsp;${esc(b.action)}${b.stock ? ' <small>(tmux default)</small>' : ''}</p><p>${esc(b.why)}</p>${b.stock ? '' : `<span class="where"><code>${esc(b.conf)}</code></span>`}</div>`,
         )
         .join('');
     }
@@ -396,7 +396,7 @@ const dx = 'https://github.com/coletebou/dx/blob/master/base/tmux.conf';
         e.preventDefault();
         if (layer() !== 'prefix') setLayer('prefix');
         prefixArmed = Date.now();
-        panel.innerHTML = '<h4><kbd>Ctrl</kbd>+<kbd>B</kbd> pressed</h4><p>Now press the second key.</p>';
+        panel.innerHTML = '<p class="note-head"><kbd>Ctrl</kbd>+<kbd>B</kbd> pressed</p><p>Now press the second key.</p>';
         return;
       }
       if (prefixArmed && Date.now() - prefixArmed < 4000) {

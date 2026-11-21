@@ -2,7 +2,9 @@
    The colours are a humanist scribe's: iron-gall ink, red chalk for the rubrics, and for the illumination the
    white-vine palette of Leonardo's Florence, which is gold leaf, lapis, verdigris and bare vellum.
    Body text holds at least 10:1 contrast and every colour used for text at least 4.5:1 on the surface it is written
-   on, in both themes. test/tokens.test.mjs holds the file to that. */
+   on, in both themes. test/tokens.test.mjs holds the file to that. The surfaces are textured, and a texture's darker
+   places leave less contrast than its flat colour does: the reds and the third ink are as dark as they are so that
+   they still hold 4.5:1 there, measured on the painted page. */
 
 :root {
   --font-text: 'EB Garamond Variable', 'EB Garamond', Garamond, 'Times New Roman', serif;
@@ -26,7 +28,7 @@
   --desk: #d3cbbb;
   --desk-ink: #2a1c12;
   --desk-ink-2: #4a3828;
-  --desk-ink-3: #5c4835;
+  --desk-ink-3: #4f3d2c;
   --desk-rule: #a89c86;
   --chisel-light: rgb(255 255 255 / 0.62);
   --chisel-dark: rgb(70 52 30 / 0.24);
@@ -36,7 +38,7 @@
   --paper-3: #e0d0aa;
   --ink: #2a1c12;
   --ink-2: #4e3b2a;
-  --ink-3: #634e3a;
+  --ink-3: #5c4734;
   --rule: #b49a74;
   --ruling: rgb(120 96 66 / 0.3);
   --prick: rgb(84 60 34 / 0.5);
@@ -50,16 +52,18 @@
   --papyrus: #ead9ae;
   --papyrus-2: #dcc590;
   --papyrus-join: rgb(120 84 30 / 0.09);
+  /* Red ink on papyrus, which is a darker ground than vellum: a shade deeper than the red chalk. */
+  --papyrus-red: #842c14;
   --roll-light: rgb(255 249 226 / 0.62);
   --roll-shade: rgb(66 42 12 / 0.6);
   --roll-ring: rgb(98 68 26 / 0.55);
   --rod: #7a5632;
   --rod-shade: #3c2814;
   /* Red chalk, and green from copper. */
-  --sanguine: #93361c;
+  --sanguine: #892f17;
   --sanguine-2: #b8552f;
   --sanguine-wash: rgb(184 85 47 / 0.12);
-  --verdigris: #2b5d4c;
+  --verdigris: #25523f;
   --verdigris-wash: rgb(43 93 76 / 0.1);
   /* The illuminator's two: lapis from beyond the sea, and gold. --gold-ink is gold dark enough to read; the rest
      are the lights and shades of a burnished leaf. */
@@ -72,20 +76,20 @@
   --gold-lo: #8c6519;
   --shadow: 0 2.4rem 4.2rem -1.3rem rgb(44 32 14 / 0.6), 0 0.5rem 1rem rgb(44 32 14 / 0.26);
   --code-bg: #eadcbb;
-  --focus: #93361c;
+  --focus: #892f17;
 
   /* Shiki css-variables theme, tuned to iron-gall ink and red chalk. */
   --astro-code-foreground: #2a1c12;
   --astro-code-background: transparent;
   --astro-code-token-constant: #7a3d14;
-  --astro-code-token-string: #2b5d4c;
-  --astro-code-token-comment: #665139;
-  --astro-code-token-keyword: #93361c;
+  --astro-code-token-string: #25523f;
+  --astro-code-token-comment: #5e4a34;
+  --astro-code-token-keyword: #892f17;
   --astro-code-token-parameter: #4e3b2a;
   --astro-code-token-function: #5b3a7a;
-  --astro-code-token-string-expression: #2b5d4c;
-  --astro-code-token-punctuation: #6e5842;
-  --astro-code-token-link: #93361c;
+  --astro-code-token-string-expression: #25523f;
+  --astro-code-token-punctuation: #655039;
+  --astro-code-token-link: #892f17;
 }
 
 :root[data-theme='lucerna'] {
@@ -115,6 +119,7 @@
   --papyrus: #271d10;
   --papyrus-2: #33260f;
   --papyrus-join: rgb(0 0 0 / 0.16);
+  --papyrus-red: #ee9a72;
   --roll-light: rgb(255 206 140 / 0.2);
   --roll-shade: rgb(0 0 0 / 0.72);
   --roll-ring: rgb(0 0 0 / 0.6);

@@ -26,6 +26,19 @@ function load(): Promise<Pagefind | null> {
 /** Wire a query box to a results list. Returns a function that runs a query. */
 function seeker(input: HTMLInputElement, list: HTMLUListElement) {
   let selected = -1;
+  // In the dialog the results are a listbox the arrow keys choose from; on the search page they are a plain list
+  // of links, and are marked up as one.
+  const options = list.getAttribute('role') === 'listbox';
+  const row = (a: HTMLAnchorElement) => {
+    const li = document.createElement('li');
+    if (options) {
+      li.setAttribute('role', 'presentation');
+      a.setAttribute('role', 'option');
+    }
+    a.dataset.noPreview = '';
+    li.append(a);
+    return li;
+  };
 
   const empty = (text: string) => {
     const li = document.createElement('li');
@@ -38,7 +51,10 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
     const links = [...list.querySelectorAll<HTMLAnchorElement>('a')];
     if (!links.length) return;
     selected = (i + links.length) % links.length;
-    links.forEach((a, n) => a.setAttribute('aria-selected', String(n === selected)));
+    links.forEach((a, n) => {
+      a.toggleAttribute('data-chosen', n === selected);
+      if (options) a.setAttribute('aria-selected', String(n === selected));
+    });
     links[selected].scrollIntoView({ block: 'nearest' });
   };
 
@@ -52,18 +68,9 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
       }
       const head = document.createElement('li');
       head.className = 'seek-head';
-      head.setAttribute('role', 'presentation');
+      if (options) head.setAttribute('role', 'presentation');
       head.textContent = 'Lately read';
-      const rows = reads.map((r) => {
-        const li = document.createElement('li');
-        li.setAttribute('role', 'presentation');
-        const a = readLink(r);
-        a.setAttribute('role', 'option');
-        a.dataset.noPreview = '';
-        li.append(a);
-        return li;
-      });
-      list.replaceChildren(head, ...rows);
+      list.replaceChildren(head, ...reads.map((r) => row(readLink(r))));
       selected = -1;
       return;
     }
@@ -80,12 +87,8 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
     }
     const items = await Promise.all(search.results.slice(0, 12).map((r) => r.data()));
     const nodes = items.map((d) => {
-      const li = document.createElement('li');
-      li.setAttribute('role', 'presentation');
       const a = document.createElement('a');
       a.href = d.url;
-      a.setAttribute('role', 'option');
-      a.dataset.noPreview = '';
       const title = document.createElement('span');
       title.className = 'r-title';
       title.textContent = d.meta.title ?? d.url;
@@ -97,8 +100,7 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
       // Pagefind builds the excerpt from page text it has already escaped, adding only <mark> around matches.
       excerpt.innerHTML = d.excerpt;
       a.append(title, meta, excerpt);
-      li.append(a);
-      return li;
+      return row(a);
     });
     list.replaceChildren(...nodes);
     selected = -1;

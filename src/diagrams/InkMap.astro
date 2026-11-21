@@ -195,7 +195,7 @@ const payload = JSON.stringify(
             const ty = c.y + (n.sub ? -3 : 5);
             const tx = c.x + (n.kind === 'tab' ? 4 : 0);
             return (
-              <g class={`node ${n.kind}${n.dashed ? ' dashed' : ''}`} data-node={n.id} tabindex="0" role="button" aria-label={n.sub ? `${label}: ${n.sub}` : label}>
+              <g class={`node ${n.kind}${n.dashed ? ' dashed' : ''}`} data-node={n.id} tabindex="0" role="button">
                 {n.kind === 'box' && (
                   <>
                     <rect class="shade" x={n.x + 4.5} y={n.y + 4.5} width={w} height={h} rx="2" fill={`url(#${uid}-hatch)`} />
@@ -249,7 +249,7 @@ const payload = JSON.stringify(
     <button type="button" class="ink-btn" data-step="reset">Show all</button>
   </div>
   <div class="study-note inkmap-note" aria-live="polite">
-    <h4>{first.name}</h4>
+    <p class="note-head">{first.name}</p>
     <p>{first.intro}</p>
   </div>
   <script type="application/json" class="inkmap-data" set:html={payload} />
@@ -565,7 +565,7 @@ const payload = JSON.stringify(
       for (const id of flows) for (const el of g.querySelectorAll(`[data-flow="${id}"], [data-label-for="${id}"]`)) el.classList.add('lit');
     };
     const intro = () => {
-      note.innerHTML = `<h4>${esc(scene.name)}</h4><p>${esc(scene.intro)}</p>`;
+      note.innerHTML = `<p class="note-head">${esc(scene.name)}</p><p>${esc(scene.intro)}</p>`;
       count.textContent = `Tour · ${scene.steps.length} steps`;
     };
     function stop() {
@@ -580,7 +580,7 @@ const payload = JSON.stringify(
       light(s.on, s.flows ?? []);
       reveal(group().querySelectorAll('.node.lit'));
       count.textContent = `${step + 1} / ${scene.steps.length}`;
-      note.innerHTML = `<h4>${step + 1}. ${esc(s.title)}</h4><p>${esc(s.text)}</p>`;
+      note.innerHTML = `<p class="note-head">${step + 1}. ${esc(s.title)}</p><p>${esc(s.text)}</p>`;
     }
     function show(id: string) {
       stop();
@@ -603,7 +603,7 @@ const payload = JSON.stringify(
       const others = touching.map((fl) => (fl.from === id ? fl.to : fl.from));
       light([id, ...others], touching.map((fl) => fl.id));
       const hooks = scene.hooks?.[id];
-      let html = `<h4>${esc(n.label)}${n.sub ? ` <small>· ${esc(n.sub)}</small>` : ''}</h4>`;
+      let html = `<p class="note-head">${esc(n.label)}${n.sub ? ` <small>· ${esc(n.sub)}</small>` : ''}</p>`;
       if (n.info) html += `<p>${esc(n.info)}</p>`;
       if (hooks) html += `<ul>${hooks.map((h) => `<li><b>${esc(h.name)}</b>: ${esc(h.does)}</li>`).join('')}</ul>`;
       const outs = touching.filter((fl) => fl.label);

@@ -72,6 +72,17 @@
     }
   }
 }
+@media print {
+  /* The gold leaf is a background, and a printer leaves backgrounds out: on paper the title is set in gold ink. */
+  .frontispiece h1 {
+    color: var(--gold-ink);
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+  }
+  .frontispiece h1::after {
+    display: none;
+  }
+}
 @media (forced-colors: active) {
   .frontispiece h1 {
     -webkit-text-stroke: 0;
@@ -213,6 +224,12 @@
 }
 .lately-note button:hover {
   color: var(--sanguine);
+}
+.feed-line {
+  margin: 0.9rem 0 0;
+  font-size: 0.92rem;
+  font-style: italic;
+  color: var(--ink-2);
 }
 .sortes-line {
   margin: 0.5rem auto 0;

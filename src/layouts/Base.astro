@@ -5,6 +5,12 @@ import '@fontsource/cinzel/400.css';
 import '@fontsource/cinzel/700.css';
 import '@fontsource/italianno/400.css';
 import '@fontsource-variable/jetbrains-mono/wght.css';
+// The four faces every page shows at its head (the wordmark, the navigation, the title), fetched at once and not
+// after the stylesheet that names them has been read.
+import garamond from '@fontsource-variable/eb-garamond/files/eb-garamond-latin-wght-normal.woff2?url';
+import garamondItalic from '@fontsource-variable/eb-garamond/files/eb-garamond-latin-wght-italic.woff2?url';
+import cinzel from '@fontsource/cinzel/files/cinzel-latin-400-normal.woff2?url';
+import cinzelBold from '@fontsource/cinzel/files/cinzel-latin-700-normal.woff2?url';
 import '../styles/tokens.css';
 import 'virtual:materials.css';
 import '../styles/material.css';
@@ -49,8 +55,12 @@ const withFrom = (h: string) => {
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     {canonical ? <link rel="canonical" href={canonical} /> : <meta name="robots" content="noindex" />}
+    {[garamond, garamondItalic, cinzel, cinzelBold].map((font) => <link rel="preload" as="font" type="font/woff2" href={font} crossorigin />)}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="alternate" type="application/atom+xml" title="Codex Tebou: emendations" href="/emendations.xml" />
     <meta name="theme-color" content="#d3cbbb" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0e0a07" media="(prefers-color-scheme: dark)" />
     <meta property="og:site_name" content="Codex Tebou" />
@@ -61,7 +71,7 @@ const withFrom = (h: string) => {
     <meta property="og:image" content={new URL('/og.jpg', site).href} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Codex Tebou, How to Be a Beast: the wiki's frontispiece on parchment" />
+    <meta property="og:image:alt" content="Codex Tebou, How to Be a Beast: the title in gold on vellum, beside Leonardo's Vitruvian Man" />
     <meta name="twitter:card" content="summary_large_image" />
     <script is:inline>
       // Before first paint: the reader's chosen theme, else the system's.
@@ -77,8 +87,8 @@ const withFrom = (h: string) => {
   <body>
     <a class="skip" href="#text">Skip to the text</a>
     <header class="masthead">
-      <a class="wordmark" href="/" aria-label="Codex Tebou, home">
-        <b>CODEX TEBOU</b><i>How to Be a Beast</i>
+      <a class="wordmark" href="/">
+        <b>CODEX TEBOU</b> <i>How to Be a Beast</i><span class="visually-hidden">, the frontispiece</span>
       </a>
       <nav aria-label="Library">
         <a href="/pinakes/" aria-current={current === 'pinakes' ? 'page' : undefined}>Pinakes</a>
@@ -162,6 +172,7 @@ const withFrom = (h: string) => {
       import '../scripts/sillybos';
       import '../scripts/folio';
       import '../scripts/lately';
+      import '../scripts/ribbon';
       import '../scripts/keys';
     </script>
   </body>
