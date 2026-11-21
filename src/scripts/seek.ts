@@ -26,6 +26,10 @@ function load(): Promise<Pagefind | null> {
 /** Wire a query box to a results list. Returns a function that runs a query. */
 function seeker(input: HTMLInputElement, list: HTMLUListElement) {
   let selected = -1;
+  // Each query is numbered, and an answer is shown only if no later query has been asked since: a search still on
+  // its way when the box is cleared must not come back and fill it.
+  let asked = 0;
+  let rows = 0;
   // In the dialog the results are a listbox the arrow keys choose from; on the search page they are a plain list
   // of links, and are marked up as one.
   const options = list.getAttribute('role') === 'listbox';
@@ -34,6 +38,7 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
     if (options) {
       li.setAttribute('role', 'presentation');
       a.setAttribute('role', 'option');
+      a.id = `${list.id}-${rows++}`;
     }
     a.dataset.noPreview = '';
     li.append(a);
@@ -55,10 +60,21 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
       a.toggleAttribute('data-chosen', n === selected);
       if (options) a.setAttribute('aria-selected', String(n === selected));
     });
+    // The focus stays in the box; this is how the choice is told to a screen reader.
+    if (options) input.setAttribute('aria-activedescendant', links[selected].id);
     links[selected].scrollIntoView({ block: 'nearest' });
   };
 
+  const show = (label: string, nodes: Node[]) => {
+    list.replaceChildren(...nodes);
+    selected = -1;
+    input.removeAttribute('aria-activedescendant');
+    if (options) list.setAttribute('aria-label', label);
+  };
+
   const run = async (q: string) => {
+    const mine = ++asked;
+    rows = 0;
     if (!q.trim()) {
       // Before a word is typed, the leaves lately read: most often the reader is going back to one of them.
       const reads = lately().slice(0, 8);
@@ -68,24 +84,29 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
       }
       const head = document.createElement('li');
       head.className = 'seek-head';
-      if (options) head.setAttribute('role', 'presentation');
+      // The list's own name says what these are; the line above them is for the eye.
+      if (options) {
+        head.setAttribute('role', 'presentation');
+        head.setAttribute('aria-hidden', 'true');
+      }
       head.textContent = 'Lately read';
-      list.replaceChildren(head, ...reads.map((r) => row(readLink(r))));
-      selected = -1;
+      show('Lately read', [head, ...reads.map((r) => row(readLink(r)))]);
       return;
     }
     const pf = await load();
+    if (mine !== asked) return;
     if (!pf) {
       empty('The index is built with the site; it is not here in development.');
       return;
     }
     const search = await pf.debouncedSearch(q, {}, 160);
-    if (!search) return; // a newer keystroke superseded this one
+    if (!search || mine !== asked) return; // a newer keystroke superseded this one
     if (!search.results.length) {
       empty(`Nothing in the library matches “${q}”.`);
       return;
     }
     const items = await Promise.all(search.results.slice(0, 12).map((r) => r.data()));
+    if (mine !== asked) return;
     const nodes = items.map((d) => {
       const a = document.createElement('a');
       a.href = d.url;
@@ -102,8 +123,7 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
       a.append(title, meta, excerpt);
       return row(a);
     });
-    list.replaceChildren(...nodes);
-    selected = -1;
+    show('Results', nodes);
   };
 
   input.addEventListener('input', () => void run(input.value));
@@ -156,7 +176,9 @@ document.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   // A study that took the key for itself (the tmux keymap reads real chords, Ctrl+K among them) keeps it.
   if (e.defaultPrevented) return;
-  const typing = (e.target as Element).closest('input, textarea, select, [contenteditable="true"]');
+  const target = e.target as HTMLElement;
+  // Typing, or in some other dialog (the keys): "/" is a character there, not a summons.
+  const typing = target.isContentEditable || target.closest('input, textarea, select') || (target.closest('dialog') && target.closest('dialog') !== dialog);
   if ((e.key === '/' && !typing) || (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey))) {
     e.preventDefault();
     open();

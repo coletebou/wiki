@@ -92,6 +92,9 @@
   --astro-code-token-link: #892f17;
 }
 
+/* Lamplight belongs to the screen. On paper the leaf is always the leaf by day, whichever lamp was lit when it was
+   printed: pale ink on white paper cannot be read. */
+@media screen {
 :root[data-theme='lucerna'] {
   color-scheme: dark;
   --desk: #0e0a07;
@@ -151,4 +154,5 @@
   --astro-code-token-string-expression: #9fd3bf;
   --astro-code-token-punctuation: #b9a37f;
   --astro-code-token-link: #ee9a72;
+}
 }

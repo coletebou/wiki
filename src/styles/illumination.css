@@ -10,6 +10,7 @@
   --il-dot: #f6ecd2;
   --il-hair: #3a2716;
 }
+@media screen {
 :root[data-theme='lucerna'] {
   /* By lamplight the pigments deepen and the vine is the brightest thing on the leaf after the gold. */
   --il-lapis: #25407f;
@@ -19,6 +20,7 @@
   --il-line: #160e07;
   --il-dot: #e9d9b4;
   --il-hair: #b9a37f;
+}
 }
 
 .il-lapis {

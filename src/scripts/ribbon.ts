@@ -41,6 +41,8 @@ if (article && prose) {
   // Leaving: the ribbon goes in at the last heading read past, unless the folio was hardly begun or was finished.
   const lay = () => {
     const all = marks();
+    // A reader who came, saw the offer and left again without reading on has not moved the ribbon.
+    if (all[slug] && scrollY < 240) return;
     const line = scrollY + innerHeight * 0.4;
     const passed = heads.filter((h) => h.getBoundingClientRect().top + scrollY <= line);
     const foot = prose.getBoundingClientRect().bottom + scrollY;

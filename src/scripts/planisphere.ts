@@ -49,6 +49,8 @@ if (root && links) {
     if (a) point(a);
   });
   root.addEventListener('pointerout', (e) => {
+    // A finger lifting is not a pointer leaving: what it drew stays until something else is touched.
+    if ((e as PointerEvent).pointerType === 'touch') return;
     if (star(e) && !root.querySelector('.pl-star:focus-visible')) clear();
   });
   root.addEventListener('focusin', (e) => {
@@ -56,4 +58,19 @@ if (root && links) {
     if (a) point(a);
   });
   root.addEventListener('focusout', clear);
+  // Under a finger there is no pointing before pressing, and the stars stand close: the first touch of a star draws
+  // its citations and names it, and a second touch of the same star opens it.
+  let touched: HTMLAnchorElement | null = null;
+  root.addEventListener('pointerdown', (e) => {
+    touched = e.pointerType === 'touch' ? star(e) : null;
+  });
+  root.addEventListener('click', (e) => {
+    const a = star(e);
+    if (!a || a !== touched || a.dataset.shown) return;
+    e.preventDefault();
+    for (const other of stars.values()) delete other.dataset.shown;
+    a.dataset.shown = '1';
+    point(a);
+    if (caption) caption.textContent += ' Touch it again to open it.';
+  });
 }
