@@ -272,6 +272,14 @@ const crt = {
       display: none;
     }
   }
+  @media print {
+    /* On paper the drawing is simply there, whole. */
+    .vt-sheet,
+    .vt-margin {
+      animation: none !important;
+      opacity: 1 !important;
+    }
+  }
   /* On the first visit of a session the sheet comes up out of the navel, the centre Leonardo struck the circle from,
      and then the instruments are set down round it. */
   @media (prefers-reduced-motion: no-preference) {

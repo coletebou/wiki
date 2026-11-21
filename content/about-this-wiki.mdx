@@ -60,6 +60,7 @@ Every page is a *folio*, a leaf of the codex, with a number like **f. 11r**. The
 - **Seek anything.** Press <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd> (<kbd>⌘</kbd>+<kbd>K</kbd> on a Mac) anywhere to search every word of every folio. The search runs in your browser against an index built with the site, so it is fast and sends your query nowhere. Before you type, it offers the folios you read last.
 - **Turn leaves from the keyboard.** <kbd>n</kbd> turns to the next leaf and <kbd>p</kbd> to the one before, <kbd>v</kbd> goes to the back of the leaf, <kbd>c</kbd> opens the catalogue, <kbd>m</kbd> the planisphere, <kbd>h</kbd> the frontispiece, and <kbd>l</kbd> lights the lamp. <kbd>?</kbd> lists them all. A study that reads the keyboard itself keeps its keys while you are in it.
 - **The catchword.** At the foot of each folio's text stand the first words of the folio that follows, as binders had them written so that the leaves of a book were gathered in order. It is also the link to that folio.
+- **The ribbon.** Leave a long folio part read and a ribbon is laid at the last heading you read past. Come back to the folio and it offers to be taken up there. Read it to the end and the ribbon comes out. This too is kept in your browser and nowhere else.
 - **Lately on your table.** The frontispiece lists the folios you opened last. The list is kept in your browser and nowhere else, and one press clears it.
 - **Sortes.** Press <kbd>s</kbd>, or follow the line under the cabinet, and the library opens at a folio drawn by lot, the way Romans opened Virgil at random for counsel (the *sortes Vergilianae*).
 - **Lamplight.** The oil lamp in the top bar is the theme switch. Light it and the leaf goes dark for reading at night, with the lamp's own light on the head of the page; put it out for daylight. Without a choice of your own, the site follows your system setting.
@@ -96,7 +97,8 @@ The site is static: plain HTML, CSS and a little JavaScript, built ahead of time
 | [Pagefind](https://pagefind.app) | Indexes every word after the build and searches it in the browser. |
 | Prices | Every price on the site comes from one data file, with the date it was read and a link to the vendor's own page. See [[what-it-costs]]. |
 | Fonts | EB Garamond for the text, Cinzel for the inscriptions, Italianno for Leonardo's hand, JetBrains Mono for code. All under the SIL Open Font License and served from this site, never a third-party font CDN. |
-| Materials and illumination | The vellum, the stone, the outline of the leaf and every initial are drawn by code when the site is built, a few lines of SVG each. None of it is an image file. |
+| Materials and illumination | The vellum, the stone, the papyrus, the outlines of the leaf and the roll, the burnt edge, every initial and the planisphere are drawn by code when the site is built, a few lines of SVG each. None of them is an image file. The one drawing that is a file is Leonardo's man on the frontispiece, traced once from a photograph. |
+| Feed | The thirty folios most lately emended are published as an [Atom feed](/emendations.xml), for a feed reader. |
 
 The site is hosted on [[vercel|Vercel]], and its name, `wiki.coletebou.com`, is a DNS record at [[cloudflare|Cloudflare]] like every other domain Cole runs. It is one of the editions of coletebou.com, beside the Almanac, the Plan Set and the Terminal: the switcher at the foot of every page moves between them.
 

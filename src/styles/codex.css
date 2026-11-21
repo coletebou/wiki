@@ -144,6 +144,16 @@ a {
 .masthead nav a[aria-current='page'] {
   color: var(--sanguine);
 }
+:root[data-theme='lucerna'] .masthead nav a,
+:root[data-theme='lucerna'] .masthead nav button {
+  /* By lamplight the stone beside the lamp is the brightest thing on the page: what is cut there is cut bolder. */
+  color: var(--desk-ink);
+}
+:root[data-theme='lucerna'] .masthead nav a:hover,
+:root[data-theme='lucerna'] .masthead nav button:hover,
+:root[data-theme='lucerna'] .masthead nav a[aria-current='page'] {
+  color: var(--sanguine);
+}
 .masthead nav a[aria-current='page'] {
   text-decoration: underline 1px;
   text-underline-offset: 0.3em;
@@ -1057,7 +1067,7 @@ kbd {
   border-left: 3px solid transparent;
 }
 .seek-results li a:hover,
-.seek-results li a[aria-selected='true'] {
+.seek-results li a[data-chosen] {
   background: var(--sanguine-wash);
   border-left-color: var(--sanguine);
 }
@@ -1195,6 +1205,54 @@ kbd {
   }
 }
 
+/* ── The ribbon: where the reader stopped, and the offer to take the folio up there ──────────────────────── */
+.resume {
+  padding: 0;
+  font: inherit;
+  font-style: italic;
+  color: var(--sanguine);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+  cursor: pointer;
+}
+.resume[hidden] {
+  display: none;
+}
+.ribbon {
+  /* A silk ribbon, laid over the head of the leaf from the binding above it. */
+  position: absolute;
+  top: -0.5rem;
+  right: clamp(4.4rem, 10.5%, 8.5rem);
+  z-index: 4;
+  width: 1.05rem;
+  height: 4.6rem;
+  background: linear-gradient(to right, color-mix(in srgb, var(--sanguine) 78%, black), var(--sanguine-2) 42%, var(--sanguine) 70%, color-mix(in srgb, var(--sanguine) 70%, black));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 0.55rem), 0 100%);
+  filter: drop-shadow(0 0.15rem 0.2rem rgb(40 20 8 / 0.4));
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ribbon {
+    animation: ribbon-fall 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+    transform-origin: 50% 0;
+  }
+  @keyframes ribbon-fall {
+    from {
+      transform: scaleY(0.15);
+      opacity: 0;
+    }
+  }
+}
+@media print {
+  .resume,
+  .ribbon {
+    display: none;
+  }
+}
+
 /* ── The catchword: the next leaf's first words, at the foot of this one ───────────────────────────────────── */
 .catchword {
   margin: 2.2rem 0 0;
@@ -1291,7 +1349,7 @@ kbd {
   font-variant-caps: all-small-caps;
   font-size: 1.04rem;
   letter-spacing: 0.12em;
-  color: var(--desk-ink-3);
+  color: var(--desk-ink-2);
 }
 .editions a,
 .editions span[aria-current] {
@@ -1360,9 +1418,28 @@ kbd {
   .colophon,
   .margin-outer,
   .margin-inner,
+  .capitula-inline,
   .copy-code,
+  .heading-anchor,
+  .seek-large,
+  .lately,
   .sillybos {
     display: none !important;
+  }
+  /* A heading is not left alone at the foot of a sheet, and a figure, a table's row or a note is not cut in two. */
+  h1,
+  h2,
+  h3,
+  h4,
+  .pinax-head {
+    break-after: avoid;
+  }
+  figure,
+  tr,
+  .coles-take,
+  .pinax li,
+  .nidus {
+    break-inside: avoid;
   }
   .prose a[href^='http']::after {
     content: ' (' attr(href) ')';

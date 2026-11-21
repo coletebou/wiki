@@ -203,7 +203,7 @@ const sheet = plate(800, 470);
         const y = laneY(i);
         const fy = branchFrom(i);
         return (
-          <g class="lane" data-lane={i} tabindex="0" role="button" aria-label={`Lane ${l.tag}: branch ${l.branch}, engine ${l.engine}`}>
+          <g class="lane" data-lane={i} tabindex="0" role="button">
             <g class="row">
               <rect class="row-box" x="16" y={y - 2} width="214" height="50" rx="2" />
               <path class="row-rule" d={`M22 ${y + 4}V${y + 42}`} />
@@ -256,7 +256,7 @@ const sheet = plate(800, 470);
     </svg>
   </div>
   <div class="study-note wf-note" aria-live="polite">
-    <h4>One launch</h4>
+    <p class="note-head">One launch</p>
     <p>Each row of the manifest names a lane: a tag, a branch, the prompt and, if you like, the engine. Press Launch to watch <code>pw</code> turn rows into worktrees, worktrees into tmux windows, and finished work into the merged log.</p>
   </div>
   <script type="application/json" class="wf-data" set:html={data} />
@@ -553,7 +553,7 @@ const sheet = plate(800, 470);
     let lines: { text: string; cls: string }[] = [];
 
     const n = () => Number(fig.dataset.lanes);
-    const say = (title: string, html: string) => (note.innerHTML = `<h4>${esc(title)}</h4><p>${html}</p>`);
+    const say = (title: string, html: string) => (note.innerHTML = `<p class="note-head">${esc(title)}</p><p>${html}</p>`);
     const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, reduced ? 0 : ms));
 
     function drawLog() {

@@ -50,7 +50,7 @@ const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
       <span class="folio-no">{folioLabel(folio)}</span>
     </div>
     <div class="folio">
-      <aside class="margin-inner"><Capitula variant="margin" headings={headings} /></aside>
+      <div class="margin-inner"><Capitula variant="margin" headings={headings} /></div>
       <article class="text-block" data-pagefind-body data-pagefind-filter={`table:${table.title}`} data-folio-slug={page.id} data-folio-title={title} data-folio-label={folioLabel(folio)}>
         <header>
           <p class="kicker"><a href={`/pinakes/#table-${table.id}`}>Table {table.numeral} · {table.title}</a></p>
@@ -60,6 +60,7 @@ const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
           <p class="meta-line" data-pagefind-ignore>
             <span>{folioLabel(folio)}</span><span>{lines.toLocaleString('en-US')} stichoi</span><span>emended {emended}</span>
             {citedBy.length > 0 && <a href="#cited-by">cited by {citedBy.length}</a>}
+            <button type="button" class="resume" data-resume hidden></button>
           </p>
           <span hidden data-pagefind-meta="folio">{folioLabel(folio)}</span>
           <span hidden data-pagefind-meta="table">{table.title}</span>
@@ -71,11 +72,11 @@ const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
         </div>
         {next && catchword && (
           <p class="catchword" data-pagefind-ignore>
-            <a href={href(next.id)} aria-label={`The next leaf: ${next.data.title}`}>{catchword}</a>
+            <a href={href(next.id)}>{catchword}<span class="visually-hidden">: the next leaf, {next.data.title}</span></a>
           </p>
         )}
       </article>
-      <aside class="margin-outer" data-pagefind-ignore><Marginalia folio={folio} /></aside>
+      <div class="margin-outer" data-pagefind-ignore><Marginalia folio={folio} /></div>
       <div data-pagefind-ignore style="display:contents">
         <Verso page={page} citedBy={citedBy} cites={cites} prev={pages[index - 1]} next={pages[index + 1]} stichoi={lines} />
       </div>

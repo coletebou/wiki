@@ -5,6 +5,10 @@
   position: relative;
   max-width: 66rem;
   margin: 0 auto 3.5rem;
+  /* Papyrus is a darker ground than vellum. Whatever is written in red on the roll is written in the red that holds
+     on it, and the faintest ink is not used here at all. */
+  --sanguine: var(--papyrus-red);
+  --ink-3: var(--ink-2);
 }
 .volumen::before {
   /* The shadow the roll throws on the table: a box a little inside the sheet, since a mask would cut a shadow of the
@@ -464,4 +468,12 @@
   font-style: italic;
   line-height: 1.4;
   text-wrap: balance;
+}
+
+@media print {
+  /* Paper has nothing to type on and nowhere to jump to. */
+  .pinax-nav,
+  .pinax-find {
+    display: none;
+  }
 }

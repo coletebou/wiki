@@ -28,6 +28,10 @@ The body is MDX: Markdown that can hold a few components.
 
 - No `#` heading: the title comes from the frontmatter. Open with a short paragraph that says what the thing is and why
   it matters; its first words become the page's incipit in the catalogue. Then `##` sections and `###` below them.
+- That opening paragraph does three more jobs, so write it as plain prose. Its first letter is drawn as the page's
+  illuminated initial (a page that opens on code, a link or a component gets none). Its first three words are the
+  catchword at the foot of the page before it. And the `##` and `###` headings are where a reader's ribbon is laid, so
+  give a long page headings worth returning to.
 - **Wiki links:** `[[slug]]`, `[[slug|label]]`, `[[slug#section-id|label]]`. A target may be a slug, a title or an
   alias. Inside a table cell escape the pipe, `[[slug\|label]]`, or the cell ends inside the link. Keep each link on
   one line: a label that wraps onto the next line is not a link. The label is plain words: no code, emphasis, HTML,
