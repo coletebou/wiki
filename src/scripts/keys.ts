@@ -45,6 +45,9 @@ document.addEventListener('keydown', (e) => {
     case 'm':
       location.href = '/planisphere/';
       break;
+    case 'f':
+      location.href = '/fasti/';
+      break;
     case 'h':
       location.href = '/';
       break;

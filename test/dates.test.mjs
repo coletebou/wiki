@@ -1,7 +1,7 @@
 // The Roman date, held to the days everyone knows and to the calendar's own arithmetic.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { roman, romanDate, romanDay } from '../lib/dates.mjs';
+import { nundinal, roman, romanDate, romanDay } from '../lib/dates.mjs';
 
 test('the fixed days are named outright', () => {
   assert.equal(romanDay(2026, 1, 1), 'Kal. Ian.');
@@ -73,4 +73,26 @@ test('a whole date is read in UTC', () => {
   assert.equal(romanDate(new Date('2026-11-20T00:00:00Z')), 'a.d. XII Kal. Dec. MMXXVI');
   assert.equal(romanDate(new Date('2026-11-20T23:59:59Z')), 'a.d. XII Kal. Dec. MMXXVI');
   assert.equal(romanDate(new Date('2027-01-01T00:00:00Z')), 'Kal. Ian. MMXXVII');
+});
+
+test('the nundinal letters are counted A to H from the first of January without a break', () => {
+  assert.equal(nundinal(2026, 1, 1), 'A');
+  assert.equal(nundinal(2026, 1, 2), 'B');
+  assert.equal(nundinal(2026, 1, 8), 'H');
+  assert.equal(nundinal(2026, 1, 9), 'A');
+  assert.equal(nundinal(2026, 2, 1), 'H'); // the 32nd day of the year
+  assert.equal(nundinal(2026, 12, 31), 'E'); // day 365: 364 is 45 weeks of eight and four over
+  assert.equal(nundinal(2028, 12, 31), 'F'); // day 366 of a leap year
+  assert.equal(nundinal(2028, 3, 1), 'E'); // day 61, the leap day counted: 60 is seven eights and four over
+  for (const year of [2026, 2028]) {
+    const letters = [];
+    for (let d = 10; d < 18; d++) letters.push(nundinal(year, 5, d));
+    assert.equal(new Set(letters).size, 8);
+  }
+});
+
+test('a day that does not exist has no nundinal letter', () => {
+  assert.throws(() => nundinal(2026, 2, 29), RangeError);
+  assert.throws(() => nundinal(2026, 13, 1), RangeError);
+  assert.throws(() => nundinal(2026, 4, 31), RangeError);
 });

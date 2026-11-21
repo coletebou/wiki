@@ -1,0 +1,129 @@
+/* The fasti (src/pages/fasti.astro): the wiki's calendar of emendations, set as the Romans set theirs, a column of
+   days each headed by its letter. It is mostly type: red letters and rubrics, hairline rules, and the small devices. */
+
+.fasti-body {
+  margin-top: 1.4rem;
+}
+.fasti-month {
+  margin-top: 2.2rem;
+}
+.fasti-month h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--step-2);
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.fasti-note {
+  margin: 0.2rem 0 0.6rem;
+  font-variant-caps: all-small-caps;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+  color: var(--sanguine);
+}
+.fasti-days,
+.fasti-folios {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fasti-day {
+  display: grid;
+  grid-template-columns: 1.6rem 10.5rem 7.5rem 1fr;
+  gap: 0.15rem 1rem;
+  align-items: baseline;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--rule);
+}
+.fasti-letter {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  line-height: 1;
+  color: var(--sanguine);
+}
+.fasti-roman {
+  font-variant-caps: all-small-caps;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+}
+.fasti-plain {
+  font-size: var(--step--1);
+  font-variant-numeric: lining-nums;
+  color: var(--ink-3);
+}
+/* The Kalends, Nones and Ides: the days the fasti set apart. */
+.fasti-day.is-fixed .fasti-roman {
+  font-weight: 600;
+  color: var(--sanguine);
+}
+.fasti-day.is-fixed {
+  background: var(--sanguine-wash);
+  box-shadow: inset 2px 0 0 var(--sanguine);
+  padding-inline: 0.6rem;
+  margin-inline: -0.6rem;
+}
+.fasti-folios li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.7rem;
+  padding: 0.1rem 0;
+}
+.fasti-folios a {
+  color: var(--ink);
+  text-decoration-color: var(--rule);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+.fasti-folios a:hover {
+  color: var(--sanguine);
+}
+.fasti-folio {
+  font-style: italic;
+  font-size: var(--step--1);
+  color: var(--ink-3);
+}
+.fasti-table {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-variant-caps: all-small-caps;
+  font-size: 1.02rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+.fasti-table .device {
+  width: 1.5em;
+  height: 1.5em;
+  overflow: visible;
+  color: var(--ink-2);
+}
+.fasti-table .device :is(path, circle) {
+  stroke-width: 1.25;
+}
+.fasti-table .device :is(.fine, .sand, .shine) {
+  stroke-width: 0.8;
+}
+.fasti-foot {
+  margin-top: 2.4rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+}
+
+/* On a narrow leaf the letter, the Roman date and the plain date share the first line and the folios follow it. */
+@media (max-width: 44rem) {
+  .fasti-day {
+    grid-template-columns: 1.6rem 1fr auto;
+    row-gap: 0.35rem;
+  }
+  .fasti-folios {
+    grid-column: 1 / -1;
+    padding-left: 2.6rem;
+  }
+  .fasti-plain {
+    text-align: right;
+  }
+}

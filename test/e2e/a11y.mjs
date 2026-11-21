@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const [base, ...given] = process.argv.slice(2);
 // With no pages named: one of each kind the site has.
-const paths = given.length ? given : ['/', '/tmux/', '/pinakes/', '/planisphere/', '/about-this-wiki/', '/what-it-costs/', '/tmux-keymap/', '/agent-fleet/', '/parallel-worktrees/', '/observability/', '/cloudflare-front-door/', '/search/?q=tmux', '/sortes/#stay', '/no-such-folio/'];
+const paths = given.length ? given : ['/', '/tmux/', '/pinakes/', '/planisphere/', '/fasti/', '/about-this-wiki/', '/what-it-costs/', '/tmux-keymap/', '/agent-fleet/', '/parallel-worktrees/', '/observability/', '/cloudflare-front-door/', '/search/?q=tmux', '/sortes/#stay', '/no-such-folio/'];
 const axe = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 const b = await pw.chromium.launch({ headless: true });
 let total = 0;
