@@ -58,14 +58,18 @@ const path = (p) => new URL(p.url()).pathname;
   await p.context().close();
 }
 
-// 4. The gold title is read once.
+// 4. The title is read once, in words, and drawn in Pacioli's capitals for the eye.
 {
   const p = await open();
   await p.goto(`${base}/`, { waitUntil: 'networkidle' });
   const snap = await p.locator('.frontispiece h1').ariaSnapshot().catch((e) => `unsupported: ${e.message.slice(0, 40)}`);
-  ok('the title is read once', /^- heading "CODEX TEBOU" \[level=1\]$/.test(snap.trim()) || snap.startsWith('unsupported'), snap.trim());
-  const shown = await p.evaluate(() => getComputedStyle(document.querySelector('.frontispiece h1'), '::after').content);
-  ok('and the gold is still laid over it', shown.includes('CODEX TEBOU') || shown.includes('attr('), shown);
+  ok('the title is read once', /^- heading "Codex Tebou" \[level=1\]$/.test(snap.trim()) || snap.startsWith('unsupported'), snap.trim());
+  const drawn = await p.evaluate(() => {
+    const d = document.querySelector('.frontispiece h1 .wm-drawing');
+    const masks = [...(d?.children ?? [])].map((e) => getComputedStyle(e).maskImage || getComputedStyle(e).webkitMaskImage);
+    return { hidden: d?.getAttribute('aria-hidden'), masks: masks.map((m) => /pacioli|codex-tebou/.test(m ?? '')), height: d?.getBoundingClientRect().height };
+  });
+  ok('and drawn, letters and construction, hidden from assistive technology', drawn.hidden === 'true' && drawn.masks.length === 2 && drawn.masks.every(Boolean) && drawn.height > 20, JSON.stringify(drawn));
   await p.context().close();
 }
 

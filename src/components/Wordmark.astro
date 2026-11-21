@@ -1,0 +1,64 @@
+---
+// The book's name in Luca Pacioli's capitals, the alphabet he built with compass and ruler for De divina proportione
+// (Venice, 1509), the book Leonardo drew the solids for. Traced from the woodcuts (scripts/trace-pacioli.mjs) in two
+// layers: the letters, and the circles and ruled lines that built them. Each is a mask the page's own ink shows
+// through, so the name is in the same ink as the drawing of the man beneath it, by day and by lamplight. Pacioli's
+// alphabet, like every Roman inscription, has no U: the name is cut as the Romans would have cut it, TEBOV.
+// Built, each letter stands in its own square as Pacioli drew it; set, the letters alone are spaced by their ink, as a
+// compositor would set them, for the masthead. The words are given to assistive technology; the drawing is hidden.
+import construction from '../assets/pacioli/codex-tebou-construction.svg?url';
+import letters from '../assets/pacioli/codex-tebou-letters.svg?url';
+import set from '../assets/pacioli/codex-tebou-set.svg?url';
+
+interface Props {
+  /** Draw the construction too: on the frontispiece, not in the masthead. */
+  built?: boolean;
+  /** The words, for a reader who cannot see the drawing. */
+  label?: string;
+}
+const { built = false, label = 'Codex Tebou' } = Astro.props;
+---
+<span class:list={['wm', { built }]}>
+  <span class="visually-hidden">{label}</span>
+  <span class="wm-drawing" aria-hidden="true">
+    {built && <span class="wm-construction" style={`--wm: url("${construction}")`}></span>}
+    <span class="wm-letters" style={`--wm: url("${built ? letters : set}")`}></span>
+  </span>
+</span>
+<style>
+  .wm {
+    display: inline-block;
+    width: 100%;
+  }
+  .wm-drawing {
+    position: relative;
+    display: block;
+    /* The viewBoxes of the traced files. */
+    aspect-ratio: 8256 / 830;
+  }
+  .built .wm-drawing {
+    aspect-ratio: 9190 / 889;
+  }
+  .wm-drawing > span {
+    position: absolute;
+    inset: 0;
+    -webkit-mask: var(--wm) center / 100% 100% no-repeat;
+    mask: var(--wm) center / 100% 100% no-repeat;
+  }
+  .wm-letters {
+    background: currentColor;
+  }
+  .wm-construction {
+    /* Pacioli printed his construction in the same black as the letter; here it is a lighter ink, so the name reads
+       first and the geometry after. */
+    background: color-mix(in srgb, currentColor 34%, transparent);
+  }
+  @media (forced-colors: active) {
+    .wm-drawing > span {
+      background: CanvasText;
+    }
+    .wm-construction {
+      display: none;
+    }
+  }
+</style>

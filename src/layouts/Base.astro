@@ -11,6 +11,7 @@ import garamond from '@fontsource-variable/eb-garamond/files/eb-garamond-latin-w
 import garamondItalic from '@fontsource-variable/eb-garamond/files/eb-garamond-latin-wght-italic.woff2?url';
 import cinzel from '@fontsource/cinzel/files/cinzel-latin-400-normal.woff2?url';
 import cinzelBold from '@fontsource/cinzel/files/cinzel-latin-700-normal.woff2?url';
+import Wordmark from '../components/Wordmark.astro';
 import '../styles/tokens.css';
 import 'virtual:materials.css';
 import '../styles/material.css';
@@ -71,7 +72,7 @@ const withFrom = (h: string) => {
     <meta property="og:image" content={new URL('/og.jpg', site).href} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Codex Tebou, How to Be a Beast: the title in gold on vellum, beside Leonardo's Vitruvian Man" />
+    <meta property="og:image:alt" content="Codex Tebou, How to Be a Beast: the name in Pacioli's compass-drawn capitals on vellum, beside Leonardo's Vitruvian Man" />
     <meta name="twitter:card" content="summary_large_image" />
     <script is:inline>
       // Before first paint: the reader's chosen theme, else the system's.
@@ -100,7 +101,7 @@ const withFrom = (h: string) => {
     <a class="skip" href="#text">Skip to the text</a>
     <header class="masthead">
       <a class="wordmark" href="/">
-        <b>CODEX TEBOU</b> <i>How to Be a Beast</i><span class="visually-hidden">, the frontispiece</span>
+        <b><Wordmark /></b> <i>How to Be a Beast</i><span class="visually-hidden">, the frontispiece</span>
       </a>
       <nav aria-label="Library">
         <a href="/pinakes/" aria-current={current === 'pinakes' ? 'page' : undefined}>Pinakes</a>
