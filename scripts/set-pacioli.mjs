@@ -4,9 +4,12 @@
 //                                                               a square apart and a little more, the words parted
 //                                                               by a Roman interpunct
 //   codex-tebou-set.svg                                        set: the letters alone, spaced by their ink
+//   initials/<L>-letter.svg and initials/<L>-construction.svg  each letter alone in its square, for the initial that
+//                                                               opens a folio (src/components/Initial.astro). W is two
+//                                                               V's crossed, as printers made it before there was one.
 // Not part of the build: the files are committed. To make them again:
 //   node scripts/set-pacioli.mjs <dir of traced letters> [out dir]
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -84,4 +87,42 @@ const use = (defs, id, g, x, y) => {
   const vb = `-10 -10 ${(x - TRACK + 20).toFixed(0)} ${SIDE + 30}`;
   writeFileSync(join(OUT, 'codex-tebou-set.svg'), file(vb, defs, body));
   console.log('set', vb);
+}
+// Initials: every letter Pacioli drew, in its square with a narrow margin. The construction is cut at the margin; the
+// letter never is, so where it stands out of its square (A's apex, Q's tail) the drawing is that much larger, and
+// initials/index.json says each one's box.
+{
+  const dir = join(OUT, 'initials');
+  mkdirSync(dir, { recursive: true });
+  const ALPHABET = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'V', 'X', 'Y'];
+  const m = Math.round(0.06 * SIDE);
+  const boxes = {};
+  // One letter in square coordinates (the square from 0 to SIDE), squeezed by `sx` and moved by `dx` (for W).
+  const one = (L, layer, dx = 0, sx = 1) => {
+    const g = glyph(L, layer);
+    const place = dx || sx !== 1 ? `translate(${dx.toFixed(1)} 0) scale(${sx} 1) ` : '';
+    return { svg: `<g transform="${place}translate(${-g.square.x} ${-g.square.y})"><g transform="${g.transform}">${g.body}</g></g>`, g, dx, sx };
+  };
+  const write = (name, parts) => {
+    // The box: the square and its margin, and all of the letter's ink.
+    let [x0, y0, x1, y1] = [-m, -m, SIDE + m, SIDE + m];
+    for (const { g, dx, sx } of parts.letter) {
+      x0 = Math.min(x0, dx + (g.ink.x0 - g.square.x) * sx - 4);
+      x1 = Math.max(x1, dx + (g.ink.x1 - g.square.x) * sx + 4);
+      y0 = Math.min(y0, g.ink.y0 - g.square.y - 4);
+      y1 = Math.max(y1, g.ink.y1 - g.square.y + 4);
+    }
+    const vb = [x0, y0, x1 - x0, y1 - y0].map(Math.round);
+    boxes[name] = vb;
+    const sq = `<clipPath id="sq"><rect x="${-m}" y="${-m}" width="${SIDE + 2 * m}" height="${SIDE + 2 * m}"/></clipPath>`;
+    const svg = (body, clip) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb.join(' ')}">${clip ? `<defs>${sq}</defs>` : ''}<g fill="#000"${clip ? ' clip-path="url(#sq)"' : ''}>${body}</g></svg>\n`;
+    writeFileSync(join(dir, `${name}-letter.svg`), svg(parts.letter.map((p) => p.svg).join(''), false));
+    writeFileSync(join(dir, `${name}-construction.svg`), svg(parts.construction.map((p) => p.svg).join(''), true));
+  };
+  for (const L of ALPHABET) write(L, { letter: [one(L, 'letter')], construction: [one(L, 'construction')] });
+  // W: two V's, each drawn narrower, the second crossing the first, as printers set a W before founts had one.
+  const narrow = 0.6, step = (0.6 - 0.2) * SIDE;
+  write('W', { letter: [one('V', 'letter', 0, narrow), one('V', 'letter', step, narrow)], construction: [one('V', 'construction', 0, narrow), one('V', 'construction', step, narrow)] });
+  writeFileSync(join(dir, 'index.json'), `${JSON.stringify(boxes, null, 1)}\n`);
+  console.log('initials', Object.keys(boxes).length);
 }

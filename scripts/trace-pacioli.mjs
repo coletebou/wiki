@@ -1,5 +1,6 @@
 // Trace one of Luca Pacioli's capitals into vector ink, in two layers: the letter, and the compass circles and ruled
-// lines that built it. The letters are the frontispiece's name (src/assets/pacioli/, by scripts/set-pacioli.mjs).
+// lines that built it: for the frontispiece's name, the masthead and every folio's initial (src/assets/pacioli/, set
+// by scripts/set-pacioli.mjs).
 //
 // Pacioli's De divina proportione (Venice, 1509) closes with an alphabet of Roman capitals, each drawn in its square
 // with compass and ruler; Leonardo drew the book's solids. Wikimedia Commons hosts a public-domain scan of each letter
@@ -9,11 +10,12 @@
 //
 // Not part of the build: the traced files are committed, and this is how they were made. To make them again:
 //   brew install potrace         (sharp comes with Astro)
-//   node scripts/trace-pacioli.mjs "Letter C.jpg" out/C --open=6 --size=800 --margin=0.09 --prune=4 --grow=2
-//   (D and X with --margin=0.14: their circles stand outside the square), then scripts/set-pacioli.mjs.
+//   for L in A B C D E F G H I K L M N O2 P Q R S T V X Y; do
+//     node scripts/trace-pacioli.mjs "Letter $L.jpg" out/$L --open=6 --size=800 --margin=0.14 --prune=4 --grow=2
+//   done
+//   node scripts/set-pacioli.mjs out
 //
-// Steps: find the letter's square from the long runs of ink that frame it; crop to it with a margin, leaving out the
-// text beneath; flatten the paper (subtract a wide blur) and find the ink; close it, since the printed black is
+// Steps: find the letter's square from its upright sides; crop to it with a margin; take out the text beneath; flatten the paper (subtract a wide blur) and find the ink; close it, since the printed black is
 // flecked with paper; open it wider than a hairline, so the letter survives and the construction does not; grow the
 // letter back a little into the ink, for its serifs; fill its flecks, drop the knots where hairlines cross, prune the
 // stubs of hairline left on it; and what ink is left, a hair clear of the letter, is the construction. Each layer is
@@ -29,39 +31,84 @@ const openR = Number(a.open ?? 5);
 const grow = Number(a.grow ?? 3);
 
 const meta = await sharp(SRC).metadata();
-// First pass, small: find the square's frame from long runs of ink.
+// First pass, small: find the square that frames the letter.
 const pre = 1000 / meta.width;
 const pw = Math.round(meta.width * pre), ph = Math.round(meta.height * pre);
 const g0 = await sharp(SRC).greyscale().resize(pw, ph).raw().toBuffer();
 const b0 = await sharp(SRC).greyscale().resize(pw, ph).blur(12).raw().toBuffer();
 const ink0 = new Uint8Array(pw * ph);
 for (let i = 0; i < pw * ph; i++) ink0[i] = b0[i] - g0[i] > 22 ? 1 : 0;
-const ink1 = (x, y) => ink0[y * pw + x] || (y > 0 && ink0[(y - 1) * pw + x]) || (y < ph - 1 && ink0[(y + 1) * pw + x]);
-const rowRun = (y) => { let best = 0, run = 0, gap = 0; for (let x = 0; x < pw; x++) { if (ink1(x, y)) { run += 1 + gap; gap = 0; } else if (run && gap < 4) gap++; else { run = 0; gap = 0; } best = Math.max(best, run); } return best; };
 const inkc = (x, y) => ink0[y * pw + x] || (x > 0 && ink0[y * pw + x - 1]) || (x < pw - 1 && ink0[y * pw + x + 1]);
-const colRun = (x, y0, y1) => { let best = 0, run = 0, gap = 0; for (let y = y0; y < y1; y++) { if (inkc(x, y)) { run += 1 + gap; gap = 0; } else if (run && gap < 4) gap++; else { run = 0; gap = 0; } best = Math.max(best, run); } return best; };
-const rows = []; for (let y = 0; y < ph; y++) if (rowRun(y) > pw * 0.45) rows.push(y);
-if (rows.length < 2) throw new Error(`no frame rows found in ${SRC}`);
-const top = rows[0], bottom = rows[rows.length - 1];
-const cols = []; for (let x = 0; x < pw; x++) if (colRun(x, top, bottom + 1) > (bottom - top) * 0.6) cols.push(x);
-const left = cols[0], right = cols[cols.length - 1];
-const side = Math.max(right - left, bottom - top);
-// Some letters' circles stand outside the square (D, X): keep a margin all round, but nothing below (the text).
+const colRun = (x, y0, y1) => { let best = 0, run = 0, gap = 0; for (let y = y0; y < y1; y++) { if (inkc(x, y)) { run += 1 + gap; gap = 0; } else if (run && gap < 8) gap++; else { run = 0; gap = 0; } best = Math.max(best, run); } return best; };
+// The square's sides are the longest upright lines on the page: a line of the text beneath can look like a rule,
+// but nothing in it stands upright. Its top and bottom are where those sides begin and end.
+const segment = (x) => {
+  let best = [0, 0], start = -1, gap = 0;
+  for (let y = 0; y <= ph; y++) {
+    const on = y < ph && inkc(x, y);
+    if (on) { if (start < 0) start = y; gap = 0; }
+    else if (start >= 0 && gap < 8 && y < ph) gap++;
+    else if (start >= 0) { if (y - gap - start > best[1] - best[0]) best = [start, y - gap]; start = -1; gap = 0; }
+  }
+  return best;
+};
+// Every upright long enough, gathered into the lines they make (a line is a few pixels wide); the square is the
+// widest pair of them about as far apart as they are tall. A letter's own stem (I, Y) stands upright too, but with
+// no partner at the right distance. A side is often broken where a circle meets it (F), so it may measure short;
+// Pacioli's frames are true squares, and the side is taken from the width.
+const ups = [];
+for (let x = 0; x < pw; x++) {
+  if (colRun(x, 0, ph) <= ph * 0.3) continue;
+  const [y0, y1] = segment(x);
+  const last = ups[ups.length - 1];
+  if (last && x - last.x1 <= 3) { last.x1 = x; if (y1 - y0 > last.y1 - last.y0) Object.assign(last, { y0, y1 }); }
+  else ups.push({ x0: x, x1: x, y0, y1 });
+}
+let pair = null;
+for (const p of ups) for (const q of ups) {
+  const w = q.x1 - p.x0, h = Math.max(p.y1, q.y1) - Math.min(p.y0, q.y0);
+  if (w < pw * 0.4 || h < w * 0.6 || h > w * 1.08) continue;
+  if (!pair || w > pair.w) pair = { p, q, w };
+}
+if (!pair) throw new Error(`no square found in ${SRC}: uprights ${JSON.stringify(ups)}`);
+const left = pair.p.x0, right = pair.q.x1;
+const lt = pair.p.y0, rt = pair.q.y0;
+const side = right - left;
+const top = Math.min(lt, rt), bottom = top + side;
+// Some letters stand outside their square: circles beside it (D, M, X, Y), A's apex above it, Q's tail below it. Keep
+// a margin all round, and more below; the text beneath is taken out later, piece by piece.
 const m = Math.round(side * Number(a.margin ?? 0.09));
-const crop = { left: Math.max(0, left - m), top: Math.max(0, top - m), width: 0, height: 0 };
-crop.width = Math.min(pw - crop.left, right - left + 2 * m);
-crop.height = Math.min(ph - crop.top, bottom - top + m + Math.round(side * 0.015));
+const crop = { left: Math.max(0, left - m), top: Math.max(0, top - Math.round(side * 0.24)), width: 0, height: 0 };
+crop.width = Math.min(pw - crop.left, right + Math.max(m, Math.round(side * 0.42)) - crop.left);
+crop.height = Math.min(ph - crop.top, bottom + Math.round(side * 0.5) - crop.top);
 const k = N / side; // scale from the small pass to the working size
 const s = 1 / pre;
 const W = Math.round(crop.width * k), H = Math.round(crop.height * k);
-const base = sharp(SRC).greyscale().extract({ left: Math.round(crop.left * s), top: Math.round(crop.top * s), width: Math.round(crop.width * s), height: Math.round(crop.height * s) });
+const full = { left: Math.round(crop.left * s), top: Math.round(crop.top * s) };
+full.width = Math.min(meta.width - full.left, Math.round(crop.width * s));
+full.height = Math.min(meta.height - full.top, Math.round(crop.height * s));
+const base = sharp(SRC).greyscale().extract(full);
 const grey = await base.clone().resize(W, H, { kernel: 'lanczos3' }).raw().toBuffer();
 const paper = await base.clone().resize(W, H).blur(Math.max(8, N / 60)).raw().toBuffer();
 const ink = new Uint8Array(W * H);
 for (let i = 0; i < W * H; i++) ink[i] = paper[i] - grey[i] > thresh || grey[i] < 90 ? 1 : 0;
-// Blank whatever lies past the frame's bottom (the first words of the text), but keep the frame line itself.
-const frameBottom = Math.round((bottom - crop.top) * k);
-for (let y = frameBottom + Math.round(N * 0.012); y < H; y++) for (let x = 0; x < W; x++) ink[y * W + x] = 0;
+// The text beneath the square: every piece of ink that starts below the frame's bottom line. A piece that reaches up
+// into the square (Q's tail) is the letter's, and stays.
+{
+  const frameBottom = Math.round((bottom - crop.top) * k) + Math.round(N * 0.012);
+  const seen = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    if (!ink[i] || seen[i]) continue;
+    const comp = [i]; seen[i] = 1;
+    let top = H;
+    for (let c = 0; c < comp.length; c++) {
+      const j = comp[c], x = j % W, y = (j / W) | 0;
+      if (y < top) top = y;
+      for (const q of [x > 0 ? j - 1 : -1, x < W - 1 ? j + 1 : -1, y > 0 ? j - W : -1, y < H - 1 ? j + W : -1]) if (q >= 0 && ink[q] && !seen[q]) { seen[q] = 1; comp.push(q); }
+    }
+    if (top > frameBottom) for (const j of comp) ink[j] = 0;
+  }
+}
 
 // Morphology on a square structuring element, separable.
 const pass = (src, r, isMax) => {
