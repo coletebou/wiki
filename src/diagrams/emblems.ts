@@ -229,6 +229,92 @@ const EMBLEMS = {
     circle([-39.4, 0.4], 3, 'sand') +
     circle([-32.8, 0.4], 3, 'sand') +
     circle([-36, -4.6], 3, 'sand'),
+  // The devices of the tables that had none among the studies' emblems. Each table of the catalogue has a device, as
+  // a printer or a guild had (src/data/devices.ts says which).
+  // A counting frame: the machine on a Roman desk.
+  abacus: () => {
+    const rods = [-28, -14, 0, 14, 28];
+    // What the frame reads, rod by rod: beads pushed to the beam count, the rest wait at the rail.
+    const fives = [1, 0, 0, 1, 0];
+    const ones = [2, 3, 1, 4, 0];
+    const beads = rods
+      .map((x, i) => {
+        const upper = circle([x, fives[i] ? -16.6 : -28.4], 4.2, 'sand');
+        const lower = [0, 1, 2, 3].map((k) => circle([x, k < ones[i] ? -5.4 + k * 8.4 : 29.4 - (3 - k) * 8.4], 4.2, 'sand')).join('');
+        return upper + lower;
+      })
+      .join('');
+    return (
+      path('M-40 -34H40V34H-40Z', 'paper') +
+      path(rods.map((x) => `M${x} -34V34`).join(''), 'fine') +
+      path('M-40 -12H40M-40 -10.4H40') +
+      beads +
+      path('M-34 34V40M34 34V40M-46 40H46', 'fine')
+    );
+  },
+  // A scallop: the shell.
+  concha: () => {
+    const hinge: P = [0, 32];
+    const ribs = 9;
+    const at = (i: number, r: number): P => {
+      const a = ((-160 + (i * 140) / ribs) * Math.PI) / 180;
+      return [hinge[0] + r * Math.cos(a), hinge[1] + r * Math.sin(a)];
+    };
+    let rim = `M${xy(at(0, 62))}`;
+    for (let i = 0; i < ribs; i++) rim += `Q${xy(at(i + 0.5, 69))} ${xy(at(i + 1, 62))}`;
+    const lines = Array.from({ length: ribs + 1 }, (_, i) => `M${xy(at(i, 9))}L${xy(at(i, 61))}`).join('');
+    const growth = [27, 44].map((r) => `M${xy(at(0.2, r))}${Array.from({ length: ribs }, (_, i) => `Q${xy(at(i + 0.5, r + 3.2))} ${xy(at(Math.min(ribs - 0.2, i + 1), r))}`).join('')}`).join('');
+    return (
+      path(`${rim}L${xy(hinge)}Z`, 'paper') +
+      path(lines, 'fine') +
+      path(growth, 'fine') +
+      path('M-15 30H15V37H-15Z', 'paper') +
+      path('M-9 30V37M-3 30V37M3 30V37M9 30V37', 'fine')
+    );
+  },
+  // An aqueduct: the works that carry everything else.
+  aquaeductus: () => {
+    const lower = [-39, -11, 17].map((x) => `M${x} 36V15A11 11 0 0 1 ${x + 22} 15V36Z`).join('');
+    const upper = [-41, -27, -13, 1, 15, 29].map((x) => `M${x} 4V-9A5 5 0 0 1 ${x + 10} -9V4Z`).join('');
+    return (
+      `<path class="paper" fill-rule="evenodd" d="M-45 -18H45V36H-45Z${lower}${upper}"/>` +
+      path('M-45 4H45', 'fine') +
+      path('M-48 -24H48V-18H-48Z', 'paper') +
+      path('M-44 -21q3 -2 6 0t6 0t6 0t6 0t6 0t6 0t6 0t6 0t6 0t6 0t6 0t6 0t6 0t6 0', 'fine') +
+      path('M-50 36H50M-42 40H30', 'fine')
+    );
+  },
+  // An armillary sphere: the heavens in rings, for watching them.
+  sphaera: () =>
+    path('M0 -44V26', 'fine') +
+    circle([0, -8], 30) +
+    path('M-30 -8A30 9 0 1 0 30 -8A30 9 0 1 0 -30 -8', 'fine') +
+    path('M0 -38A11 30 0 1 0 0 22A11 30 0 1 0 0 -38', 'fine') +
+    path('M-27.6 3.7A30 9.5 -23 1 0 27.6 -19.7A30 9.5 -23 1 0 -27.6 3.7') +
+    circle([0, -8], 4.6, 'sand') +
+    circle([0, -44], 1.8, 'dot') +
+    path('M0 22V34M-16 44Q0 28 16 44M-21 44H21') +
+    path('M-12 44H12', 'fine'),
+  // Two coins, the upper one struck with the sign of Bitcoin: a B with two strokes through it, above and below.
+  nummus: () =>
+    circle([6, 7], 33, 'paper') +
+    circle([-3, -3], 33, 'paper') +
+    circle([-3, -3], 27, 'fine') +
+    Array.from({ length: 28 }, (_, i) => circle([-3 + 30 * Math.cos((i / 28) * Math.PI * 2), -3 + 30 * Math.sin((i / 28) * Math.PI * 2)], 0.8, 'dot')).join('') +
+    path('M-11 -18V12M-11 -18H0C7 -18 9 -13 9 -10C9 -6 6 -3 0 -3H-11M0 -3C8 -3 11 1 11 5C11 9 7 12 0 12H-11') +
+    path('M-6 -22V-18M0 -22V-18M-6 12V16M0 12V16') +
+    path('M31 22A33 33 0 0 1 14 39', 'fine'),
+  // An open book, with its ribbon.
+  liber: () => {
+    const lines = [-15, -7, 1, 9].map((y) => `M-38 ${y + 2}Q-22 ${y - 3} -7 ${y + 2}M38 ${y + 2}Q22 ${y - 3} 7 ${y + 2}`).join('');
+    return (
+      path('M-47 -19V29C-30 23 -12 24 0 32C12 24 30 23 47 29V-19', 'fine') +
+      path('M0 -22C-12 -30 -30 -30 -44 -24V24C-30 18 -12 18 0 26Z', 'paper') +
+      path('M0 -22C12 -30 30 -30 44 -24V24C30 18 12 18 0 26Z', 'paper') +
+      path(lines, 'fine') +
+      path('M3 25V42L0 38L-3 42V26', 'seal')
+    );
+  },
 } satisfies Record<string, (id: string) => string>;
 
 export interface Emblem {

@@ -3,6 +3,7 @@ import { render } from 'astro:content';
 import { initialOf, sprayRoom } from '../../lib/illumination.mjs';
 import { folioLabel } from '../../lib/schema.mjs';
 import Capitula from '../components/Capitula.astro';
+import Device from '../components/Device.astro';
 import ColesTake from '../components/ColesTake.astro';
 import Initial from '../components/Initial.astro';
 import Diagram from '../components/Diagram.astro';
@@ -54,7 +55,7 @@ const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
       <div class="margin-inner"><Capitula variant="margin" headings={headings} /></div>
       <article class="text-block" data-pagefind-body data-pagefind-filter={`table:${table.title}`} data-folio-slug={page.id} data-folio-title={title} data-folio-label={folioLabel(folio)}>
         <header>
-          <p class="kicker"><a href={`/pinakes/#table-${table.id}`}>Table {table.numeral} · {table.title}</a></p>
+          <p class="kicker"><a href={`/pinakes/#table-${table.id}`}><Device table={table.id} />Table {table.numeral} · {table.title}</a></p>
           <h1 class="title" data-pagefind-meta="title">{title}</h1>
           <InkStroke seed={folio} />
           <p class="summary">{summary}</p>
