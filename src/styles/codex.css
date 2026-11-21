@@ -91,12 +91,12 @@ a {
   text-decoration: none;
 }
 .wordmark b {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.28rem;
-  letter-spacing: 0.16em;
-  /* Letters cut with a chisel catch the light on their lower edge. */
-  text-shadow: 0 1px 0 var(--chisel-light), 0 -1px 0 var(--chisel-dark);
+  /* The name in Pacioli's capitals (Wordmark.astro), as on the frontispiece but without the compass work. */
+  display: block;
+  width: 11.6rem;
+  align-self: center;
+  font-weight: inherit;
+  transition: color 0.15s;
 }
 .wordmark i {
   font-size: 1.05rem;

@@ -1,105 +1,32 @@
-/* The frontispiece: the book's first page. A headpiece of white vine, the title in burnished gold, the beast; and
-   below them the library's cabinet of rolls and the plate of studies. */
+/* The frontispiece: the book's first page. The name in Pacioli's constructed capitals, the beast, Leonardo's man;
+   and below them the library's cabinet of rolls and the plate of studies. */
 
-/* ── Headpiece and title ──────────────────────────────────────────────────────────────────────────────────── */
+/* ── The title ───────────────────────────────────────────────────────────────────────────────────────────── */
 .frontispiece {
   text-align: center;
   padding: 0 0 1rem;
-}
-.headpiece {
-  height: clamp(2.1rem, 1.5rem + 2vw, 2.9rem);
-  max-width: 50rem;
-  margin: 0 auto clamp(1rem, 2.2vw, 1.5rem);
-  border: 2px solid var(--gold);
-  outline: 1px solid var(--il-line);
-  box-shadow: inset 0 0 0 1px var(--il-line);
-  overflow: hidden;
-}
-.headpiece svg {
-  display: block;
-  width: 100%;
-  height: 100%;
 }
 .frontispiece .greek {
   margin: 0;
   font-family: var(--font-text);
   font-size: 0.95rem;
   letter-spacing: 0.4em;
-  color: var(--sanguine);
+  color: var(--ink-3);
 }
+/* The name in Pacioli's capitals (Wordmark.astro), in the ink the man beneath it is drawn in. */
 .frontispiece h1 {
-  position: relative;
-  margin: 0.45rem 0 0;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: clamp(2.6rem, 1.6rem + 5.5vw, 5.6rem);
-  line-height: 1.02;
-  letter-spacing: 0.12em;
+  width: min(100%, 50rem);
+  margin: 0.9rem auto 0;
   color: var(--ink);
-}
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  /* Gold leaf, as a title was laid: the letters first drawn in ink and raised with gesso (the heading itself, with
-     a stroke round it and a shadow under), then the leaf burnished over them (the same words again, cut from a
-     gradient of the leaf's lights and shades). */
-  .frontispiece h1 {
-    color: var(--il-line);
-    -webkit-text-stroke: 0.05em var(--il-line);
-    text-shadow: 0.018em 0.04em 0.02em rgb(30 18 6 / 0.45);
-  }
-  .frontispiece h1::after {
-    content: attr(data-text);
-    /* The same words a second time are for the eye only: with an empty alternative text they are not read twice. */
-    content: attr(data-text) / '';
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(104deg, transparent 42%, rgb(255 251 232 / 0.9) 50%, transparent 58%) 160% 0 / 260% 100% no-repeat,
-      linear-gradient(172deg, var(--gold-hi) 8%, var(--gold) 30%, var(--gold-hi) 46%, var(--gold) 58%, var(--gold-lo) 94%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    -webkit-text-fill-color: transparent;
-    -webkit-text-stroke: 0;
-    text-shadow: none;
-    pointer-events: none;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    /* Once the beast below has drawn himself, the leaf catches the light, once. */
-    .frontispiece h1::after {
-      animation: glint 1.7s cubic-bezier(0.4, 0, 0.3, 1) 2.7s 1 both;
-    }
-    @keyframes glint {
-      from { background-position: 160% 0, 0 0; }
-      to { background-position: -60% 0, 0 0; }
-    }
-  }
-}
-@media print {
-  /* The gold leaf is a background, and a printer leaves backgrounds out: on paper the title is set in gold ink. */
-  .frontispiece h1 {
-    color: var(--gold-ink);
-    -webkit-text-stroke: 0;
-    text-shadow: none;
-  }
-  .frontispiece h1::after {
-    display: none;
-  }
-}
-@media (forced-colors: active) {
-  .frontispiece h1 {
-    -webkit-text-stroke: 0;
-    text-shadow: none;
-  }
-  .frontispiece h1::after {
-    display: none;
-  }
+  line-height: 0;
 }
 .frontispiece .beast {
-  margin: 0.7rem 0 0;
-  font-family: var(--font-display);
+  margin: 0.85rem 0 0;
+  font-family: var(--font-text);
+  font-style: italic;
   font-size: var(--step-2);
-  letter-spacing: 0.08em;
-  color: var(--lapis);
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
 }
 /* Under the drawing, whose it is: small, as a caption is written. */
 .frontispiece .vt-credit {

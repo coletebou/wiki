@@ -1,5 +1,5 @@
 // Make the share card (public/og.jpg, 1200 x 630): the picture a link to the wiki shows when it is posted somewhere.
-// It is the frontispiece itself, rearranged to the card's shape: the title in gold on the left, Leonardo's man on
+// It is the frontispiece itself, rearranged to the card's shape: the name in Pacioli's capitals on the left, Leonardo's man on
 // the right. Like the traced drawing, the card is committed and this is how it was made; it is not part of the build.
 //
 // It needs a browser to draw with, which the site itself does not:
@@ -36,10 +36,8 @@ const CARD = `
     height: 630px; padding: 54px 46px 44px 64px; text-align: left;
   }
   .frontispiece > * { grid-column: 1; min-width: 0; }
-  .headpiece { width: 100%; max-width: none; height: 42px; margin: 0 0 34px; }
-  .frontispiece .greek { font-size: 18px; }
-  .frontispiece h1 { font-size: 73px; letter-spacing: 0.09em; margin-top: 12px; white-space: nowrap; }
-  .frontispiece h1::after { animation: none; }
+  .frontispiece .greek { font-size: 18px; margin-top: 30px; }
+  .frontispiece h1 { width: 640px; margin: 22px 0 0; }
   .frontispiece .beast { font-size: 36px; margin-top: 20px; }
   .frontispiece .being { max-width: 590px; margin: 28px 0 0; font-size: 25px; line-height: 1.42; text-wrap: pretty; }
   .vitruvian { grid-column: 2; grid-row: 1 / -1; align-self: center; width: 424px; margin: 0; }

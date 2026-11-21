@@ -1,10 +1,10 @@
 ---
 import { folioLabel } from '../../lib/schema.mjs';
 import Armarium from '../components/Armarium.astro';
-import Headpiece from '../components/Headpiece.astro';
 import Leaf from '../components/Leaf.astro';
 import Manicule from '../components/Manicule.astro';
 import Vitruvian from '../components/Vitruvian.astro';
+import Wordmark from '../components/Wordmark.astro';
 import { emblem } from '../diagrams/emblems';
 import Base from '../layouts/Base.astro';
 import { href, incipit, tableOf, wiki } from '../lib/wiki';
@@ -35,9 +35,8 @@ const cited = [...pages]
     <div class="folio">
       <div class="text-block" style="grid-column: 1 / -1">
         <section class="frontispiece">
-          <Headpiece seed={1} />
           <p class="greek" lang="grc" title="“The house of healing for the soul”, the inscription said to stand over the library">ΨΥΧΗΣ · ΙΑΤΡΕΙΟΝ</p>
-          <h1 data-text="CODEX TEBOU">CODEX TEBOU</h1>
+          <h1><Wordmark built /></h1>
           <p class="beast">How to Be a Beast</p>
           <Vitruvian />
           <p class="vt-credit">Leonardo da Vinci, about 1490. Photograph: <a href="https://lucnix.be">Luc Viatour / Lucnix.be</a></p>
