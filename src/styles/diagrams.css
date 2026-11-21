@@ -271,6 +271,13 @@
   -webkit-mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
   mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
 }
+/* On a phone the drawing is made wider than the screen, so that its labels stay big enough to read; the frame scrolls
+   sideways to reach the rest. (!important: each drawing also carries its own, smaller, minimum width inline.) */
+@media (max-width: 40rem) {
+  .study-scroll > .study-svg {
+    min-width: 62rem !important;
+  }
+}
 .study-swipe {
   margin: 0.35rem 0 0;
   font-size: 0.85rem;

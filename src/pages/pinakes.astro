@@ -1,6 +1,7 @@
 ---
 import { attic } from '../../lib/numerals.mjs';
 import { folioLabel } from '../../lib/schema.mjs';
+import Device from '../components/Device.astro';
 import Volumen from '../components/Volumen.astro';
 import Base from '../layouts/Base.astro';
 import { href, incipit, stichoi, wiki } from '../lib/wiki';
@@ -43,6 +44,7 @@ const fold = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').
             <span class="numeral">{t.numeral}</span>
             <h2 id={`h-${t.id}`}>{t.title}</h2>
             <p>{t.subtitle}</p>
+            <Device table={t.id} />
           </div>
           {t.pages.length ? (
             <>

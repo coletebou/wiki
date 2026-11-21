@@ -1,0 +1,20 @@
+---
+// A table's device (src/data/devices.ts), drawn in ink. Ornament: the table's name stands beside it wherever it is
+// used, so it is hidden from assistive technology.
+import { DEVICES } from '../data/devices';
+import { emblem } from '../diagrams/emblems';
+
+interface Props {
+  /** The table's id. */
+  table: string;
+  /** Keeps the drawing's own ids unique where one page shows several. */
+  uid?: string;
+}
+const { table, uid = table } = Astro.props;
+const device = DEVICES[table];
+---
+{device && (
+  <svg class="device" viewBox="-56 -56 112 112" aria-hidden="true" focusable="false">
+    <g class="emblem" set:html={emblem({ name: device.emblem, x: 0, y: 0, size: 100 }, `device-${uid}`)} />
+  </svg>
+)}
