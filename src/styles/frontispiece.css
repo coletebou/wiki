@@ -400,7 +400,7 @@ a.roll:focus-visible {
   margin-left: 1.2rem;
 }
 
-/* ── The plate of studies: each with the emblem of its Latin motto ─────────────────────────────────────────── */
+/* ── The plate of studies: each with Leonardo's drawing for its Latin motto ────────────────────────────────────────── */
 .plates {
   list-style: none;
   display: grid;
@@ -429,10 +429,20 @@ a.roll:focus-visible {
   color: var(--ink);
   text-decoration: none;
 }
-.plate svg {
-  width: min(6.6rem, 62%);
-  overflow: visible;
+.plate-sketch {
+  /* Leonardo's drawing, traced: a mask the ink shows through. */
+  display: block;
+  width: min(7.4rem, 70%);
+  aspect-ratio: 1;
   color: var(--ink-2);
+  background: currentColor;
+  -webkit-mask: var(--m) center / contain no-repeat;
+  mask: var(--m) center / contain no-repeat;
+}
+@media (forced-colors: active) {
+  .plate-sketch {
+    background: CanvasText;
+  }
 }
 .plate-motto {
   margin-top: 0.15rem;
@@ -465,10 +475,10 @@ a.roll:focus-visible {
   color: var(--sanguine);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .plate svg {
+  .plate-sketch {
     transition: color 0.2s, transform 0.3s;
   }
-  .plate:hover svg {
+  .plate:hover .plate-sketch {
     color: var(--sanguine);
     transform: rotate(-2deg) scale(1.04);
   }

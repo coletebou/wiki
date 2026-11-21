@@ -1,5 +1,5 @@
-// Trace one of Leonardo's pen sketches into vector ink: the machines in the frontispiece's margins and in the outer
-// margin of every folio (src/assets/leonardo/). The way the Vitruvian man was traced (scripts/trace-vitruvian.mjs), for any sheet: crop to
+// Trace one of Leonardo's pen sketches into vector ink: the machines round the Vitruvian man, the plate of studies,
+// and the outer margin of every folio (src/assets/leonardo/). The way the Vitruvian man was traced (scripts/trace-vitruvian.mjs), for any sheet: crop to
 // the sketch, flatten the paper, find the ink at two thresholds, drop the paper's flecks, trace with potrace.
 //
 // The sheets are the Biblioteca Ambrosiana's scans of the Codex Atlanticus and the Institut de France's of Manuscript
@@ -9,6 +9,9 @@
 //   https://commons.wikimedia.org/wiki/File:Leonardo_da_vinci,_Flying_machine.jpg
 //   https://commons.wikimedia.org/wiki/File:Vinci,_Leonardo_Da_-_Volano_(meccanica).jpg
 //   https://commons.wikimedia.org/wiki/File:Leonardo_da_Vinci_helicopter_and_lifting_wing.jpg
+//   https://commons.wikimedia.org/wiki/File:Leonardo_da_Vinci_-_Ms._H_45v_-_Viola_organista.jpg
+//   https://commons.wikimedia.org/wiki/File:Leonardo_da_Vinci_-_RCIN_912660,_Studies_of_water_c.1510-12.jpg
+//   https://commons.wikimedia.org/wiki/File:Leonardo_da_Vinci_-_zamek_drzwiowy_(Kodeks_Madrycki).jpg
 //
 // Not part of the build: the traced files are committed, and this is how they were made (each at 1920 pixels wide,
 // the size Commons serves; the crops below are on that size). To make them again:
@@ -20,6 +23,9 @@
 //   geometria  Codex Atlanticus f. 272v   --crop=240,370,290,290 --size=520 --thresh=20 --lo=9 --blur=10 --area=40 --long=14
 //   volano     the flywheel press, Codex Atlanticus   --crop=30,20,1860,1700 --size=520 --thresh=26 --lo=12
 //   cochlea    the aerial screw, Manuscript B (364 wide)   --crop=15,5,335,240 --size=520 --thresh=30 --lo=14 --blur=8
+//   clavis     the viola organista's keyboard, Manuscript H f. 45v (652 wide)   --crop=20,0,630,289 --size=520 --thresh=16 --lo=8 --blur=10 --area=30 --long=12
+//   flumen     water past an obstacle, Windsor RCIN 912660 (1439 wide)   --crop=110,310,650,490 --size=520 --thresh=24 --lo=11
+//   porta      a door's lock, Codex Madrid I (324 wide)   --crop=0,0,324,200 --size=520 --thresh=22 --lo=10 --blur=8
 import { execFileSync } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

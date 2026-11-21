@@ -161,26 +161,6 @@ const EMBLEMS = {
       circle(hinge, 1.8, 'dot')
     );
   },
-  // His aerial screw: a sail wound round a mast, to bore into the air.
-  cochlea: () => {
-    const turn = (t: number): P => {
-      const a = t * Math.PI * 3.2;
-      const R = 38 - t * 12;
-      return [Math.cos(a) * R, -2 - t * 40 + Math.sin(a) * R * 0.22];
-    };
-    const edge = Array.from({ length: 90 }, (_, i) => turn(i / 89));
-    const ribs = Array.from({ length: 13 }, (_, i) => {
-      const p = turn(i / 12);
-      return `M0 ${r1(p[1] + 3)}L${xy(p)}`;
-    }).join('');
-    return (
-      path(ribs, 'fine') +
-      path(`M${edge.map(xy).join('L')}`, '') +
-      path('M0 -48V30', '') +
-      path('M-30 30A30 7 0 1 0 30 30A30 7 0 1 0 -30 30Z', 'paper') +
-      path('M-24 34L-28 46M24 34L28 46M0 37V48M-8 30V24H8V30', 'fine')
-    );
-  },
   // Water turning on itself, as he drew it falling into a pool.
   vortex: () => {
     const spiral = Array.from({ length: 80 }, (_, i) => {
@@ -194,29 +174,6 @@ const EMBLEMS = {
       path('M-46 -30C-30 -38 -6 -40 14 -30M-48 -18C-30 -26 -10 -28 6 -22M-46 40C-26 34 0 34 24 24M-30 46C-12 42 8 40 30 30', 'fine')
     );
   },
-  // A key, as a Roman smith cut it: the ring it hangs by, the shank, the bit and its ward.
-  clavis: (id) => {
-    const bit = 'M17 21.2L28.4 32.6L19.2 41.8L15.6 38.2L18.6 35.2L15 31.6L12 34.6L7.8 30.4Z';
-    return (
-      path('M-14.6 -10.4L-10.4 -14.6L36 31.8L31.8 36Z', 'paper') +
-      path(bit, 'paper') +
-      hatched(`${id}-bit`, bit, [6, 20, 30, 43], 2.3) +
-      circle([-24, -24], 15, 'paper') +
-      circle([-24, -24], 8.4, 'fine') +
-      path('M-9.6 -5.4L-5.4 -9.6M-6 -1.8L-1.8 -6', 'fine') +
-      path('M-36 -30C-37 -22 -33 -14 -26 -11', 'shine')
-    );
-  },
-  // A tree: one trunk and three boughs, each with its own crown.
-  arbor: () =>
-    path('M-5 46C-4 30 -3.4 20 -3 8L3 8C3.4 20 4 30 5 46Z', 'paper') +
-    path('M-3 9C-6 -4 -16 -12 -27 -17M0 8C0 -6 0 -18 1 -29M3 9C7 -3 17 -10 28 -14', '') +
-    path('M-14 -9C-18 -8 -22 -4 -23 0M10 -4C15 -4 19 -1 21 3M0.6 -14C4 -16 7 -19 8 -23', 'fine') +
-    circle([-30, -24], 11, 'paper') +
-    circle([1, -38], 11.5, 'paper') +
-    circle([31, -20], 10.5, 'paper') +
-    path('M-36 -26C-33 -30 -28 -30 -25 -27M-34 -20C-30 -23 -27 -22 -25 -19M-4 -41C-1 -45 4 -45 7 -41M-3 -34C0 -37 4 -36 6 -33M26 -23C29 -27 34 -26 36 -22M27 -16C30 -19 34 -18 35 -15', 'fine') +
-    path('M-22 46H22M-14 49.5H14M-1.6 40C-1.4 30 -1.2 22 -1 14', 'fine'),
   // A balance: what is spent in one pan, what it buys in the other.
   libra: () =>
     path('M-3 44L-1.4 -30H1.4L3 44Z', 'paper') +

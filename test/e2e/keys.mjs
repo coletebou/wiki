@@ -11,8 +11,9 @@ p.on('pageerror', (e) => errs.push(e.message));
 const path = () => new URL(p.url()).pathname;
 const ok = (name, cond, extra = '') => console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${extra ? `  (${extra})` : ''}`);
 const key = async (k) => { await p.keyboard.press(k); await p.waitForTimeout(350); await p.waitForLoadState('networkidle'); };
-// A key that turns to another page: wait until the address changes (or give up after a moment) and the page settles.
-const turn = async (k) => { const was = p.url(); await p.keyboard.press(k); await p.waitForURL((u) => u.href !== was, { timeout: 5000 }).catch(() => {}); await p.waitForLoadState('networkidle'); await p.waitForTimeout(250); };
+// A key that turns to another page: wait until the address changes (or give up after a while: a loaded machine can
+// take seconds) and the new page has loaded and settled.
+const turn = async (k) => { const was = p.url(); await p.keyboard.press(k); await p.waitForURL((u) => u.href !== was, { timeout: 12000 }).catch(() => {}); await p.waitForLoadState('load'); await p.waitForLoadState('networkidle'); await p.waitForTimeout(250); };
 
 await p.goto(`${base}/tmux/`, { waitUntil: 'networkidle' });
 const cw = await p.evaluate(() => { const a = document.querySelector('.catchword a'); return a && { text: a.textContent, href: a.getAttribute('href'), label: a.getAttribute('aria-label'), next: document.querySelector('.turn .next')?.getAttribute('href') }; });
@@ -36,8 +37,10 @@ const after = await p.evaluate(() => document.documentElement.dataset.theme);
 ok('l lights the lamp', before !== after, `${before} -> ${after}`);
 await key('l');
 await key('v');
-await p.waitForTimeout(1500);
-ok('v goes to the back of the leaf', await p.evaluate(() => { const r = document.getElementById('verso-head').getBoundingClientRect(); return r.top >= -5 && r.top < innerHeight; }));
+// The leaf scrolls there smoothly: wait for it to arrive (a fixed pause lost the race on a loaded machine).
+const atVerso = () => { const r = document.getElementById('verso-head').getBoundingClientRect(); return r.top >= -5 && r.top < innerHeight; };
+const arrived = await p.waitForFunction(atVerso, null, { timeout: 8000 }).then(() => true, () => false);
+ok('v goes to the back of the leaf', arrived, await p.evaluate(() => `top ${Math.round(document.getElementById('verso-head').getBoundingClientRect().top)}`));
 
 // A study that reads keys keeps them.
 await p.goto(`${base}/tmux-keymap/`, { waitUntil: 'networkidle' });
