@@ -74,9 +74,12 @@ const fold = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').
         <path d="M8 40 L18 46 L8 52 M18 46 H24 M48 46 H66" />
       </svg>
       <p class="sub-name" lang="grc">ΠΙΝΑΚΕΣ</p>
-      <p class="sub-attic" lang="grc" role="img" aria-label={`${count(total)}, written in Attic numerals`}>
-        {attic(total).map(({ sign, five }) => (five && sign !== 'Ι' ? <span class="attic-five">Π<small>{sign}</small></span> : five ? 'Π' : sign))}
-      </p>
+      {/* The Attic signs stop short of a hundred thousand: a library past that keeps its count in plain figures. */}
+      {total >= 1 && total <= 99999 && (
+        <p class="sub-attic" lang="grc" role="img" aria-label={`${count(total)}, written in Attic numerals`}>
+          {attic(total).map(({ sign, five }) => (five && sign !== 'Ι' ? <span class="attic-five">Π<small>{sign}</small></span> : five ? 'Π' : sign))}
+        </p>
+      )}
       <p class="sub-count">{pages.length} folios, {count(total)} stichoi</p>
       <p class="sub-note">The count of lines stands at the foot of the roll, where a scribe left it, in the old numerals of Athens.</p>
     </footer>

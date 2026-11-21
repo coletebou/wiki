@@ -73,4 +73,7 @@ if (table && list) {
   });
   // A leaf read in another tab, or come back to with the browser's Back, shows here too.
   addEventListener('pageshow', lay);
+  addEventListener('storage', (e) => {
+    if (e.key === KEY) lay();
+  });
 }

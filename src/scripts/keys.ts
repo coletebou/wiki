@@ -19,9 +19,10 @@ dialog?.addEventListener('click', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
-  const target = e.target as Element;
-  if (target.closest('input, textarea, select, [contenteditable="true"], figure, dialog')) return;
-  switch (e.key) {
+  const target = e.target as HTMLElement;
+  if (target.isContentEditable || target.closest('input, textarea, select, figure, dialog')) return;
+  // A letter is the same key with Caps Lock on.
+  switch (e.key.length === 1 ? e.key.toLowerCase() : e.key) {
     case '?':
       dialog?.showModal();
       break;
