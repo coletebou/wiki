@@ -72,6 +72,38 @@
   gap: 0 0.7rem;
   padding: 0.1rem 0;
 }
+/* A crowded day, table by table: the table's device and name, then its folios in a line that wraps. */
+.fasti-folios.by-table > .fasti-group {
+  display: grid;
+  grid-template-columns: 10.5rem minmax(0, 1fr);
+  gap: 0.1rem 1rem;
+  align-items: baseline;
+  padding: 0.3rem 0;
+}
+.fasti-folios.by-table > .fasti-group + .fasti-group {
+  border-top: 1px solid color-mix(in srgb, var(--rule) 45%, transparent);
+}
+.fasti-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fasti-inline li {
+  gap: 0 0.4rem;
+}
+@media (max-width: 62rem) {
+  .fasti-folios.by-table {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 34rem) {
+  .fasti-folios.by-table > .fasti-group {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .fasti-folios a {
   color: var(--ink);
   text-decoration-color: var(--rule);
