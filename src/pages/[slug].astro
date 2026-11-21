@@ -9,6 +9,7 @@ import Diagram from '../components/Diagram.astro';
 import InkStroke from '../components/InkStroke.astro';
 import Marginalia from '../components/Marginalia.astro';
 import Price from '../components/Price.astro';
+import Table from '../components/Table.astro';
 import Verso from '../components/Verso.astro';
 import Leaf from '../components/Leaf.astro';
 import Base from '../layouts/Base.astro';
@@ -68,7 +69,7 @@ const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
         <Capitula variant="inline" headings={headings} />
         <div class="prose">
           {initial && <Initial letter={initial} seed={folio} room={sprayRoom(page.body ?? '')} />}
-          <Content components={{ ColesTake, Price, Diagram }} />
+          <Content components={{ ColesTake, Price, Diagram, table: Table }} />
         </div>
         {next && catchword && (
           <p class="catchword" data-pagefind-ignore>

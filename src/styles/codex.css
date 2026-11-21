@@ -582,6 +582,16 @@ kbd {
   overflow-x: auto;
   margin-top: 1.05em;
 }
+/* A table wider than the leaf scrolls sideways in its own box; the leaf stays still. */
+.table-scroll {
+  overflow-x: auto;
+}
+.table-scroll > table {
+  margin-top: 0;
+}
+.table-scroll:focus-visible {
+  outline-offset: 2px;
+}
 .prose table {
   width: 100%;
   border-collapse: collapse;
@@ -597,7 +607,8 @@ kbd {
   vertical-align: top;
   border-bottom: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
 }
-.prose thead th {
+.prose thead th,
+.prose thead td {
   font-weight: 500;
   font-variant-caps: all-small-caps;
   font-size: 1.08em;
@@ -671,6 +682,12 @@ kbd {
 /* ── Prices: amount, then when and where it was read ──────────────────────────────────────────────────────── */
 .price {
   white-space: nowrap;
+}
+@media (max-width: 34rem) {
+  /* A long price ("$20 a seat a month, billed yearly") is wider than a phone: there it may break. */
+  .price {
+    white-space: normal;
+  }
 }
 .price-amount {
   font-variant-numeric: lining-nums;

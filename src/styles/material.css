@@ -154,6 +154,9 @@ body {
 @media (min-width: 48rem) {
   .leaf {
     margin-top: 0.4rem;
+    /* Room on the table at each side for the leaves beneath, which lie a little to the right of this one: without
+       it they would reach past the edge of a screen narrower than the leaf, and the page would scroll sideways. */
+    max-width: min(78rem, calc(100% - 1.6rem));
   }
   .leaf-under {
     display: block;

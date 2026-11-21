@@ -1,0 +1,10 @@
+---
+// A table in a folio's text. On a narrow screen a table can be wider than the leaf: it scrolls sideways inside this
+// box, and the leaf does not. (src/scripts/folio.ts makes the box reachable from the keyboard while it scrolls.)
+//
+// A table that compares things across its columns has an empty corner at the head of its first column. Markdown
+// makes that corner a header cell like the rest of the row, and a header that says nothing is announced as one all
+// the same; it is written out as a plain cell.
+const rows = (await Astro.slots.render('default')).replace(/<th([^>]*)>\s*<\/th>/g, '<td$1></td>');
+---
+<div class="table-scroll"><table {...Astro.props}><Fragment set:html={rows} /></table></div>

@@ -28,6 +28,28 @@ for (const pre of document.querySelectorAll<HTMLPreElement>('.prose pre')) {
   pre.append(button);
 }
 
+// A table that scrolls sideways can be scrolled from the keyboard: while it is wider than its box, the box takes
+// the focus and says what it is. A table that fits is left out of the tab order.
+const boxes = [...document.querySelectorAll<HTMLElement>('.table-scroll')];
+if (boxes.length && 'ResizeObserver' in window) {
+  const fit = new ResizeObserver((entries) => {
+    for (const { target } of entries) {
+      const box = target as HTMLElement;
+      if (box.scrollWidth > box.clientWidth + 1) {
+        // A group and not a region: a page may hold several, and they are not places to navigate between.
+        box.tabIndex = 0;
+        box.setAttribute('role', 'group');
+        box.setAttribute('aria-label', 'Table, scrolls sideways');
+      } else {
+        box.removeAttribute('tabindex');
+        box.removeAttribute('role');
+        box.removeAttribute('aria-label');
+      }
+    }
+  });
+  for (const box of boxes) fit.observe(box);
+}
+
 const marks = new Map<string, HTMLAnchorElement>();
 for (const a of document.querySelectorAll<HTMLAnchorElement>('[data-capitulum]')) marks.set(a.dataset.capitulum!, a);
 if (marks.size && 'IntersectionObserver' in window) {

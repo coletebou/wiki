@@ -266,8 +266,9 @@ const crt = {
   .vt-margin .instrument {
     opacity: 0.85;
   }
-  @media (max-width: 47.99rem) {
-    /* A narrow screen has no margin for the instruments to stand in. */
+  @media (max-width: 63.99rem) {
+    /* A narrow screen has no margin for the instruments to stand in: they need the drawing's width and half as
+       much again, or the edge of the leaf cuts them. */
     .vt-margin {
       display: none;
     }

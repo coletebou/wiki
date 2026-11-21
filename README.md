@@ -46,6 +46,7 @@ npm run e2e -- http://127.0.0.1:4391                  # every suite in test/e2e/
 npm run e2e -- http://127.0.0.1:4391 --engine=all     # in Chromium, WebKit and Firefox
 npm run audit:a11y -- http://127.0.0.1:4391           # axe-core, by day and by lamplight
 npm run audit:contrast -- http://127.0.0.1:4391       # every text against the surface as it is painted
+npm run audit:overflow -- http://127.0.0.1:4391       # no page scrolls sideways, at six widths
 ```
 
 The suites cover the reader's keys, the catalogue's finder, the planisphere, the reading ribbon, and the defects found
