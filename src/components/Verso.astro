@@ -3,6 +3,7 @@
 import { romanDate } from '../../lib/dates.mjs';
 import { folioLabel } from '../../lib/schema.mjs';
 import { href, tableOf, type Page } from '../lib/wiki';
+import Device from './Device.astro';
 
 interface Props {
   page: Page;
@@ -16,6 +17,13 @@ const { page, citedBy, cites, prev, next, stichoi } = Astro.props;
 const { folio, sources = [], updated } = page.data;
 const editUrl = `https://github.com/coletebou/wiki/edit/master/content/${page.id}.mdx`;
 const historyUrl = `https://github.com/coletebou/wiki/commits/master/content/${page.id}.mdx`;
+// A folio's citations, set out table by table in the order the tables first come: the device and the table's name,
+// then its folios run on in a line. A long list stays a few short paragraphs, and says at a glance where it reaches.
+const byTable = (list: Page[]) => {
+  const groups = new Map<string, Page[]>();
+  for (const p of list) groups.set(p.data.table, [...(groups.get(p.data.table) ?? []), p]);
+  return [...groups].map(([id, pages]) => ({ table: tableOf(id), pages }));
+};
 const emended = updated.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 ---
 <section class="verso" aria-labelledby="verso-head">
@@ -23,9 +31,16 @@ const emended = updated.toLocaleDateString('en-US', { month: 'long', day: 'numer
   <section aria-labelledby="cited-by">
     <h3 id="cited-by">Cited by</h3>
     {citedBy.length ? (
-      <ul>
-        {citedBy.map((p) => (
-          <li><a href={href(p.id)}>{p.data.title}</a><small>{folioLabel(p.data.folio)} · {tableOf(p.data.table).title}</small></li>
+      <ul class="by-table">
+        {byTable(citedBy).map(({ table, pages }) => (
+          <li>
+            <span class="verso-table"><Device table={table.id} uid={`verso-cb-${table.id}`} />{table.title}</span>
+            <ul>
+              {pages.map((p) => (
+                <li><a href={href(p.id)}>{p.data.title}</a> <small>{folioLabel(p.data.folio)}</small></li>
+              ))}
+            </ul>
+          </li>
         ))}
       </ul>
     ) : <p class="empty">No folio cites this one yet.</p>}
@@ -33,9 +48,16 @@ const emended = updated.toLocaleDateString('en-US', { month: 'long', day: 'numer
   <section aria-labelledby="cites">
     <h3 id="cites">Cites</h3>
     {cites.length ? (
-      <ul>
-        {cites.map((p) => (
-          <li><a href={href(p.id)}>{p.data.title}</a><small>{folioLabel(p.data.folio)} · {tableOf(p.data.table).title}</small></li>
+      <ul class="by-table">
+        {byTable(cites).map(({ table, pages }) => (
+          <li>
+            <span class="verso-table"><Device table={table.id} uid={`verso-ci-${table.id}`} />{table.title}</span>
+            <ul>
+              {pages.map((p) => (
+                <li><a href={href(p.id)}>{p.data.title}</a> <small>{folioLabel(p.data.folio)}</small></li>
+              ))}
+            </ul>
+          </li>
         ))}
       </ul>
     ) : <p class="empty">This folio cites no other.</p>}
