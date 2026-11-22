@@ -22,6 +22,9 @@ while IFS='|' read -r table subject; do
     jq -r '.data[0].b64_json' | base64 -d > "$out/dev-$table.png"
   node "$here/trace-leonardo.mjs" "$out/dev-$table.png" "$out/$table.svg" --crop=0,0,1024,1024 --size=360 \
     --thresh=40 --lo=18 --blur=10 --area=16 --long=8
+  # The small cut, with a broader nib (src/assets/devices/small/).
+  node "$here/trace-leonardo.mjs" "$out/dev-$table.png" "$out/small-$table.svg" --crop=0,0,1024,1024 --size=360 \
+    --thresh=40 --lo=18 --blur=10 --area=16 --long=8 --bold=4
 done <<'TABLES'
 desk|A Renaissance counting frame (abacus): a square wooden frame with five rods of round beads, seen straight on.
 shell|A scallop shell, seen from above, its ribs fanning from the hinge.

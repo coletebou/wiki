@@ -2,6 +2,6 @@
 import { DEVICES } from '../data/devices';
 
 export function GET() {
-  const drawings = Object.fromEntries(Object.entries(DEVICES).map(([table, d]) => [table, d.src]));
+  const drawings = Object.fromEntries(Object.entries(DEVICES).map(([table, d]) => [table, d.small]));
   return new Response(JSON.stringify(drawings), { headers: { 'content-type': 'application/json; charset=utf-8' } });
 }

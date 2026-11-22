@@ -34,7 +34,7 @@ import sharp from 'sharp';
 
 const [SRC, OUT, ...rest] = process.argv.slice(2);
 if (!SRC || !OUT) {
-  console.error('usage: node scripts/trace-leonardo.mjs <sheet.jpg> <out.svg> --crop=left,top,width,height [--thresh= --lo= --blur= --area= --size=]');
+  console.error('usage: node scripts/trace-leonardo.mjs <sheet.jpg> <out.svg> --crop=left,top,width,height [--thresh= --lo= --blur= --area= --size= --bold=]');
   process.exit(2);
 }
 const a = Object.fromEntries(rest.map((s) => s.replace(/^--/, '').split('=')));
@@ -86,6 +86,23 @@ const ink = strong.slice();
       for (const q of [x > 0 ? j - 1 : -1, x < W - 1 ? j + 1 : -1, y > 0 ? j - W : -1, y < H - 1 ? j + W : -1]) if (q >= 0 && ink[q] && !seen[q]) { seen[q] = 1; comp.push(q); }
     }
     if (comp.length < minArea && Math.max(x1 - x0, y1 - y0) < minLong) for (const j of comp) ink[j] = 0;
+  }
+}
+// A broader nib, for a drawing shown very small: every line thickened by this many pixels, so it holds its weight at
+// a size where a fine pen line would fade to a grey hair. A disc swept along the ink.
+{
+  const r = Number(a.bold ?? 0);
+  if (r > 0) {
+    const src = ink.slice();
+    const disc = [];
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (dx * dx + dy * dy <= r * r + r) disc.push([dx, dy]);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!src[y * W + x]) continue;
+      for (const [dx, dy] of disc) {
+        const xx = x + dx, yy = y + dy;
+        if (xx >= 0 && yy >= 0 && xx < W && yy < H) ink[yy * W + xx] = 1;
+      }
+    }
   }
 }
 const tmp = join(tmpdir(), `leonardo-${process.pid}.pbm`);

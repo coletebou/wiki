@@ -7,8 +7,10 @@ import { DEVICES } from '../data/devices';
 interface Props {
   /** The table's id. */
   table: string;
+  /** At the head of a table in the catalogue: the pen's own line. Elsewhere it is small, cut with a broader nib. */
+  large?: boolean;
 }
-const { table } = Astro.props;
+const { table, large = false } = Astro.props;
 const device = DEVICES[table];
 ---
-{device && <span class="device" style={`--m: url("${device.src}")`} aria-hidden="true"></span>}
+{device && <span class="device" style={`--m: url("${large ? device.src : device.small}")`} aria-hidden="true"></span>}
