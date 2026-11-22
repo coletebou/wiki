@@ -73,7 +73,7 @@ const structured = [
 <Base structured={structured} title={title} description={summary} ogType="article" card={{ src: `/og/${slug}.jpg`, alt: `${title}: ${folioLabel(folio)} of Codex Tebou, in Table ${table.numeral}, ${table.title}, with its device` }}>
   <Leaf>
     <div class="running-head">
-      <a href="/">Codex Tebou</a>
+      <a href="/"><span aria-hidden="true">Codex Tebov</span><span class="visually-hidden">Codex Tebou</span></a>
       <a href={`/pinakes/#table-${table.id}`} class="wide-only">{table.title}</a>
       <span class="folio-no">{folioLabel(folio)}</span>
     </div>
