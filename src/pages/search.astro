@@ -10,7 +10,7 @@ import Base from '../layouts/Base.astro';
         <p class="kicker">The seeker</p>
         <h1 class="title">Seek</h1>
         <p class="summary" style="margin-top: 1rem">Every folio is indexed word by word when the library is built. Type to search; results come from that index, in your browser.</p>
-        <form class="seek-form seek-page" role="search" action="/search/" style="border: 1px solid var(--rule); border-radius: 999px; background: color-mix(in srgb, var(--paper) 70%, transparent)">
+        <form class="seek-form seek-page" role="search" action="/search/" style="border: 1px solid var(--rule); border-radius: 2px; box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--paper) 70%, transparent), inset 0 0 0 4px color-mix(in srgb, var(--rule) 60%, transparent); background: color-mix(in srgb, var(--paper) 70%, transparent)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" /><path d="m15 15 5.5 5.5" /></svg>
           <label class="visually-hidden" for="seek-page-input">Seek in the library</label>
           <input id="seek-page-input" class="seek-input" type="search" name="q" placeholder="Seek a word, a tool, a folio…" autocomplete="off" spellcheck="false" aria-controls="seek-page-results" />

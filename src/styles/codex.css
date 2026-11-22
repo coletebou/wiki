@@ -1288,7 +1288,7 @@ kbd {
   color: var(--ink-2);
   background: none;
   border: 1px solid var(--rule);
-  border-radius: 999px;
+  border-radius: 2px;
   cursor: pointer;
 }
 .keys-close:hover {
@@ -1466,19 +1466,24 @@ kbd {
   letter-spacing: 0.12em;
   color: var(--desk-ink-2);
 }
-.editions a,
-.editions span[aria-current] {
-  display: inline-block;
-  padding: 0.15rem 0.65rem;
-  border: 1px solid var(--desk-rule);
-  border-radius: 999px;
-  text-decoration: none;
-  font-size: 0.95rem;
+/* The editions as a scribe would list them: names in a run, parted by a Roman interpunct, this one in italic. */
+.editions {
+  gap: 0.2rem 0;
+}
+.editions li:not(.label) + li::before {
+  content: '·';
+  margin: 0 0.55rem;
+  color: var(--desk-ink-2);
+}
+.editions a {
+  font-size: 1rem;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 }
 .editions span[aria-current] {
-  color: var(--paper);
-  background: var(--sanguine);
-  border-color: var(--sanguine);
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--desk-ink);
 }
 
 /* ── Shared by the frontispiece and the page that is not there ─────────────────────────────────────────────── */
@@ -1495,7 +1500,9 @@ kbd {
   text-align: left;
   background: color-mix(in srgb, var(--paper) 70%, transparent);
   border: 1px solid var(--rule);
-  border-radius: 999px;
+  /* A ruled box, as a label on a page is ruled, not a capsule. */
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--paper) 70%, transparent), inset 0 0 0 4px color-mix(in srgb, var(--rule) 60%, transparent);
   cursor: text;
   font-style: italic;
 }
