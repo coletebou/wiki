@@ -54,7 +54,7 @@ const path = (p) => new URL(p.url()).pathname;
   await p.waitForTimeout(1500);
   await p.keyboard.press('ArrowDown');
   const a = await p.evaluate(() => { const i = document.querySelector('#seek-input'); const id = i.getAttribute('aria-activedescendant'); const el = id && document.getElementById(id); return { id, role: el?.getAttribute('role'), selected: el?.getAttribute('aria-selected'), label: document.querySelector('#seek-results').getAttribute('aria-label'), n: document.querySelectorAll('#seek-results a').length }; });
-  ok('the arrow keys tell a screen reader which result is chosen', a.n > 0 ? a.role === 'option' && a.selected === 'true' && a.label === 'Results' : true, JSON.stringify(a));
+  ok('the arrow keys tell a screen reader which result is chosen', a.n > 0 ? a.role === 'option' && a.selected === 'true' && /^Results: \d+ folios? answers? “tmux”/.test(a.label ?? '') : true, JSON.stringify(a));
   await p.context().close();
 }
 

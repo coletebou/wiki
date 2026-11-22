@@ -1294,8 +1294,13 @@ kbd {
   list-style: none;
 }
 .seek-results li a {
-  display: block;
-  padding: 0.65rem 1.1rem;
+  /* Set as the catalogue sets an entry (volumen.css .pinax li): the folio in the rubric's column, then the rest. */
+  display: grid;
+  grid-template-columns: 3.6rem minmax(0, 1fr);
+  gap: 0 0.8rem;
+  align-items: baseline;
+  padding: 0.65rem 1.1rem 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 45%, transparent);
   color: var(--ink);
   text-decoration: none;
   border-left: 3px solid transparent;
@@ -1304,6 +1309,15 @@ kbd {
 .seek-results li a[data-chosen] {
   background: var(--sanguine-wash);
   border-left-color: var(--sanguine);
+}
+.seek-results .r-folio {
+  font-style: italic;
+  font-size: 0.98rem;
+  color: var(--sanguine);
+  white-space: nowrap;
+}
+.seek-results .r-body {
+  min-width: 0;
 }
 .seek-results .r-title {
   display: block;
@@ -1339,9 +1353,19 @@ kbd {
   color: var(--ink-2);
 }
 .seek-results mark {
+  /* The words that answered, in the rubricator's red and nothing louder. */
   background: none;
   color: var(--sanguine);
-  font-weight: 650;
+  font-weight: inherit;
+  text-decoration: underline 1px color-mix(in srgb, var(--sanguine) 40%, transparent);
+  text-underline-offset: 0.18em;
+}
+@media (max-width: 34rem) {
+  .seek-results li a {
+    grid-template-columns: 2.9rem minmax(0, 1fr);
+    gap: 0 0.55rem;
+    padding-inline: 0.6rem;
+  }
 }
 .seek-empty {
   padding: 1.2rem 1.1rem;
@@ -1355,7 +1379,7 @@ kbd {
   letter-spacing: 0.12em;
   color: var(--sanguine);
 }
-.seek-head ~ li .r-title {
+.seek-head:not(.seek-count) ~ li .r-title {
   display: inline;
   margin-right: 0.6rem;
 }
