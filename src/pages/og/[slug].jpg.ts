@@ -71,7 +71,7 @@ export async function GET({ params }: { params: { slug: string } }) {
             'div',
             { alignItems: 'baseline', gap: 22, color: INK3 },
             h('div', { fontFamily: 'Garamond', fontStyle: 'italic', fontSize: 30, color: SANGUINE }, folioLabel(page.data.folio)),
-            h('div', { fontFamily: 'Cinzel', fontSize: 22, letterSpacing: 4, color: INK }, 'CODEX · TEBOU'),
+            h('div', { fontFamily: 'Cinzel', fontSize: 22, letterSpacing: 4, color: INK }, 'CODEX · TEBOV'),
             h('div', { fontFamily: 'Garamond', fontSize: 22 }, 'wiki.coletebou.com'),
           ),
         ),
