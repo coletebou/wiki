@@ -5,6 +5,7 @@ import { satteri } from '@astrojs/markdown-satteri';
 import sitemap from '@astrojs/sitemap';
 import { defineConfig } from 'astro/config';
 import { codeFrame } from './lib/code-frame.mjs';
+import { shortCode } from './lib/satteri-code.mjs';
 import { burnCss, materialsCss, volumenCss } from './lib/materials.mjs';
 import { wikiLinks } from './lib/satteri-wikilinks.mjs';
 
@@ -26,8 +27,8 @@ export default defineConfig({
   // The lot-drawing page sends its reader on at once: it is a tool, not a text, and stays out of the sitemap.
   integrations: [mdx(), sitemap({ filter: (page) => !page.endsWith('/sortes/') })],
   markdown: {
-    processor: satteri({ mdastPlugins: [wikiLinks({ contentDir })] }),
-    shikiConfig: { theme: 'css-variables', wrap: false, transformers: [codeFrame()] },
+    processor: satteri({ mdastPlugins: [wikiLinks({ contentDir }), shortCode()] }),
+    shikiConfig: { theme: 'css-variables', wrap: false, transformers: [codeFrame()], langAlias: { tmux: 'shellscript' } },
   },
   devToolbar: { enabled: false },
   vite: { plugins: [materials()] },

@@ -531,8 +531,13 @@ h1.title {
   overflow-wrap: anywhere;
   hyphens: none;
 }
+.prose code.nobr {
+  /* Short enough to fit any line (lib/satteri-code.mjs): never split, where a hyphen would leave a lone dash. */
+  white-space: nowrap;
+}
 kbd {
-  display: inline-block;
+  /* Inline, not a block in the line: a chord like Alt+a then keeps its keys together instead of breaking at the +. */
+  display: inline;
   min-width: 1.7em;
   padding: 0.06em 0.42em 0.12em;
   font-family: var(--font-mono);
@@ -580,6 +585,10 @@ kbd {
 }
 .prose .code-frame > pre {
   margin: 0;
+}
+.prose .code-frame[data-language] > pre {
+  /* Room above the first line for the label, so a long line never runs under it. */
+  padding-top: 1.45rem;
 }
 .prose .code-frame[data-language]::before {
   content: attr(data-language);
