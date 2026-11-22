@@ -173,9 +173,16 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
       .sort((a, b) => b.fit - a.fit || a.i - b.i)
       .slice(0, 12)
       .map(({ d }) => d);
+    // Each result is set as the catalogue sets an entry: the folio's number in the rubric's column, then its title,
+    // its table and the words that answered.
     const nodes = items.map((d) => {
       const a = document.createElement('a');
       a.href = d.url;
+      const folio = document.createElement('span');
+      folio.className = 'r-folio';
+      folio.textContent = d.meta.folio ?? '';
+      const body = document.createElement('span');
+      body.className = 'r-body';
       const title = document.createElement('span');
       title.className = 'r-title';
       title.textContent = d.meta.title ?? d.url;
@@ -183,11 +190,21 @@ function seeker(input: HTMLInputElement, list: HTMLUListElement) {
       meta.className = 'r-meta';
       const mark = device(d.meta.device && drawings[d.meta.device]);
       if (mark) meta.append(mark);
-      meta.append([d.meta.table, d.meta.folio].filter(Boolean).join(', '));
-      a.append(title, meta, excerpt(d.excerpt, d.meta.title ?? ''));
+      meta.append(d.meta.table ?? '');
+      body.append(title, meta, excerpt(d.excerpt, d.meta.title ?? ''));
+      a.append(folio, body);
       return row(a);
     });
-    show('Results', nodes);
+    const all = search.results.length;
+    const head = document.createElement('li');
+    head.className = 'seek-head seek-count';
+    if (options) {
+      head.setAttribute('role', 'presentation');
+      head.setAttribute('aria-hidden', 'true');
+    }
+    const many = (n: number) => `${n} ${n === 1 ? 'folio answers' : 'folios answer'}`;
+    head.textContent = all > items.length ? `${many(all)} “${q.trim()}”; the ${items.length} that answer best` : `${many(all)} “${q.trim()}”`;
+    show(`Results: ${head.textContent}`, [head, ...nodes]);
   };
 
   input.addEventListener('input', () => void run(input.value));
