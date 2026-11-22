@@ -4,6 +4,8 @@
 const root = document.querySelector<HTMLElement>('[data-planisphere]');
 const links = root?.querySelector<SVGGElement>('.pl-links');
 const caption = document.querySelector<HTMLElement>('[data-planisphere-caption]');
+// Where there is no pointer, only a finger, the caption says how a finger works the chart.
+if (caption?.dataset.touch && matchMedia('(hover: none)').matches) caption.textContent = caption.dataset.touch;
 
 if (root && links) {
   const stars = new Map([...root.querySelectorAll<HTMLAnchorElement>('.pl-star')].map((a) => [a.dataset.slug!, a]));

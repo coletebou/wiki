@@ -177,6 +177,40 @@
     display: none;
   }
 }
+.pl-bright {
+  /* The brightest stars in words, where the chart is too small to name them (a phone). */
+  display: none;
+}
+@media (max-width: 40rem) {
+  .pl-bright {
+    display: block;
+    margin: 1.4rem auto 0;
+    max-width: 40rem;
+  }
+  .pl-bright h2 {
+    margin: 0 0 0.4rem;
+    font-family: var(--font-text);
+    font-weight: 400;
+    font-variant-caps: all-small-caps;
+    font-size: 1.05rem;
+    letter-spacing: 0.14em;
+    color: var(--sanguine);
+  }
+  .pl-bright ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pl-bright li {
+    padding: 0.4rem 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--rule) 45%, transparent);
+  }
+  .pl-bright small {
+    display: block;
+    font-size: 0.82rem;
+    color: var(--ink-3);
+  }
+}
 .pl-caption {
   max-width: 40rem;
   min-height: 2.9em;
