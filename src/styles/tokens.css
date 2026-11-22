@@ -131,8 +131,9 @@
   --sanguine: #ee9a72;
   --sanguine-2: #f2b08e;
   --sanguine-wash: rgb(238 154 114 / 0.14);
-  --verdigris: #8cc7b2;
-  --verdigris-wash: rgb(140 199 178 / 0.12);
+  /* Verdigris by lamplight: the green of old copper warmed by the flame, not the cool mint it is by day. */
+  --verdigris: #aec495;
+  --verdigris-wash: rgb(174 196 149 / 0.12);
   --lapis: #9db4ee;
   --lapis-2: #5f7fcf;
   --lapis-wash: rgb(157 180 238 / 0.12);

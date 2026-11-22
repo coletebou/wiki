@@ -116,8 +116,9 @@
     linear-gradient(to top, color-mix(in srgb, var(--roll-shade) 60%, transparent), transparent 3rem),
     linear-gradient(to right, var(--thumbed), transparent 1.8rem),
     linear-gradient(to left, var(--thumbed), transparent 1.8rem),
-    /* A roll is many sheets pasted end to end: each join is a lap of double thickness, a little darker. */
-    repeating-linear-gradient(to bottom, transparent 0 44rem, var(--papyrus-join) 44.05rem 45.1rem, transparent 45.2rem),
+    /* A roll is many sheets pasted end to end: each join is a lap of double thickness, a little darker, its edges
+       feathered where the paste thins out, so it reads as a lap and not as a seam in the picture. */
+    repeating-linear-gradient(to bottom, transparent 0 43.4rem, var(--papyrus-join) 44.2rem 44.9rem, transparent 45.7rem),
     var(--fibres),
     var(--fibres-v),
     var(--grain);

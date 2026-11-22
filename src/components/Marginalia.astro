@@ -3,8 +3,11 @@
 // traced from his notebooks (scripts/trace-leonardo.mjs), in the outer margin. Hidden from assistive technology and
 // never used for content. Point at a line and it turns to face you, and a tag gives its English
 // (src/scripts/sillybos.ts reads the data-gloss attributes).
+import clavis from '../assets/leonardo/clavis.svg?url';
 import cochlea from '../assets/leonardo/cochlea.svg?url';
+import flumen from '../assets/leonardo/flumen.svg?url';
 import geometria from '../assets/leonardo/geometria.svg?url';
+import porta from '../assets/leonardo/porta.svg?url';
 import rotae from '../assets/leonardo/rotae.svg?url';
 import veru from '../assets/leonardo/veru.svg?url';
 import volano from '../assets/leonardo/volano.svg?url';
@@ -18,11 +21,13 @@ interface Props {
 }
 const { folio, table } = Astro.props;
 const pick = (i: number) => LINES[(folio * 7 + i * 3) % LINES.length];
-// Each table's sketch: the aerial screw for the Shell (a shell's own spiral), the spit that turns itself for the
-// Automata, wheels in mesh for the Workshop, the great press for the Works, the flying machine for the Atelier, the
-// game of circles for the Observatory, and so on.
+// Each table's sketch, nine of his machines for ten tables: the keyboard of his viola organista for the Desk and
+// its keyboards, the aerial screw for the Shell (a shell's own spiral), the spit that turns itself for the Automata,
+// wheels in mesh for the Workshop, the great press for the Works, the game of circles for the Observatory, the flying
+// machine for the Atelier, the same circles struck as coins for the Mint, water running its course for the Ledger
+// (money is spent as a river runs), and a door's lock for the Library.
 const SKETCHES = {
-  desk: rotae,
+  desk: clavis,
   shell: cochlea,
   automata: veru,
   workshop: rotae,
@@ -30,8 +35,8 @@ const SKETCHES = {
   observatory: geometria,
   atelier: volatus,
   mint: geometria,
-  ledger: volano,
-  library: cochlea,
+  ledger: flumen,
+  library: porta,
 } as Record<string, string>;
 const sketch = SKETCHES[table] ?? [cochlea, geometria, rotae, veru, volano, volatus][folio % 6];
 const source = (n?: number) => (n ? `Richter, § ${n}` : 'A plain rendering');
