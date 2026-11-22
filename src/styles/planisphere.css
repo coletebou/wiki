@@ -36,6 +36,24 @@
   stroke-width: 0.7;
   stroke-dasharray: 1 5;
 }
+/* The figures of the houses: each table's device drawn large and faint behind its stars, as an old chart drew a
+   constellation's figure behind its own. Ornament: the house is named on the rim. */
+.pl-figures {
+  opacity: 0.11;
+  pointer-events: none;
+}
+.pl-figure {
+  fill: var(--ink);
+  stroke: none;
+}
+:root[data-theme='lucerna'] .pl-figures {
+  opacity: 0.1;
+}
+@media (forced-colors: active) {
+  .pl-figures {
+    display: none;
+  }
+}
 .pl-pole {
   stroke-width: 0.9;
 }
