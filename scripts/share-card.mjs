@@ -1,4 +1,5 @@
-// Make the share card (public/og.jpg, 1200 x 630): the picture a link to the wiki shows when it is posted somewhere.
+// Make the share card (public/og.jpg, 1200 x 630): the picture a link to the wiki's front page shows when it is posted
+// somewhere. Each folio has a card of its own, drawn with the build (src/pages/og/[slug].jpg.ts).
 // It is the frontispiece itself, rearranged to the card's shape: the name in Pacioli's capitals on the left, Leonardo's man on
 // the right. Like the traced drawing, the card is committed and this is how it was made; it is not part of the build.
 //

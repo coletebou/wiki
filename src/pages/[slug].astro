@@ -44,7 +44,7 @@ const emended = updated.toLocaleDateString('en-US', { month: 'short', day: 'nume
 const next = pages[index + 1];
 const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
 ---
-<Base title={title} description={summary} ogType="article">
+<Base title={title} description={summary} ogType="article" card={{ src: `/og/${slug}.jpg`, alt: `${title}: ${folioLabel(folio)} of Codex Tebou, in Table ${table.numeral}, ${table.title}, with its device` }}>
   <Leaf>
     <div class="running-head">
       <a href="/">Codex Tebou</a>

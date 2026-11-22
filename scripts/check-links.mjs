@@ -25,6 +25,8 @@ function walk(dir, out = []) {
 
 const decode = (s) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 const ATTR = /<(a|link|script|img|source|iframe|use)\b[^>]*?\s(href|src|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
+// A page's share card is named in a meta tag's content: a missing card is a broken picture wherever the page is posted.
+const CARD = /<meta\b[^>]*?\sproperty="(?:og:image|twitter:image)"[^>]*?\scontent="([^"]*)"/gi;
 const ID = /\s(?:id|name)\s*=\s*"([^"]+)"/g;
 
 const files = walk(dist);
@@ -62,8 +64,9 @@ let checked = 0;
 for (const file of html) {
   const source = readFileSync(file, 'utf8');
   const pageUrl = new URL(`/${path.relative(dist, file).replace(/index\.html$/, '').replace(/\\/g, '/')}`, SITE);
-  for (const m of source.matchAll(ATTR)) {
-    const raw = decode(m[3] ?? m[4] ?? '').trim();
+  const found = [...[...source.matchAll(ATTR)].map((m) => m[3] ?? m[4] ?? ''), ...[...source.matchAll(CARD)].map((m) => m[1])];
+  for (const value of found) {
+    const raw = decode(value).trim();
     if (!raw || /^(mailto:|tel:|javascript:|data:|blob:)/i.test(raw)) continue;
     let url;
     try {
