@@ -5,7 +5,7 @@
 // order of their folios, makes of each table a constellation. Pointing at a star draws its citations.
 import { RADIUS, chart, magnitude, onCircle } from '../../lib/planisphere.mjs';
 import { folioLabel } from '../../lib/schema.mjs';
-import { href, type Wiki } from '../lib/wiki';
+import { href, tableOf, type Wiki } from '../lib/wiki';
 // Each house's figure, as an old star chart drew the figure of a constellation faintly behind its stars: the table's
 // device (src/data/devices.ts), the same file the catalogue shows, used as a mask the chart's ink shows through.
 import { DEVICES } from '../data/devices';
@@ -88,7 +88,7 @@ const named = [...stars]
       return Math.min(...stars.filter((o) => o !== s).map((o) => Math.hypot(Math.max(0, Math.abs(o.x - cx) - wide / 2), Math.max(0, Math.abs(o.y - cy) - 9))));
     };
     const best = sides.reduce((a, b) => (clearance(b) > clearance(a) ? b : a));
-    return { x: s.x + best.dx, y: s.y + best.dy, anchor: best.anchor, title };
+    return { x: s.x + best.dx, y: s.y + best.dy, anchor: best.anchor, title, slug: s.slug };
   });
 const GLYPH = [
   null,
@@ -154,6 +154,18 @@ const GLYPH = [
     );
   })}
 </div>
-<p class="pl-caption" data-planisphere-caption>
+<p class="pl-caption" data-planisphere-caption data-touch="Touch a star to draw its citations across the chart; touch it again to open its folio.">
   Point at a star to draw its citations across the chart.
 </p>
+{/* On a phone the chart is too small to name its stars: the brightest are named here instead, as links. */}
+<section class="pl-bright" aria-labelledby="pl-bright-title">
+  <h2 id="pl-bright-title">The brightest stars</h2>
+  <ol>
+    {named.map((n) => {
+      const p = bySlug.get(n.slug)!;
+      return (
+        <li><a href={href(n.slug)}>{n.title}</a><small>{folioLabel(p.data.folio)} · {tableOf(p.data.table).title} · cited by {citedBy(n.slug).length}</small></li>
+      );
+    })}
+  </ol>
+</section>
