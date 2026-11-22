@@ -43,8 +43,34 @@ const emended = updated.toLocaleDateString('en-US', { month: 'short', day: 'nume
 // so that the leaves of a book were gathered in their order.
 const next = pages[index + 1];
 const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
+// What the folio is, for search engines: an article in its table of the codex, by Cole, with its card and the day
+// it was last emended; and the trail to it, the codex, then the table in the catalogue.
+const here = new URL(href(page.id), Astro.site).href;
+const structured = [
+  {
+    '@type': 'TechArticle',
+    headline: title,
+    description: summary,
+    url: here,
+    image: new URL(`/og/${page.id}.jpg`, Astro.site).href,
+    dateModified: updated.toISOString().slice(0, 10),
+    articleSection: table.title,
+    inLanguage: 'en',
+    author: { '@type': 'Person', name: 'Cole Tebou' },
+    isPartOf: { '@type': 'WebSite', name: 'Codex Tebou', url: new URL('/', Astro.site).href },
+    license: 'https://creativecommons.org/licenses/by/4.0/',
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Codex Tebou', item: new URL('/', Astro.site).href },
+      { '@type': 'ListItem', position: 2, name: `Table ${table.numeral} · ${table.title}`, item: new URL(`/pinakes/#table-${table.id}`, Astro.site).href },
+      { '@type': 'ListItem', position: 3, name: title, item: here },
+    ],
+  },
+];
 ---
-<Base title={title} description={summary} ogType="article" card={{ src: `/og/${slug}.jpg`, alt: `${title}: ${folioLabel(folio)} of Codex Tebou, in Table ${table.numeral}, ${table.title}, with its device` }}>
+<Base structured={structured} title={title} description={summary} ogType="article" card={{ src: `/og/${slug}.jpg`, alt: `${title}: ${folioLabel(folio)} of Codex Tebou, in Table ${table.numeral}, ${table.title}, with its device` }}>
   <Leaf>
     <div class="running-head">
       <a href="/">Codex Tebou</a>
