@@ -6,6 +6,9 @@
 import { RADIUS, chart, magnitude, onCircle } from '../../lib/planisphere.mjs';
 import { folioLabel } from '../../lib/schema.mjs';
 import { href, type Wiki } from '../lib/wiki';
+// Each house's figure, as an old star chart drew the figure of a constellation faintly behind its stars: the table's
+// device (src/data/devices.ts), the same file the catalogue shows, used as a mask the chart's ink shows through.
+import { DEVICES } from '../data/devices';
 
 interface Props {
   tables: Wiki['tables'];
@@ -15,6 +18,16 @@ interface Props {
 const { tables, graph, bySlug } = Astro.props;
 
 const { houses, stars, lines } = chart(tables.map((t) => ({ id: t.id, slugs: t.pages.map((p) => p.id) })));
+// The figure stands across the middle of its house, as large as the house is wide there, never larger than a
+// fifth of the chart.
+const figures = houses.flatMap((h) => {
+  const d = DEVICES[h.id];
+  if (!d) return [];
+  const r = RADIUS * 0.74;
+  const size = Math.min(RADIUS * 0.4, r * (h.to - h.from) * 0.95);
+  const [cx, cy] = onCircle(r, h.mid);
+  return [{ id: h.id, src: d.src, x: (cx - size / 2).toFixed(1), y: (cy - size / 2).toFixed(1), size: size.toFixed(1) }];
+});
 const citedBy = (slug: string): string[] => [...(graph.backlinks.get(slug) ?? [])].filter((s) => s !== slug);
 const cites = (slug: string): string[] => [...new Set((graph.outlinks.get(slug) ?? []).map((l: { to: string }) => l.to))].filter((s) => s !== slug && bySlug.has(s));
 const most = Math.max(1, ...stars.map((s) => citedBy(s.slug).length));
@@ -96,6 +109,16 @@ const GLYPH = [
     <circle class="pl-circle pl-ecliptic" r={RADIUS * 0.56} />
     <path class="pl-door" d={doors} />
     <path class="pl-pole" d="M-9 0H9M0 -9V9M-4 -4L4 4M-4 4L4 -4" />
+    <g class="pl-figures">
+      {figures.map((g) => (
+        <>
+          <mask id={`pl-fig-${g.id}`} style="mask-type: alpha" maskUnits="userSpaceOnUse" x={g.x} y={g.y} width={g.size} height={g.size}>
+            <image href={g.src} x={g.x} y={g.y} width={g.size} height={g.size} />
+          </mask>
+          <rect class="pl-figure" data-table={g.id} x={g.x} y={g.y} width={g.size} height={g.size} mask={`url(#pl-fig-${g.id})`} />
+        </>
+      ))}
+    </g>
     {names.map((n) => (
       <text class:list={['pl-name', { narrow: n.narrow }]}>
         <textPath href={`#${n.id}`} startOffset="50%" text-anchor="middle"><tspan class="pl-numeral">{n.numeral}</tspan><tspan class="pl-title" dx="7">{n.title}</tspan></textPath>
