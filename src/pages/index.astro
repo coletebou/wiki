@@ -30,11 +30,14 @@ const studies = (
     { slug: 'what-it-costs', name: 'What it costs', note: 'A calculator over every price, each with its date.', sketch: geometria, motto: 'de sumptibus' },
   ] as const
 ).filter((s) => bySlug.has(s.slug));
-const recent = [...pages].sort((a, b) => b.data.updated.valueOf() - a.data.updated.valueOf() || a.data.folio - b.data.folio).slice(0, 8);
+// The folios most lately emended, a day at a time (lib/emended.mjs): a day too full to list is named as one day.
+const { recent, together } = lately(pages, 8);
+const togetherOn = together?.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 const cited = [...pages]
   .map((p) => ({ p, n: (graph.backlinks.get(p.id) ?? []).length }))
   .sort((a, b) => b.n - a.n || a.p.data.folio - b.p.data.folio)
   .slice(0, 8);
+import { lately } from '../../lib/emended.mjs';
 ---
 <Base title="How to Be a Beast" description="Cole Tebou’s wiki of the whole workflow: terminals, tmux, agents and their hooks, worktrees, Cloudflare, Vercel, Langfuse, apps, desk gear and what it all costs." current="home" structured={[{ '@type': 'WebSite', name: 'Codex Tebou', alternateName: 'How to Be a Beast', url: new URL('/', Astro.site).href, inLanguage: 'en', author: { '@type': 'Person', name: 'Cole Tebou' }, potentialAction: { '@type': 'SearchAction', target: new URL('/search/?q={search_term_string}', Astro.site).href, 'query-input': 'required name=search_term_string' } }]}>
   <Leaf>
@@ -81,7 +84,7 @@ const cited = [...pages]
             <svg class="roll" viewBox="-16 -16 32 32" aria-hidden="true"><circle class="roll-end" r="14" /><circle class="roll-boss gold" r="2.7" /></svg>
             a gold boss: among the eight most cited
             <svg class="roll recent" viewBox="-20 -16 36 40" aria-hidden="true"><circle class="roll-end" r="14" /><circle class="roll-boss" r="2.7" /><path class="roll-tag" d="M-9.5 9.5L-13 15.5M-15.6 14.4L-10.6 17.4L-13.4 22L-18.4 19Z" /></svg>
-            a red tag: among the eight most lately emended
+            a red tag: emended since the rest
           </p>
           <p class="sortes-line">See how the folios cite one another on <a href="/planisphere/">the planisphere</a>, or let the library choose: <a href="/sortes/">open it at a leaf drawn by lot</a>.</p>
         </section>
@@ -124,6 +127,9 @@ const cited = [...pages]
               {recent.map((p) => (
                 <li><a href={href(p.id)}>{p.data.title}</a><small>{folioLabel(p.data.folio)} · {tableOf(p.data.table).title}</small></li>
               ))}
+              {together && (
+                <li class="together"><a href="/fasti/">{together.count} folios</a> set down together<small>all on {togetherOn}</small></li>
+              )}
             </ul>
             <p class="feed-line">Follow the emendations in a feed reader: <a href="/emendations.xml">the feed</a>. Or read <a href="/fasti/">the whole calendar</a>.</p>
           </section>
