@@ -29,8 +29,10 @@ interface Props {
   notFound?: boolean;
   /** A page that is a tool and not a text (the lot-drawing page): not indexed. */
   noindex?: boolean;
+  /** The page's own share card (a folio's, src/pages/og/), and what it shows; else the frontispiece's. */
+  card?: { src: string; alt: string };
 }
-const { title, description, current, ogType = 'website', notFound = false, noindex = false } = Astro.props;
+const { title, description, current, ogType = 'website', notFound = false, noindex = false, card } = Astro.props;
 const site = Astro.site!;
 const canonical = notFound || noindex ? null : new URL(Astro.url.pathname, site).href;
 const fullTitle = current === 'home' ? 'Codex Tebou · How to Be a Beast' : `${title} · Codex Tebou`;
@@ -69,10 +71,10 @@ const withFrom = (h: string) => {
     <meta property="og:description" content={description} />
     <meta property="og:type" content={ogType} />
     {canonical && <meta property="og:url" content={canonical} />}
-    <meta property="og:image" content={new URL('/og.jpg', site).href} />
+    <meta property="og:image" content={new URL(card?.src ?? '/og.jpg', site).href} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Codex Tebou, How to Be a Beast: the name in Pacioli's compass-drawn capitals on vellum, beside Leonardo's Vitruvian Man" />
+    <meta property="og:image:alt" content={card?.alt ?? "Codex Tebou, How to Be a Beast: the name in Pacioli's compass-drawn capitals on vellum, beside Leonardo's Vitruvian Man"} />
     <meta name="twitter:card" content="summary_large_image" />
     <script is:inline>
       // Before first paint: the reader's chosen theme, else the system's.
