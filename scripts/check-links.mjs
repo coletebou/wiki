@@ -65,6 +65,15 @@ for (const file of html) {
   const source = readFileSync(file, 'utf8');
   const pageUrl = new URL(`/${path.relative(dist, file).replace(/index\.html$/, '').replace(/\\/g, '/')}`, SITE);
   const found = [...[...source.matchAll(ATTR)].map((m) => m[3] ?? m[4] ?? ''), ...[...source.matchAll(CARD)].map((m) => m[1])];
+  // What a page tells search engines it is (JSON-LD) must at least be JSON that names its schema.org type.
+  for (const m of source.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
+    try {
+      const d = JSON.parse(m[1]);
+      if (d['@context'] !== 'https://schema.org' || !d['@type']) broken.push({ file, raw: 'ld+json', reason: 'no schema.org @context or @type' });
+    } catch (e) {
+      broken.push({ file, raw: 'ld+json', reason: `not JSON: ${e.message}` });
+    }
+  }
   for (const value of found) {
     const raw = decode(value).trim();
     if (!raw || /^(mailto:|tel:|javascript:|data:|blob:)/i.test(raw)) continue;

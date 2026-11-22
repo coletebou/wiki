@@ -31,8 +31,10 @@ interface Props {
   noindex?: boolean;
   /** The page's own share card (a folio's, src/pages/og/), and what it shows; else the frontispiece's. */
   card?: { src: string; alt: string };
+  /** What the page is, for search engines (schema.org JSON-LD): a folio says it is an article in a table. */
+  structured?: Record<string, unknown>[];
 }
-const { title, description, current, ogType = 'website', notFound = false, noindex = false, card } = Astro.props;
+const { title, description, current, ogType = 'website', notFound = false, noindex = false, card, structured = [] } = Astro.props;
 const site = Astro.site!;
 const canonical = notFound || noindex ? null : new URL(Astro.url.pathname, site).href;
 const fullTitle = current === 'home' ? 'Codex Tebou · How to Be a Beast' : `${title} · Codex Tebou`;
@@ -98,6 +100,8 @@ const withFrom = (h: string) => {
         if (why && /^(AbortError|InvalidStateError|TimeoutError)$/.test(why.name) && /transition/i.test(why.message || '')) e.preventDefault();
       });
     </script>
+    {/* The data is the site's own; '<' is escaped so no text in it can close the script. */}
+    {structured.map((d) => <script type="application/ld+json" set:html={JSON.stringify({ '@context': 'https://schema.org', ...d }).replace(/</g, '\\u003c')} />)}
   </head>
   <body>
     <a class="skip" href="#text">Skip to the text</a>
