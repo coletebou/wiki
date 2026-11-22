@@ -71,7 +71,7 @@ const fixed = (name: string) => /^(Kal|Non|Id)\./.test(name);
                         <ul class="fasti-folios by-table">
                           {byTable(list).map(({ t, items }) => (
                             <li class="fasti-group">
-                              <span class="fasti-table"><Device table={t.id} uid={`fasti-${key}-${t.id}`} />{t.title}</span>
+                              <span class="fasti-table"><Device table={t.id} />{t.title}</span>
                               <ul class="fasti-inline">
                                 {items.map((p) => (
                                   <li>
@@ -91,7 +91,7 @@ const fixed = (name: string) => /^(Kal|Non|Id)\./.test(name);
                               <li>
                                 <a href={href(p.id)}>{p.data.title}</a>
                                 <span class="fasti-folio">{folioLabel(p.data.folio)}</span>
-                                <span class="fasti-table"><Device table={t.id} uid={`fasti-${p.id}`} />{t.title}</span>
+                                <span class="fasti-table"><Device table={t.id} />{t.title}</span>
                               </li>
                             );
                           })}

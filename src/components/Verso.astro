@@ -34,7 +34,7 @@ const emended = updated.toLocaleDateString('en-US', { month: 'long', day: 'numer
       <ul class="by-table">
         {byTable(citedBy).map(({ table, pages }) => (
           <li>
-            <span class="verso-table"><Device table={table.id} uid={`verso-cb-${table.id}`} />{table.title}</span>
+            <span class="verso-table"><Device table={table.id} />{table.title}</span>
             <ul>
               {pages.map((p) => (
                 <li><a href={href(p.id)}>{p.data.title}</a> <small>{folioLabel(p.data.folio)}</small></li>
@@ -51,7 +51,7 @@ const emended = updated.toLocaleDateString('en-US', { month: 'long', day: 'numer
       <ul class="by-table">
         {byTable(cites).map(({ table, pages }) => (
           <li>
-            <span class="verso-table"><Device table={table.id} uid={`verso-ci-${table.id}`} />{table.title}</span>
+            <span class="verso-table"><Device table={table.id} />{table.title}</span>
             <ul>
               {pages.map((p) => (
                 <li><a href={href(p.id)}>{p.data.title}</a> <small>{folioLabel(p.data.folio)}</small></li>
