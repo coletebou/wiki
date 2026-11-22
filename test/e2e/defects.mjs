@@ -156,5 +156,24 @@ const path = (p) => new URL(p.url()).pathname;
   await p.context().close();
 }
 
+// A code block with a line too long for it: an edge shadow says it scrolls, and its label and copy button stay put
+// on the frame while the text scrolls under them.
+{
+  const p = await open();
+  await p.goto(`${base}/ssh/`, { waitUntil: 'networkidle' });
+  const s = await p.evaluate(() => {
+    const pre = [...document.querySelectorAll('.prose .code-frame > pre')].find((e) => e.scrollWidth > e.clientWidth + 4);
+    if (!pre) return null;
+    const frame = pre.parentElement, button = frame.querySelector('.copy-code');
+    const at = () => Math.round(button.getBoundingClientRect().left);
+    const before = at();
+    pre.scrollLeft = 9999;
+    const after = at();
+    return { label: getComputedStyle(frame, '::before').content, layers: getComputedStyle(pre).backgroundImage.split('linear-gradient').length - 1, before, after, scrolled: pre.scrollLeft > 0 };
+  });
+  ok('a long line scrolls under a still label and copy button, with a shadow at the edge', s && s.scrolled && s.label === '"sh"' && s.layers === 4 && s.before === s.after, JSON.stringify(s));
+  await p.context().close();
+}
+
 console.log('page errors:', errs);
 await b.close();

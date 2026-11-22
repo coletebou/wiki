@@ -4,6 +4,7 @@ import mdx from '@astrojs/mdx';
 import { satteri } from '@astrojs/markdown-satteri';
 import sitemap from '@astrojs/sitemap';
 import { defineConfig } from 'astro/config';
+import { codeFrame } from './lib/code-frame.mjs';
 import { burnCss, materialsCss, volumenCss } from './lib/materials.mjs';
 import { wikiLinks } from './lib/satteri-wikilinks.mjs';
 
@@ -26,7 +27,7 @@ export default defineConfig({
   integrations: [mdx(), sitemap({ filter: (page) => !page.endsWith('/sortes/') })],
   markdown: {
     processor: satteri({ mdastPlugins: [wikiLinks({ contentDir })] }),
-    shikiConfig: { theme: 'css-variables', wrap: false },
+    shikiConfig: { theme: 'css-variables', wrap: false, transformers: [codeFrame()] },
   },
   devToolbar: { enabled: false },
   vite: { plugins: [materials()] },

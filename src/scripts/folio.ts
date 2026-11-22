@@ -25,7 +25,8 @@ for (const pre of document.querySelectorAll<HTMLPreElement>('.prose pre')) {
     }
     setTimeout(() => (button.textContent = 'Copy'), 1600);
   });
-  pre.append(button);
+  // On the block's frame when it has one, so the button stays put while a long line is scrolled.
+  (pre.parentElement?.classList.contains('code-frame') ? pre.parentElement : pre).append(button);
 }
 
 // A table that scrolls sideways can be scrolled from the keyboard: while it is wider than its box, the box takes

@@ -550,7 +550,15 @@ kbd {
   position: relative;
   padding: 1rem 1.15rem;
   overflow-x: auto;
-  background: var(--code-bg) !important;
+  /* A line longer than the block scrolls; a shadow at the edge it runs past says so, and goes once it is all in
+     view. The covers move with the text (local) and hide the shadows (scroll) at an end there is nothing past. */
+  --edge: color-mix(in srgb, var(--ink) 22%, transparent);
+  background:
+    linear-gradient(to right, var(--code-bg) 40%, transparent) left / 2.5rem 100% no-repeat local,
+    linear-gradient(to left, var(--code-bg) 40%, transparent) right / 2.5rem 100% no-repeat local,
+    linear-gradient(to right, var(--edge), transparent) left / 0.9rem 100% no-repeat scroll,
+    linear-gradient(to left, var(--edge), transparent) right / 0.9rem 100% no-repeat scroll,
+    var(--code-bg) !important;
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   font-size: 0.95rem;
@@ -565,9 +573,19 @@ kbd {
   border: 0;
   padding: 0;
 }
-.prose pre[data-language]::before {
+/* The frame round a block (lib/code-frame.mjs) holds still while the block scrolls: the label and the copy button
+   sit on it. */
+.prose .code-frame {
+  position: relative;
+}
+.prose .code-frame > pre {
+  margin: 0;
+}
+.prose .code-frame[data-language]::before {
   content: attr(data-language);
   position: absolute;
+  z-index: 1;
+  pointer-events: none;
   top: 0.2rem;
   right: 0.6rem;
   font-family: var(--font-text);
@@ -578,6 +596,7 @@ kbd {
 }
 .copy-code {
   position: absolute;
+  z-index: 1;
   bottom: 0.4rem;
   right: 0.45rem;
   padding: 0.12rem 0.5rem;
@@ -590,7 +609,7 @@ kbd {
   cursor: pointer;
   transition: opacity 0.15s;
 }
-.prose pre:hover .copy-code,
+.prose :is(pre, .code-frame):hover .copy-code,
 .copy-code:focus-visible {
   opacity: 1;
 }
@@ -599,7 +618,8 @@ kbd {
     opacity: 0.85;
   }
   /* The button is always showing here, so the block keeps a strip under its last line for it to sit in. */
-  .prose pre:has(.copy-code) {
+  .prose pre:has(.copy-code),
+  .prose .code-frame:has(.copy-code) > pre {
     padding-bottom: 2.3rem;
   }
 }
