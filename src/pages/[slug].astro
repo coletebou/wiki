@@ -14,7 +14,7 @@ import Table from '../components/Table.astro';
 import Verso from '../components/Verso.astro';
 import Leaf from '../components/Leaf.astro';
 import Base from '../layouts/Base.astro';
-import { href, incipit, stichoi, tableOf, wiki } from '../lib/wiki';
+import { href, incipit, stichoi, tableOf, wiki, roman } from '../lib/wiki';
 
 export async function getStaticPaths() {
   const { pages } = await wiki();
@@ -74,6 +74,8 @@ const catchword = next ? incipit(next.body ?? '', 3).replace(/…$/, '') : '';
           {initial && <Initial letter={initial} />}
           <Content components={{ ColesTake, Price, Diagram, table: Table }} />
         </div>
+        {/* The scribe's last line under a text: here ends the leaf. Ornament, so a reader is not told it twice. */}
+        <p class="explicit" aria-hidden="true" data-pagefind-ignore>Explicit folium {roman(folio)}</p>
         {next && catchword && (
           <p class="catchword" data-pagefind-ignore>
             <a href={href(next.id)}>{catchword}<span class="visually-hidden">: the next leaf, {next.data.title}</span></a>

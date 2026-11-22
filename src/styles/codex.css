@@ -1382,6 +1382,32 @@ kbd {
 }
 
 /* ── The catchword: the next leaf's first words, at the foot of this one ───────────────────────────────────── */
+.explicit {
+  /* The scribe's closing line, rubricated, between two strokes of the pen. */
+  margin: 3rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-family: var(--font-display);
+  font-variant-caps: all-small-caps;
+  font-size: 1.05rem;
+  letter-spacing: 0.22em;
+  color: var(--sanguine);
+}
+.explicit::before,
+.explicit::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to var(--to, right), transparent, var(--sanguine) 70%);
+  opacity: 0.6;
+}
+.explicit::after {
+  --to: left;
+}
+.explicit + .catchword {
+  margin-top: 1.2rem;
+}
 .catchword {
   margin: 2.2rem 0 0;
   text-align: right;
