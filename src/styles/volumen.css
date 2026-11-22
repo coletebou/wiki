@@ -316,7 +316,6 @@
   align-self: end;
   width: clamp(3.4rem, 2.6rem + 3vw, 4.8rem);
   margin-bottom: -0.1rem;
-  overflow: visible;
   color: var(--ink-2);
 }
 .pinax-head .numeral {

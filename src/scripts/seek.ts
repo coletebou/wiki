@@ -24,16 +24,18 @@ function load(): Promise<Pagefind | null> {
   return pagefind;
 }
 
-// The tables' devices, drawn once at build time; fetched on the first search and set beside each result's folio.
+// Where each table's device is drawn; fetched on the first search and set beside each result's folio.
 let devices: Promise<Record<string, string>> | null = null;
 const loadDevices = () => (devices ??= fetch('/devices.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
 
-function device(markup: string | undefined): SVGSVGElement | null {
-  if (!markup) return null;
-  const holder = document.createElement('span');
-  // The drawings are the site's own build output, never anything a reader typed.
-  holder.innerHTML = `<svg class="device" viewBox="-56 -56 112 112" aria-hidden="true" focusable="false"><g class="emblem">${markup}</g></svg>`;
-  return holder.querySelector('svg');
+function device(src: string | undefined): HTMLSpanElement | null {
+  // Only the site's own drawings, never anything a reader typed: /devices.json gives a path on this site.
+  if (!src || !/^\/[^/]/.test(src)) return null;
+  const mark = document.createElement('span');
+  mark.className = 'device';
+  mark.setAttribute('aria-hidden', 'true');
+  mark.style.setProperty('--m', `url("${src}")`);
+  return mark;
 }
 
 /**

@@ -137,5 +137,24 @@ const path = (p) => new URL(p.url()).pathname;
   await p.context().close();
 }
 
+// The tables' devices: traced drawings set as masks, the broad-nibbed cut wherever they are small and the pen's own line
+// at the head of a table, and the same small cut beside a search's results.
+{
+  const p = await open();
+  const mask = (sel) => p.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const c = getComputedStyle(e); const r = e.getBoundingClientRect(); return { url: (c.maskImage || c.webkitMaskImage || '').match(/url\("?([^")]+)/)?.[1] ?? '', w: Math.round(r.width), h: Math.round(r.height), hidden: e.getAttribute('aria-hidden') }; }, sel);
+  await p.goto(`${base}/pinakes/`, { waitUntil: 'networkidle' });
+  const head = await mask('#table-shell .pinax-head .device');
+  await p.goto(`${base}/tmux/`, { waitUntil: 'networkidle' });
+  const kicker = await mask('.kicker .device');
+  const loads = async (u) => u && (await p.evaluate(async (x) => { const r = await fetch(x); return r.ok && /svg/.test(r.headers.get('content-type') ?? ''); }, u));
+  ok('a folio\'s device is drawn, small, from the broad-nibbed cut, and hidden', kicker?.w >= 14 && kicker.w === kicker.h && kicker.hidden === 'true' && (await loads(kicker.url)) && head?.w > kicker.w && head.url !== kicker.url && (await loads(head.url)), JSON.stringify({ head, kicker }));
+  await p.keyboard.press('/');
+  await p.keyboard.type('tmux');
+  const shown = await p.waitForFunction(() => document.querySelector('#seek-results .r-meta .device'), null, { timeout: 8000 }).then(() => true, () => false);
+  const result = shown ? await mask('#seek-results .r-meta .device') : null;
+  ok('a search sets each result\'s device beside it, from the same small cut', Boolean(result) && result.w >= 12 && result.hidden === 'true' && (await loads(result.url)) && /\/_astro\//.test(result.url), JSON.stringify(result));
+  await p.context().close();
+}
+
 console.log('page errors:', errs);
 await b.close();

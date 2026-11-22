@@ -1,20 +1,16 @@
 ---
-// A table's device (src/data/devices.ts), drawn in ink. Ornament: the table's name stands beside it wherever it is
-// used, so it is hidden from assistive technology.
+// A table's device (src/data/devices.ts), in ink: the traced drawing is a mask the ink colour shows through, so it
+// follows the theme. Ornament: the table's name stands beside it wherever it is used, so it is hidden from assistive
+// technology.
 import { DEVICES } from '../data/devices';
-import { emblem } from '../diagrams/emblems';
 
 interface Props {
   /** The table's id. */
   table: string;
-  /** Keeps the drawing's own ids unique where one page shows several. */
-  uid?: string;
+  /** At the head of a table in the catalogue: the pen's own line. Elsewhere it is small, cut with a broader nib. */
+  large?: boolean;
 }
-const { table, uid = table } = Astro.props;
+const { table, large = false } = Astro.props;
 const device = DEVICES[table];
 ---
-{device && (
-  <svg class="device" viewBox="-56 -56 112 112" aria-hidden="true" focusable="false">
-    <g class="emblem" set:html={emblem({ name: device.emblem, x: 0, y: 0, size: 100 }, `device-${uid}`)} />
-  </svg>
-)}
+{device && <span class="device" style={`--m: url("${large ? device.src : device.small}")`} aria-hidden="true"></span>}
