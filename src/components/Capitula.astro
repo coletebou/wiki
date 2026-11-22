@@ -25,3 +25,33 @@ const list = headings.filter((h) => h.depth === 2 || h.depth === 3);
     </ol>
   </details>
 )}
+{variant === 'inline' && (
+  <>
+    {/* Where the contents are inline (a narrow screen), a long folio leaves them far behind: once they are scrolled
+        past, a mark in the corner brings them back, with the head of the leaf and the library's other rooms. */}
+    <button type="button" class="capitula-mark" data-capitula-open aria-haspopup="dialog" hidden>
+      <span aria-hidden="true">¶</span><span class="visually-hidden">Contents and the library</span>
+    </button>
+    <dialog class="capitula-sheet" aria-label="Contents and the library">
+      <form method="dialog" class="capitula-close"><button aria-label="Close">×</button></form>
+      <a class="capitula-top" href="#text" data-capitula-go>The head of the leaf</a>
+      {list.length > 0 && (
+        <>
+          <h2>Capitula</h2>
+          <ol>
+            {list.map((h) => (
+              <li class={`depth-${h.depth}`}><a href={`#${h.id}`} data-capitula-go>{h.text}</a></li>
+            ))}
+          </ol>
+        </>
+      )}
+      <h2>The library</h2>
+      <p class="capitula-rooms">
+        <a href="/pinakes/">Pinakes</a> · <a href="/planisphere/">Planisphere</a> · <a href="/how-to-be-a-beast/">Start here</a> · <a href="/wiki-mcp/">For agents</a> · <a href="/about-this-wiki/">About</a>
+      </p>
+    </dialog>
+  </>
+)}
+<script>
+  import '../scripts/capitula-sheet';
+</script>

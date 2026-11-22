@@ -191,5 +191,26 @@ const path = (p) => new URL(p.url()).pathname;
   await p.context().close();
 }
 
+// On a phone a long folio keeps its contents in reach: a mark in the corner once they are scrolled past, opening
+// a sheet whose links go there and close it. On a wide screen the contents stand in the margin and there is no mark.
+{
+  const p = await open({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await p.goto(`${base}/tmux/`, { waitUntil: 'networkidle' });
+  const atTop = await p.locator('.capitula-mark').isVisible();
+  await p.evaluate(() => scrollTo(0, 5000));
+  const shown = await p.locator('.capitula-mark').waitFor({ state: 'visible', timeout: 3000 }).then(() => true, () => false);
+  if (shown) await p.locator('.capitula-mark').tap();
+  const opened = await p.waitForFunction(() => document.querySelector('.capitula-sheet')?.open, null, { timeout: 3000 }).then(() => true, () => false);
+  if (opened) await p.locator('.capitula-sheet a[href="#plugins"]').tap();
+  const gone = await p.waitForFunction(() => !document.querySelector('.capitula-sheet').open && location.hash === '#plugins', null, { timeout: 3000 }).then(() => true, () => false);
+  ok('a phone reader past the contents gets them back from the corner, and a capitulum takes them there', !atTop && shown && opened && gone, JSON.stringify({ atTop, shown, opened, gone }));
+  await p.context().close();
+  const d = await open();
+  await d.goto(`${base}/tmux/`, { waitUntil: 'networkidle' });
+  await d.evaluate(() => scrollTo(0, 5000));
+  ok('a wide screen keeps its contents in the margin and shows no mark', !(await d.locator('.capitula-mark').isVisible()));
+  await d.context().close();
+}
+
 console.log('page errors:', errs);
 await b.close();
