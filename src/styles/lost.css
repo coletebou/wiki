@@ -67,6 +67,34 @@
   min-height: calc(var(--bh) + 9rem);
   padding-bottom: calc(var(--bh) * 0.94);
 }
+.lost-sketch {
+  /* A scroll that caught fire, the machine drawn on it half saved (scripts/gen-emblems.sh says how it was drawn): in the part of
+     the leaf the fire did not reach, where the leaf is wide enough to hold it clear of the words. */
+  display: none;
+}
+@media (min-width: 64rem) {
+  .lost .folio {
+    position: relative;
+  }
+  .lost-sketch {
+    display: block;
+    position: absolute;
+    top: 1.2rem;
+    right: 4%;
+    width: min(22rem, 30%);
+    aspect-ratio: 1;
+    background: var(--ink-2);
+    opacity: 0.72;
+    pointer-events: none;
+    -webkit-mask: var(--m) center / contain no-repeat;
+    mask: var(--m) center / contain no-repeat;
+  }
+}
+@media (forced-colors: active) {
+  .lost-sketch {
+    display: none !important;
+  }
+}
 .lost-text {
   grid-column: 1 / -1;
   max-width: 35rem;
@@ -74,6 +102,26 @@
 }
 .lost-text .seek-large {
   margin: 1.4rem 0 0;
+}
+.lost-near {
+  /* The folios nearest the address asked for (src/scripts/lost.ts), when any are near. */
+  margin: 1.6rem 0 0;
+}
+.lost-near .kicker {
+  margin: 0 0 0.35rem;
+}
+.lost-near ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 1.15rem;
+}
+.lost-near .near-folio {
+  font-style: italic;
+  font-size: 0.85em;
+  color: var(--ink-3);
 }
 .lost-ways {
   /* One under another, so that none of them runs out toward the scorched part of the leaf. */

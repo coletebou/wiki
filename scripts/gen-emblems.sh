@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Seven of the studies' emblems (src/assets/emblems/): each drawn by an image model in the manner of Leonardo's pen,
+# Seven of the studies' emblems (src/assets/emblems/), and the lost scroll's sketch: each drawn by an image model in the manner of Leonardo's pen,
 # then traced into vector ink with scripts/trace-leonardo.mjs. The other three (rotae, vortex, porta) are his own
 # sketches, traced from his notebooks; trace-leonardo.mjs lists their sheets. Not part of the build: the traced files
 # are committed, and this is how they were made.
@@ -31,3 +31,13 @@ nodus|40|18|An interlaced knot of a single cord, looping over and under itself i
 scutum|40|18|A Roman shield, oval, with a raised central boss, banded with metal and riveted.
 via|40|18|A Roman road running straight into the distance between two edges, paved with stones, a milestone standing beside it.
 EMBLEMS
+
+# The lost scroll's sketch (src/assets/lost/scroll.svg, the 404 page), the same way, larger and with fainter ink kept
+# so the smoke survives. The model drew the flying machine on the scroll unasked; it stayed.
+jq -n --arg p "A papyrus scroll half unrolled, its far end burnt away to a ragged charred edge, a thin curl of smoke rising from it. ${MANNER/One object/One subject}" \
+  '{model:"gpt-image-2",prompt:$p,size:"1024x1024",background:"opaque",quality:"high"}' |
+  curl -sS https://api.openai.com/v1/images/generations -H "Authorization: Bearer $OPENAI_API_KEY" \
+    -H 'Content-Type: application/json' --data-binary @- |
+  jq -r '.data[0].b64_json' | base64 -d > "$out/lost.png"
+node "$here/trace-leonardo.mjs" "$out/lost.png" "$out/scroll.svg" --crop=0,0,1024,1024 --size=520 \
+  --thresh=20 --lo=8 --blur=12 --area=20 --long=10
