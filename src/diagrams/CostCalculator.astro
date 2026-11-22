@@ -215,10 +215,18 @@ const short = (id: string, none = 'None') => (id === 'none' ? none : all[id].lab
     font-size: 0.98rem;
   }
   .calc-totals {
+    /* The sums ride along at the head of the screen while the lines are worked down, so a change far below the
+       totals still shows what it does; they let go at the end of the calculator. */
+    position: sticky;
+    top: 0;
+    z-index: 3;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.5rem;
-    margin: 0 0 1rem;
+    margin: 0 -0.4rem 1rem;
+    padding: 0.4rem;
+    background: var(--paper);
+    box-shadow: 0 10px 12px -12px rgb(40 20 5 / 0.45);
   }
   .calc-libra {
     width: min(100%, 17rem);
@@ -429,6 +437,16 @@ const short = (id: string, none = 'None') => (id === 'none' ? none : all[id].lab
     }
     .calc-totals .t-value {
       font-size: 1.2rem;
+    }
+    .calc-totals {
+      gap: 0.3rem;
+    }
+    .calc-totals > div {
+      padding: 0.3rem 0.4rem 0.35rem;
+    }
+    .calc-totals .t-label {
+      font-size: 0.62rem;
+      letter-spacing: 0.12em;
     }
   }
 </style>
