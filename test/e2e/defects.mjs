@@ -175,5 +175,21 @@ const path = (p) => new URL(p.url()).pathname;
   await p.context().close();
 }
 
+// The lost scroll offers the folios nearest a mistyped address, and nothing when nothing is near.
+{
+  const p = await open();
+  const near = async (path) => {
+    await p.goto(`${base}${path}`, { waitUntil: 'networkidle' });
+    await p.waitForFunction(() => !document.querySelector('[data-near]')?.hidden || document.readyState === 'complete', null, { timeout: 5000 }).catch(() => {});
+    await p.waitForTimeout(300);
+    return p.evaluate(() => { const b = document.querySelector('[data-near]'); return { hidden: b?.hidden ?? null, first: b?.querySelector('a')?.getAttribute('href') ?? null, n: b?.querySelectorAll('a').length ?? 0 }; });
+  };
+  const typo = await near('/tmux-kemap/');
+  ok('a mistyped address is offered its folio first', typo.hidden === false && typo.first === '/tmux-keymap/' && typo.n <= 3, JSON.stringify(typo));
+  const none = await near('/xyzzy-plugh/');
+  ok('an address near nothing is offered nothing', none.hidden === true && none.n === 0, JSON.stringify(none));
+  await p.context().close();
+}
+
 console.log('page errors:', errs);
 await b.close();

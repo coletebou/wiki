@@ -1,6 +1,7 @@
 ---
 import Leaf from '../components/Leaf.astro';
 import Base from '../layouts/Base.astro';
+import scroll from '../assets/lost/scroll.svg?url';
 import 'virtual:burn.css';
 import '../styles/lost.css';
 ---
@@ -9,6 +10,7 @@ import '../styles/lost.css';
   <Leaf leaf="lost">
     <div class="running-head"><span>Codex Tebou</span><span class="folio-no">f. —</span></div>
     <div class="folio">
+      <span class="lost-sketch" style={`--m: url("${scroll}")`} aria-hidden="true"></span>
       <div class="lost-text">
         <p class="kicker">Not in the catalogue</p>
         <h1 class="title">A lost scroll</h1>
@@ -17,6 +19,10 @@ import '../styles/lost.css';
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" /><path d="m15 15 5.5 5.5" /></svg>
           Seek it in the library <kbd>/</kbd>
         </button>
+        <div class="lost-near" data-near hidden>
+          <p class="kicker">Perhaps you sought</p>
+          <ul></ul>
+        </div>
         <ul class="lost-ways">
           <li><a href="/pinakes/">Browse the Pinakes</a></li>
           <li><a href="/">Return to the frontispiece</a></li>
@@ -29,3 +35,6 @@ import '../styles/lost.css';
   </Leaf>
   </div>
 </Base>
+<script>
+  import '../scripts/lost';
+</script>
